@@ -1826,6 +1826,9 @@
         glMap.jumpTo({ center: [c.lng, c.lat], zoom: m.getZoom() - 1 });
       };
       var glMap = gl.getMaplibreMap();
+      glMap.on('move', function () { glMoved = true; });   // v89: see camStep
+      // (v90 tried drawing the vector map inside Leaflet's frame on every re-centre: 0.4 px instead of ~2 px off the
+      // vehicles, but a quarter fewer frames per second while following — not kept; see the documentation, §5.11)
       // v86: no label fade while the map is dragged. The 120 ms fade made MapLibre redraw the whole map on
       // every frame of a drag (~75 redraws/s, measured) instead of only when it moved (the plugin syncs
       // every 32 ms): ~220 → ~60 redraws over the same test drags. Labels appearing at the edge during a
@@ -2414,8 +2417,18 @@
   function isParked(d) { var v = vehicles[d.key]; return !!(v && v.parked); }
   function isSel(d) { return !!(selected && selected.d.key === d.key); }
   // The tracked vehicle is drawn bigger (label 1.6×, dot larger) and on top of the others
+  // v90: the tracked vehicle is placed at its exact (fractional) position. Leaflet rounds markers to whole
+  // pixels, so while the follow camera held the vehicle's exact point still, its drawn icon crept and then
+  // jumped 1 px (3.5 device px on a phone) every few frames. Only this vehicle: rounding keeps the rest crisp.
+  function exactProject() { this._point = this._map.project(this._latlng)._subtract(this._map.getPixelOrigin()); this._updateBounds(); }
+  function exactUpdate() {
+    if (this._icon && this._map) this._setPos(this._map.project(this._latlng)._subtract(this._map.getPixelOrigin()));
+    return this;
+  }
   function markVehicle(v, on) {
     if (!v) return;
+    if (on) { v.dot._project = exactProject; if (v.pill) v.pill.update = exactUpdate; }
+    else { delete v.dot._project; if (v.pill) delete v.pill.update; }
     cancelAnimationFrame(v.dot._tween);   // a hover animation must not undo this
     v.dot.setRadius(v.dot._hovered ? (on ? 12 : 9) : (on ? 9 : 5));
     v.dot.setStyle({ weight: on ? 3 : 1.5 });
@@ -2590,6 +2603,31 @@
   // back into its vehicle in 0.3 s instead of Leaflet's fade-out. Leaflet's onRemove still runs (events,
   // 'popupclose'); only the removal of the element waits for the animation.
   var SHRINK_MS = 300, reduceMotion = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  // v90: with the system's "reduce motion" setting, camera moves jump instead of flying or gliding (WCAG 2.3.3;
+  // MapLibre does this by itself, Leaflet doesn't). Covers every flight, pan and coast after a drag.
+  if (reduceMotion) {
+    map.flyTo = function (c, z) { return this.setView(c, z, { animate: false }); };
+    map.flyToBounds = function (b, o) { return this.fitBounds(b, L.extend({}, o, { animate: false })); };
+    var plainPanBy = map.panBy;
+    map.panBy = function (off, o) { return plainPanBy.call(this, off, L.extend({}, o, { animate: false })); };
+  }
+  // v90: how long a flight takes, from how far it goes: Leaflet's own natural length (0.8 s per "screenful" of
+  // its zoom-out-and-in path, van Wijk & Nuij), kept to 0.5–1.0 s. Before, every flight took a fixed 0.6–0.8 s:
+  // fine for short hops, a lurch for long ones.
+  function flyDur(center, zoom) {
+    var z0 = map.getZoom(), size = map.getSize(), w0 = Math.max(size.x, size.y), w1 = w0 * map.getZoomScale(z0, zoom);
+    var u1 = map.project(L.latLng(center), z0).distanceTo(map.project(map.getCenter(), z0));
+    var rho = 1.42, rho2 = rho * rho, S;
+    if (u1 < 1) S = Math.abs(Math.log(w1 / w0)) / rho;
+    else {
+      var r = function (i) {
+        var b = (w1 * w1 - w0 * w0 + (i ? -1 : 1) * rho2 * rho2 * u1 * u1) / (2 * (i ? w1 : w0) * rho2 * u1), sq = Math.sqrt(b * b + 1) - b;
+        return sq < 1e-9 ? -18 : Math.log(sq);
+      };
+      S = (r(1) - r(0)) / rho;
+    }
+    return isFinite(S) ? Math.max(0.5, Math.min(1.0, 0.8 * S)) : 0.6;
+  }
   function shrinkOnClose(popup) {
     var onRemove = popup.onRemove;
     popup.onRemove = function (map) {
@@ -3345,10 +3383,10 @@
       drawPath(v);
       timings.route = Math.round(performance.now() - tTap) + ' ms';
       refreshPopup(v);
-      renderDiag();
-      // 2) …then, once it's on screen, the stop timetable and the road snapping
-      setTimeout(function () {
+      // 2) …then, once it's on screen and the camera has landed, the stop timetable and the road snapping
+      afterCamera(function () {
         if (selected !== v) return;
+        renderDiag();
         var info = trips[v.d.tripRef];
         if (info && info.shape_id && shapes && shapes[info.shape_id]) {
           snapShape(info.shape_id).then(function () { if (selected === v) { planMotion(v, false); drawPath(v); drawRouteStops(); } });
@@ -3361,8 +3399,21 @@
             if (selected === v) drawRouteStops();
           });
         }
-      }, 30);
+      });
     });
+  }
+  // v89: runs fn once the camera isn't flying or gliding (30 ms at the earliest, at most 2 s later)
+  var camMoving = false;
+  map.on('movestart', function () { camMoving = true; });
+  map.on('moveend', function () { camMoving = false; });
+  function afterCamera(fn) {
+    var done = false;
+    function go() { if (!done) { done = true; setTimeout(fn, 60); } }
+    setTimeout(function () {
+      if (!camMoving) { done = true; fn(); return; }
+      map.once('moveend', go);
+      setTimeout(go, 2000);
+    }, 30);
   }
   // Tapping a vehicle starts tracking it. Closing its popup (X) only hides the popup;
   // tracking stops via the Stop button, a tap on empty map, or tapping another vehicle.
@@ -3390,7 +3441,7 @@
       }
     }
     map.once('moveend', function () { setTimeout(fitPopup, 0); });
-    if (tz !== z) map.flyTo(center, tz, { duration: 0.6 });
+    if (tz !== z) map.flyTo(center, tz, { duration: flyDur(center, tz) });
     else map.panTo(center, { animate: true, duration: 0.45 });
   }
 
@@ -4020,7 +4071,9 @@
     var panel = document.getElementById('panel'), root = document.documentElement;
     panel.classList.add('fold-instant');
     root.classList.add('boot');   // v79: also the submenus' saved states (set later in this script)
-    setFolded(store('sofia_menu') === '0');
+    // v89: phones start folded (only the search row) until the menu is opened; PCs start open as before
+    var savedMenu = store('sofia_menu');
+    setFolded(savedMenu ? savedMenu === '0' : isPhone());
     requestAnimationFrame(function () { requestAnimationFrame(function () {
       panel.classList.remove('fold-instant'); root.classList.remove('boot');
     }); });
@@ -4439,8 +4492,8 @@
     while (z > 10 && (box.max.x - box.min.x > x1 - x0 || box.max.y - box.min.y > y1 - y0)) box = boxAt(--z);
     // put the middle of everything in the middle of the free area
     var c = box.min.add(box.max).divideBy(2);
-    var center = c.subtract(L.point((x0 + x1) / 2, (y0 + y1) / 2)).add(size.divideBy(2));
-    map.flyTo(map.unproject(center, z), z, { duration: 0.6 });
+    var center = map.unproject(c.subtract(L.point((x0 + x1) / 2, (y0 + y1) / 2)).add(size.divideBy(2)), z);
+    map.flyTo(center, z, { duration: flyDur(center, z) });
   }
 
   // The tracked vehicle is already centred on tap: just bring it back into view
@@ -4494,6 +4547,7 @@
     if (on) setLocFollow(false);   // one camera at a time: following a vehicle ends following you
     map.options.touchZoom = on ? 'center' : true;   // a pinch keeps the middle in place while following
     lookFor = null; lookAt = 0;   // the look-ahead lean starts again from the centre
+    followCam.off = null;
     document.getElementById('follow').classList.toggle('on', on);
     refreshVehPopup(selected);   // the popup's Follow button shows the same state
     if (!on) {
@@ -4527,15 +4581,36 @@
     mk.closePopup();   // shrinks back into the vehicle (shrinkOnClose)
     setTimeout(done, reduceMotion ? 0 : SHRINK_MS);
   }
+  // v90: it lands where the vehicle will be when the flight ends, with the look-ahead lean already applied,
+  // so the follow camera carries on without a second move (before: it aimed at where the vehicle was at
+  // take-off, without the lean, then glided to the vehicle and eased the lean in over ~1.2 s).
   function flyInToFollow(v) {
-    var size = map.getSize(), top = freeTop(), z = FOLLOW_STOP_ZOOM;
-    var target = L.point(size.x / 2, top + (size.y - top) / 2);   // middle of the free map area
-    var center = map.project(v.pos, z).subtract(target.subtract(size.divideBy(2)));
-    map.flyTo(map.unproject(center, z), z, { duration: 0.8 });
+    var size = map.getSize(), top = freeTop(), bottom = freeBottom(), z = FOLLOW_STOP_ZOOM;
+    var lean = lookAhead(v, size.x, bottom - top);   // screen px, the same at any zoom
+    lookFor = v; lookOff = lean; lookAt = 0;
+    var dur = flyDur(v.pos, z);
+    var at = posAt(v, Date.now() + dur * 1000) || v.pos;
+    var target = L.point(size.x / 2, top + (bottom - top) / 2).subtract(lean);
+    var center = map.unproject(map.project(at, z).subtract(target.subtract(size.divideBy(2))), z);
+    map.flyTo(center, z, { duration: dur });
   }
   var FOLLOW_STOP_ZOOM = 15, followHold = false;
   document.getElementById('follow').onclick = function () { setFollow(!following); };
-  map.on('dragstart', function () { if (following) setFollow(false); });  // dragging the map takes over
+  // v90: dragging the map takes over from a following camera (vehicle Follow, your location) once the finger
+  // has moved it DRAG_TAKEOVER_PX — a tap that wobbles a few pixels no longer ends Follow. Below that the
+  // camera only pauses, and glides back when the finger lifts (no coasting).
+  var DRAG_TAKEOVER_PX = 25, dragFrom = null;
+  map.on('dragstart', function () { dragFrom = map._getMapPanePos(); });
+  map.on('drag', function () {
+    if (!dragFrom || map._getMapPanePos().distanceTo(dragFrom) < DRAG_TAKEOVER_PX) return;
+    dragFrom = null;
+    if (following) setFollow(false);
+    setLocFollow(false);
+  });
+  map.on('dragend', function () {
+    if (dragFrom && (following || (loc && loc.follow))) setTimeout(function () { map.stop(); }, 0);
+    dragFrom = null;
+  });
 
   // While following, zooming (mouse wheel, double-click, the +/- buttons) happens around the followed
   // vehicle, not around the mouse or the middle of the map: the vehicle stays exactly where it is on
@@ -4700,7 +4775,7 @@
     clearTimeout(loc.waitTimer); clearInterval(loc.tick);
     if (loc.marker) { map.removeLayer(loc.marker); loc.marker = null; }
     if (loc.acc) { map.removeLayer(loc.acc); loc.acc = null; }
-    loc.state = 'off'; loc.follow = false; loc.fix = null; loc.heading = null; loc.headingSrc = ''; loc.drawnFixT = 0;
+    loc.state = 'off'; loc.follow = false; loc.fix = null; loc.show = null; loc.hist = null; loc.camHold = false; loc.heading = null; loc.headingSrc = ''; loc.drawnFixT = 0;
     updLocUI();
     drawDestLine();
   }
@@ -4710,17 +4785,32 @@
     toast(msg, 7000);
     updLocUI();
   }
+  // v89: the dot moves from where it is shown to each new reading over about the time between readings
+  // (0.3–1.5 s), so it moves steadily instead of jumping once a second. Readings further than ME_SNAP_M
+  // (a first rough fix, after a tunnel) are jumped to.
+  var ME_SNAP_M = 150;
+  function meShown() { return loc.show ? loc.show.ll : loc.fix ? loc.fix.ll : null; }
+  function glideMe(ll) {
+    var now = performance.now(), sh = loc.show;
+    if (!sh || reduceMotion || sh.ll.distanceTo(ll) > ME_SNAP_M) { loc.show = { ll: ll, from: ll, to: ll, t0: now, dur: 0, fixAt: now }; return; }
+    var dur = Math.max(300, Math.min(1500, now - sh.fixAt));
+    loc.show = { ll: sh.ll, from: sh.ll, to: ll, t0: now, dur: dur, fixAt: now };
+  }
   function onFix(p) {
     var c = p.coords;
     loc.fix = { ll: L.latLng(c.latitude, c.longitude), acc: c.accuracy || 0, t: Date.now(), speed: c.speed, heading: c.heading };
     loc.state = 'on'; loc.err = '';
+    glideMe(loc.fix.ll);
+    var hist = loc.hist || (loc.hist = []);   // v90: for meSpeed
+    hist.push({ ll: loc.fix.ll, t: loc.fix.t });
+    while (hist.length > 2 && loc.fix.t - hist[0].t > 6000) hist.shift();
     clearTimeout(loc.waitTimer);
     // no compass: the direction of travel while moving
     if (typeof c.heading === 'number' && !isNaN(c.heading) && (c.speed || 0) >= GPS_HEADING_SPEED &&
         Date.now() - loc.compassAt > COMPASS_LIVE_MS) setHeading(c.heading, 'gps', 1);
     drawMe();
     if (loc.first) { loc.first = false; if (loc.follow) centreOnMe(true); }
-    else if (loc.follow) centreOnMe(false);
+    // (later readings: locFrame keeps the camera on the gliding dot)
     updLocUI();
   }
   // v84: "permission denied" (code 1) has more than one cause, and the advice has to fit the real one.
@@ -4770,13 +4860,17 @@
     var size = map.getSize(), top = freeTop(), bottom = freeBottom(), z0 = map.getZoom();
     var z = fly ? Math.max(z0, LOC_ZOOM) : z0;
     var off = L.point(0, (top + bottom) / 2 - size.y / 2);
-    var center = map.unproject(map.project(loc.fix.ll, z).subtract(off), z);
+    var center = map.unproject(map.project(meShown(), z).subtract(off), z);
     if (!fly && map.latLngToContainerPoint(center).distanceTo(size.divideBy(2)) < 2) return;   // already there
-    if (reduceMotion) map.setView(center, z, { animate: false });
-    else if (z !== z0) map.flyTo(center, z, { duration: 0.8 });
+    if (reduceMotion) { map.setView(center, z, { animate: false }); return; }
+    loc.camHold = true;   // v89: locFrame waits until the flight has landed
+    clearTimeout(loc.holdTimer);
+    loc.holdTimer = setTimeout(function () { loc.camHold = false; }, 1500);
+    map.once('moveend', function () { loc.camHold = false; });
+    if (z !== z0) map.flyTo(center, z, { duration: flyDur(center, z) });
     else map.panTo(center, { animate: true, duration: fly ? 0.5 : 0.8, easeLinearity: 0.5 });
   }
-  map.on('dragstart', function () { setLocFollow(false); });   // dragging the map takes over (the dot stays)
+  // (dragging the map takes over: see DRAG_TAKEOVER_PX; the dot stays)
 
   // ---- Compass: which way the phone faces ----
   function screenAngle() {
@@ -4852,7 +4946,7 @@
   }
   function drawMe() {
     if (!loc.fix || loc.state === 'off' || loc.state === 'err') return;
-    var now = Date.now(), ll = loc.fix.ll, stale = now - loc.fix.t > LOC_STALE_MS;
+    var now = Date.now(), ll = meShown(), stale = now - loc.fix.t > LOC_STALE_MS;
     if (!loc.acc) {
       loc.acc = L.circle(ll, { radius: loc.fix.acc, pane: 'meAccPane', renderer: meSvg, interactive: false,
         color: '#1A73E8', weight: 1, opacity: 0.35, fillColor: '#1A73E8', fillOpacity: 0.12 }).addTo(map);
@@ -5399,6 +5493,7 @@
     }
     if (batch || full) onScreenCount = count;
     followFrame();
+    locFrame();
     if (selected) syncPath(selected);
     if (selected && now - lastPassCheck > 300) { lastPassCheck = now; checkPassedStops(); }
   }
@@ -5433,34 +5528,105 @@
     return len > lead ? vec.multiplyBy(lead / len) : vec;
   }
 
-  var followEndAt = 0;
+  var followEndAt = 0, glMoved = false, camPanned = 0;
+  var MOVEEND_SHARE = 0.05, MOVEEND_MAX_MS = 2000;   // v90: see camStep
+  // One camera step of a following camera (vehicle Follow, your location): the map slides by fractions of a
+  // pixel. v89: the vector map is drawn right away only when the plugin actually re-centred it in this step
+  // (about every other frame); in between, its canvas just slides along with the map, nothing to redraw.
+  // Before, it was redrawn every frame (~2× the drawing for the same picture).
+  // v90: the "offset decay" lock (feed-forward, from the research report): each frame the camera moves by
+  // exactly the subject's own motion, and only the gap left over from a start, a switch, a zoom, a drag or a
+  // flight (st.off) shrinks, by exp(−dt/τ) — the same feel at 30, 60 or 120 frames a second. No lag behind
+  // a moving subject and nothing to snap at the end. Before: 12 % of the gap per frame (τ 130 ms at 60 Hz,
+  // 65 ms at 120 Hz, 261 ms at 30 Hz), then a jump of up to 3 px once within 3 px.
+  var FOLLOW_TAU = 130;   // ms
+  var followCam = { off: null }, locCam = { off: null, at: 0, rest: false };
+  function lockCam(st, icon, target, dt, tau) {
+    var gap = icon.subtract(target);
+    if (!st.off || reduceMotion) st.off = reduceMotion ? L.point(0, 0) : gap;
+    st.off = st.off.multiplyBy(Math.exp(-dt / tau));
+    if (Math.abs(st.off.x) < 0.005 && Math.abs(st.off.y) < 0.005) st.off = L.point(0, 0);
+    var step = gap.subtract(st.off);
+    if (Math.abs(step.x) < 0.005 && Math.abs(step.y) < 0.005) return;
+    camStep(step);
+  }
+  map.on('zoomend', function () { followCam.off = null; locCam.off = null; });
+  function camStep(step) {
+    map._rawPanBy(step);
+    map.fire('move');
+    // 'moveend' re-centres the drawing layers (the canvas is reallocated and every route and dot redrawn) and
+    // refreshes labels and stops in view. v90: once the map has slid 5 % of the screen (the canvas has 10 %
+    // to spare on each side), or every 2 s while it moves — before, every 0.5 s even when it had moved 1 px.
+    camPanned += Math.abs(step.x) + Math.abs(step.y);
+    var now = Date.now(), size = map.getSize();
+    if (camPanned >= MOVEEND_SHARE * Math.min(size.x, size.y) || now - followEndAt > MOVEEND_MAX_MS) {
+      followEndAt = now; camPanned = 0; map.fire('moveend');
+    }
+    // after both: either can re-centre the vector map, and it must be drawn in this same frame
+    if (glMoved && glLayer && glLayer._glMap) {
+      glMoved = false;
+      try { glLayer._glMap.redraw(); } catch (e) {}
+    }
+  }
   // Leaflet's latLngToLayerPoint rounds to whole pixels; the follow camera needs the exact position
   function exactLayerPoint(ll) { return map.project(ll).subtract(map.getPixelOrigin()); }
   function followFrame() {
     if (!following || followHold || !selected || !selected.pos || zooming || map._animatingZoom ||
-        (map.dragging && map.dragging.moving())) return;
+        (map.dragging && map.dragging.moving())) { followCam.off = null; return; }
     var size = map.getSize(), top = freeTop(), bottom = freeBottom();   // phones: between the panel and the sheet
     // ease the lean towards the look-ahead direction (starts centred for a newly followed vehicle)
     var t = performance.now(), dt = lookAt ? Math.min(100, t - lookAt) : 16;
     lookAt = t;
-    if (lookFor !== selected) { lookFor = selected; lookOff = L.point(0, 0); }
+    if (lookFor !== selected) { lookFor = selected; lookOff = L.point(0, 0); followCam.off = null; }
     lookOff = lookOff.add(lookAhead(selected, size.x, bottom - top).subtract(lookOff).multiplyBy(1 - Math.exp(-dt / LOOK_EASE_MS)));
     var centre = L.point(size.x / 2, top + (bottom - top) / 2);   // middle of the free map area
     var target = centre.subtract(lookOff);                        // the vehicle sits behind it, the road ahead in view
     // The map glides by fractions of a pixel (moving it only in whole pixels made the whole map, and every
     // icon on it, tick 1 px about 10 times a second at street zoom). The vehicle lands exactly on target.
     var icon = exactLayerPoint(selected.pos).add(map._getMapPanePos());   // where the vehicle is on screen
-    var d = icon.subtract(target);
-    if (Math.abs(d.x) < 0.01 && Math.abs(d.y) < 0.01) return;
-    var step = (Math.abs(d.x) <= 3 && Math.abs(d.y) <= 3) ? d : d.multiplyBy(0.12);   // locked / gliding in
-    map._rawPanBy(step);
-    map.fire('move');
-    if (glLayer && glLayer._glMap) {
-      try { glLayer._glMap.redraw(); } catch (e) {}
+    lockCam(followCam, icon, target, dt, FOLLOW_TAU);
+  }
+
+  // v89: your location, kept in view the same way: every frame, the camera locks on to the dot as it glides
+  // between GPS readings (glideMe). Before, each reading (~1 per second) started a 0.8 s pan to it and the dot
+  // jumped: stop-and-go (the camera stood still in ~36 % of frames, measured) with a jump each second.
+  function locFrame() {
+    if ((loc.state !== 'on' && loc.state !== 'wait') || !loc.show || !loc.marker) return;
+    var sh = loc.show, now = performance.now();
+    if (sh.dur && sh.ll !== sh.to) {
+      var k = Math.min(1, (now - sh.t0) / sh.dur);
+      sh.ll = k >= 1 ? sh.to : L.latLng(sh.from.lat + (sh.to.lat - sh.from.lat) * k, sh.from.lng + (sh.to.lng - sh.from.lng) * k);
+      loc.marker.setLatLng(sh.ll);
+      if (loc.acc) loc.acc.setLatLng(sh.ll);
     }
-    // 'moveend' (re-centres the drawing layers, refreshes labels and stops in view) twice a second is plenty
-    var now = Date.now();
-    if (now - followEndAt > 500) { followEndAt = now; map.fire('moveend'); }
+    if (!loc.follow || following || loc.camHold || map._animatingZoom || (map.dragging && map.dragging.moving())) {
+      locCam.off = null; locCam.at = 0; return;
+    }
+    var dt = locCam.at ? Math.min(100, now - locCam.at) : 16;
+    locCam.at = now;
+    var size = map.getSize(), top = freeTop(), bottom = freeBottom();
+    var target = L.point(size.x / 2, top + (bottom - top) / 2);   // middle of the free map area
+    var icon = exactLayerPoint(sh.ll).add(map._getMapPanePos()), gap = icon.subtract(target);
+    // v90: moving (≥ 1 m/s): locked like a vehicle. Standing: GPS wanders a few metres, so the camera rests
+    // while the dot stays within ME_DEAD_PX of the middle, and only re-centres (gently) once it leaves.
+    if (meSpeed() >= 1) { locCam.rest = false; lockCam(locCam, icon, target, dt, ME_TAU); return; }
+    locCam.off = null;
+    var dist = Math.sqrt(gap.x * gap.x + gap.y * gap.y);
+    if (locCam.rest && dist <= ME_DEAD_PX) return;
+    locCam.rest = dist < 0.5;
+    if (!locCam.rest) camStep(gap.multiplyBy(1 - Math.exp(-dt / ME_RECENTRE_MS)));
+  }
+  var ME_TAU = 300, ME_DEAD_PX = 24, ME_RECENTRE_MS = 500;
+  // walking pace or faster? The phone's own speed when it gives one, else the last ~6 s of readings
+  // (only when they moved further than the reading's accuracy, so standing still with a wandering GPS is 0)
+  function meSpeed() {
+    var f = loc.fix;
+    if (!f) return 0;
+    if (typeof f.speed === 'number' && f.speed >= 0 && !isNaN(f.speed)) return f.speed;
+    var h = loc.hist;
+    if (!h || h.length < 2) return 0;
+    var a = h[0], b = h[h.length - 1], d = a.ll.distanceTo(b.ll), sec = (b.t - a.t) / 1000;
+    return sec > 0 && d > Math.max(10, f.acc || 0) ? d / sec : 0;
   }
 
   // ---------- Fetching ----------
