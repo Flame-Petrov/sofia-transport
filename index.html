@@ -230,19 +230,6 @@
     #pfSpark { display: none; }
   }
 
-  #err {
-    padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.4; color: var(--text);
-    background: rgba(255,107,107,.12); border: 1px solid rgba(255,107,107,.35);
-  }
-  #err[hidden] { display: none; }
-  #err input {
-    display: block; width: 100%; height: 36px; margin: 8px 0; padding: 0 10px; border-radius: 8px;
-    border: 1px solid var(--border); background: var(--surface); color: var(--text); font-family: inherit; font-size: 14px;
-  }
-  #err button {
-    height: 32px; padding: 0 12px; border: 0; border-radius: 8px; cursor: pointer;
-    background: var(--text); color: var(--bg); font-size: 13px; font-weight: 600;
-  }
 
   /* line-number markers (only used when zoomed in or when a search narrows things down) */
   /* Enlarged labels and stops (selected 1.6×, hovered 1.3×) are really drawn bigger — font, padding,
@@ -629,6 +616,37 @@
   #secBar #secOpen { background: #1A73E8; color: #fff; }
   #secBar #secClose { width: 36px; padding: 0; font-size: 18px; line-height: 1; }
   #placeCancel { height: 36px; padding: 0 14px; border: 0; border-radius: 10px; background: #2A2A2D; color: #F2F2F2; font: 600 13px Inter, system-ui, sans-serif; cursor: pointer; }
+  /* v91: live feed lost (device asleep / offline for a while): a popup over everything, the map darkened */
+  #reloadDlg {
+    position: fixed; inset: 0; z-index: 5000; display: flex; align-items: center; justify-content: center; padding: 16px;
+    background: rgba(0,0,0,.5); -webkit-backdrop-filter: blur(3px); backdrop-filter: blur(3px);
+    animation: rdFade .2s ease;
+  }
+  #reloadDlg[hidden] { display: none; }
+  @keyframes rdFade { from { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { #reloadDlg { animation: none; } }
+  #reloadCard {
+    zoom: var(--ui); width: min(340px, 100%); padding: 22px 20px 18px; border-radius: 24px; text-align: center; box-sizing: border-box;
+    background: rgba(255,255,255,.96); color: #1d1d1f; box-shadow: 0 16px 48px rgba(0,0,0,.35);
+    font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  #reloadCard .rd-ic { display: block; width: 44px; height: 44px; margin: 0 auto 10px; color: #FF9500; }
+  #reloadT { font-size: 18px; font-weight: 700; margin: 0 0 6px; }
+  #reloadMsg { font-size: 14px; line-height: 1.45; color: #3c3c43; margin: 0 0 16px; }
+  #reloadBtn {
+    display: block; width: 100%; height: 48px; border: 0; border-radius: 24px; cursor: pointer;
+    background: #1d1d1f; color: #fff; font: 600 16px Inter, system-ui, -apple-system, sans-serif;
+  }
+  #reloadBtn:disabled { background: #8e8e93; cursor: default; }
+  #reloadBtn:focus-visible { outline: 3px solid #1A73E8; outline-offset: 2px; }
+  #reloadAdv { margin-top: 14px; font-size: 12px; color: #6e6e73; text-align: left; }
+  #reloadAdv summary { cursor: pointer; text-align: center; }
+  #reloadAdv p { margin: 8px 0 0; line-height: 1.4; }
+  #proxy {
+    display: block; width: 100%; height: 40px; margin: 8px 0; padding: 0 12px; border-radius: 12px; box-sizing: border-box;
+    border: 1px solid rgba(60,60,67,.25); background: #fff; color: #1d1d1f; font: 16px Inter, system-ui, sans-serif;
+  }
+  #saveProxy { height: 36px; padding: 0 16px; border: 0; border-radius: 18px; cursor: pointer; background: rgba(118,118,128,.16); color: #1d1d1f; font: 600 13px Inter, system-ui, sans-serif; }
   #pinDlg { position: fixed; inset: 0; z-index: 1300; background: rgba(0,0,0,.45); display: flex; align-items: flex-start; justify-content: center; padding-top: 18vh; }
   #pinDlg[hidden] { display: none; }
   #pinForm {
@@ -670,7 +688,7 @@
     --ink: #1d1d1f; --ink-2: #3c3c43; --hair: rgba(60,60,67,.13); --fill: rgba(118,118,128,.14);
     --ok: #34C759; --warn: #FFB800; --err: #FF3B30;
   }
-  #panel .qrow, #types, #tracking, #err, #menuCard, #cityCard, #follow, #stopProg, #toast, #placeBar, #secBar, #pinForm, .chip,
+  #panel .qrow, #types, #tracking, #menuCard, #cityCard, #follow, #stopProg, #toast, #placeBar, #secBar, #pinForm, .chip,
   #sheet, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-tooltip.hover-tip,
   .leaflet-container .leaflet-bar, .leaflet-container .leaflet-control-attribution {
     background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
@@ -679,7 +697,7 @@
   #menuCard, #sheet, #pinForm, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-tooltip.hover-tip { background: var(--glass-strong); }
   /* browsers without backdrop blur: nearly opaque, so text stays readable over the map */
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    #panel .qrow, #types, #tracking, #err, #menuCard, #cityCard, #follow, #stopProg, #toast, #placeBar, #secBar, #pinForm, .chip,
+    #panel .qrow, #types, #tracking, #menuCard, #cityCard, #follow, #stopProg, #toast, #placeBar, #secBar, #pinForm, .chip,
     #sheet, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-tooltip.hover-tip,
     .leaflet-container .leaflet-bar { background: rgba(255,255,255,.94); }
   }
@@ -736,9 +754,6 @@
   .tb-top { font-size: 13px; color: #6e6e73; }
   .tb-bot { font-size: 15px; font-weight: 600; color: var(--ink); }
   #stopTrack, #diagCopy { height: 36px; padding: 0 16px; border: 0; border-radius: 18px; background: var(--fill); color: var(--ink); font-size: 14px; font-weight: 600; }
-  #err { padding: 12px 14px; border-radius: 20px; background: rgba(255,240,240,.82); font-size: 14px; }
-  #err input { height: 40px; border-radius: 12px; border: 1px solid rgba(60,60,67,.2); background: rgba(255,255,255,.85); color: var(--ink); }
-  #err button { height: 36px; padding: 0 16px; border-radius: 18px; background: var(--ink); color: #fff; }
   /* the menu (≡ in the search pill): My places and Diagnostics in one glass card */
   #menuCard { display: flex; flex-direction: column; padding: 4px 16px 12px; border-radius: 24px; }
   #menuCard .dg-row { height: 50px; padding: 0 2px; gap: 12px; font-size: 15px; font-weight: 500; color: var(--ink); border-top: 1px solid var(--hair); }
@@ -1068,6 +1083,21 @@
 
 <div id="secBar" hidden role="status"><span id="secTxt"></span><button id="secOpen" type="button">Open</button><button id="secClose" type="button" aria-label="Close">×</button></div>
 
+<div id="reloadDlg" hidden>
+  <div id="reloadCard" role="alertdialog" aria-modal="true" aria-labelledby="reloadT" aria-describedby="reloadMsg">
+    <svg class="rd-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2 id="reloadT">Live data is out of date</h2>
+    <p id="reloadMsg">The connection to the live feed was lost. Reload to get the latest vehicles and arrivals.</p>
+    <button id="reloadBtn" type="button">Reload</button>
+    <details id="reloadAdv">
+      <summary>Still not loading?</summary>
+      <p>The browser may be blocking the feed (CORS). Enter a CORS proxy prefix (the feed URL gets appended, URL-encoded):</p>
+      <input id="proxy" placeholder="https://corsproxy.io/?url=" aria-label="CORS proxy prefix">
+      <button id="saveProxy" type="button">Save &amp; reload</button>
+    </details>
+  </div>
+</div>
+
 <div id="pinDlg" hidden>
   <form id="pinForm" role="dialog" aria-modal="true" aria-labelledby="pinDlgT">
     <div id="pinDlgT">Name this place</div>
@@ -1111,12 +1141,6 @@
       <span class="tb-badge" id="trackBadge"></span>
       <span class="tb-text"><span class="tb-top" id="trackTop"></span><span class="tb-bot" id="trackBot"></span></span>
       <button id="stopTrack" type="button">Stop</button>
-    </div>
-    <div id="err" hidden>
-      Couldn't load the live feed directly — the browser probably blocked it (CORS).
-      Enter a CORS proxy prefix (the feed URL gets appended, URL-encoded):
-      <input id="proxy" placeholder="https://corsproxy.io/?url=" aria-label="CORS proxy prefix">
-      <button id="saveProxy" type="button">Save &amp; retry</button>
     </div>
     <div class="fold-sec" id="secMenu">
     <div id="menuCard">
@@ -5720,7 +5744,7 @@
         var ts = (msg.header && msg.header.timestamp) || 0;
         lastFeedTime = Date.now();
         feedFailed = false;
-        document.getElementById('err').hidden = true;
+        showReload(false);
         setProgress('vehicles', 1, 'Vehicles');
         if (!force && ts && ts === lastHeaderTs) { render(false); return; }  // nothing new: skip the work
         lastHeaderTs = ts;
@@ -5763,8 +5787,7 @@
         feedError = String(e && e.message || e);
         setStatus('err', 'Live feed unavailable');
         setProgress('vehicles', 1, 'Vehicles unavailable');
-        document.getElementById('err').hidden = false;
-        document.getElementById('proxy').value = proxy;
+        showReload(true);
         renderDiag();
       })
       .then(function () { busy = false; });
@@ -5885,7 +5908,7 @@
   // What can be wrong, worst first; computed from the same values as the raw report
   function diagIssues(n, withLine) {
     var out = [], vf = /vector failed: (.*)\)$/.exec(mapMode || '');
-    if (feedFailed) out.push({ level: 'err', text: 'Live feed blocked: ' + feedError + '. A CORS proxy can be entered in the box above.' });
+    if (feedFailed) out.push({ level: 'err', text: 'Live feed blocked: ' + feedError + '. A CORS proxy can be set in the reload popup ("Still not loading?").' });
     if (staticState === 'failed' || staticState === 'empty') {
       out.push({ level: 'err', text: 'Schedule failed to load: ' + (staticState === 'empty' ? 'it contains no lines' : staticInfo || 'unknown error') });
     }
@@ -6132,11 +6155,51 @@
     prefetchTimer = setTimeout(prefetchViewportTiles, 350);
   });
 
+  // v91: the live feed failed (most often: the phone/computer was asleep or offline for a while). Instead of the
+  // old CORS box in the panel, a popup over everything asks for a reload, which starts the app fresh with the
+  // latest data. While the device says it's offline the button waits (reloading then would only show the
+  // browser's "no internet" page); if a later update gets through on its own, the popup goes away by itself.
+  var reloadDlg = document.getElementById('reloadDlg'), reloadBtn = document.getElementById('reloadBtn');
+  var RELOAD_MSG = 'The connection to the live feed was lost. Reload to get the latest vehicles and arrivals.';
+  var OFFLINE_MSG = 'You\u2019re offline. Once you\u2019re connected again, reload to get the latest vehicles and arrivals.';
+  function reloadState() {
+    var off = navigator.onLine === false;
+    reloadBtn.disabled = off;
+    setText(reloadBtn, off ? 'Waiting for connection\u2026' : 'Reload');
+    setText(document.getElementById('reloadMsg'), off ? OFFLINE_MSG : RELOAD_MSG);
+  }
+  function showReload(on) {
+    if (on === !reloadDlg.hidden) { if (on) reloadState(); return; }
+    reloadDlg.hidden = !on;
+    if (!on) return;
+    document.getElementById('proxy').value = proxy;
+    reloadState();
+    if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+    // keyboard users land on the button; on touch screens no focus ring is drawn around it
+    if (window.matchMedia && matchMedia('(hover: hover)').matches) try { reloadBtn.focus({ preventScroll: true }); } catch (e) {}
+  }
+  function stripStamp(u) { return u.replace(/([?&])_r=\d+&?/, '$1').replace(/[?&](#|$)/, '$1'); }
+  function hardReload() {
+    reloadBtn.disabled = true;
+    setText(reloadBtn, 'Reloading\u2026');
+    // a new address, so no cached copy of the page can be served: the app starts over with the newest version.
+    // Only on the website: a file opened from the phone (content://, file://) may not survive an added ?query
+    if (!/^https?:$/.test(location.protocol)) { location.reload(); return; }
+    var hash = location.hash, u = stripStamp(location.href.replace(/#.*$/, ''));
+    location.replace(u + (u.indexOf('?') < 0 ? '?' : '&') + '_r=' + Date.now() + hash);
+  }
+  reloadBtn.onclick = hardReload;
+  window.addEventListener('online', function () { if (!reloadDlg.hidden) reloadState(); update(true); });
+  window.addEventListener('offline', function () { if (!reloadDlg.hidden) reloadState(); });
+  // the _r= stamp from a reload is taken out of the address bar again (bookmarks and shares stay clean)
+  if (/[?&]_r=\d+/.test(location.search) && history.replaceState) {
+    try { history.replaceState(history.state, '', stripStamp(location.href)); } catch (e) {}
+  }
+
   document.getElementById('saveProxy').onclick = function () {
     proxy = document.getElementById('proxy').value.trim();
     store('sofia_proxy', proxy);
-    if (staticState !== 'ok') { staticState = 'loading'; loadStatic(); }
-    update(true);
+    hardReload();
   };
 
   // ---------- Performance overlay ----------
