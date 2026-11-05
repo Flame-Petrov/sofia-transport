@@ -1090,6 +1090,7 @@
   .rt-sum b { font-size: 16px; }
   .rt-dur { font-size: 14px; color: var(--ink-2); }
   .rt-meta { margin-left: auto; font-size: 12px; color: #6e6e73; }
+  .rt-easy { align-self: center; padding: 1px 7px; border-radius: 999px; background: rgba(30,111,217,.12); color: #1e5bb0; font-size: 11px; font-weight: 600; letter-spacing: .02em; }   /* v97: Easiest */
   .rt-seq { display: flex; align-items: center; flex-wrap: wrap; gap: 4px; }
   .rt-seq .sep { font-size: 13px; color: #aeaeb2; }
   .rt-walk { width: 16px; height: 16px; color: #6e6e73; flex: none; }
@@ -5735,6 +5736,11 @@
   var WALK_ONLY_M = 1500;       // a walk-only way is offered up to this far (or whenever it's the fastest)
   var WALK_PREFER_S = 300;      // walking is the main way when it arrives at most this much later (no wait, nothing to miss)
   var ROUTE_REFRESH_MS = 60000; // a fresh search while the route is shown
+  // v97: the easiest way — one vehicle and little walking (asked: European Union → Mladost 3 never offered bus X9,
+  // one bus with a 2-min walk, because "fewest vehicles" was the earliest one-vehicle way: the metro + a 22-min walk)
+  var FEW_SLACK_S = 1200;       // the fewest-vehicles way is shown when it arrives at most this much later than the fastest
+  var DIRECT_WALK_M = 600;      // a one-vehicle search with at most this far on foot to the first stop and from the last
+  var EASY_WALK_WEIGHT = 2;     // choosing that way: a minute on foot counts as this many minutes of arriving later
   var R_INF = 0x3fffffff, R_SKIP = -0x3fffffff;
   var route = null, routeInfo = { ms: 0, runs: 0, at: 0, n: 0 };
   map.createPane('routePane').style.zIndex = 612;   // the route's stops: over stops and vehicles, under flags and your dot
@@ -5791,8 +5797,8 @@
   // One search. access / egress: [{ s: stop index, sec: walking seconds }]; dep: seconds from tt.base;
   // ban: { inst: true } first vehicles not to take ("the next one"). Returns every round's labels and the
   // best arrival at the place for each number of vehicles that beats fewer vehicles.
-  function raptor(access, egress, dep, ov, ban) {
-    var nS = tt.stopIds.length, limit = dep + ROUTE_HORIZON_MIN * 60;
+  function raptor(access, egress, dep, ov, ban, maxK) {   // maxK: at most this many vehicles (v97; default ROUTE_ROUNDS)
+    var nS = tt.stopIds.length, limit = dep + ROUTE_HORIZON_MIN * 60, rounds = maxK || ROUTE_ROUNDS;
     var best = new Int32Array(nS).fill(R_INF), bKind = new Int8Array(nS).fill(-1), bRound = new Int8Array(nS);
     var isMarked = new Uint8Array(nS), marked = [], m, j, i;
     var r0 = { at: new Int32Array(nS).fill(R_INF), acc: new Int32Array(nS).fill(-1) };
@@ -5805,7 +5811,7 @@
     var egW = new Int32Array(nS).fill(R_INF);
     egress.forEach(function (e) { if (e.sec < egW[e.s]) egW[e.s] = e.sec; });
     var R = [r0], results = [], destBest = R_INF, qPos = new Int32Array(tt.patRoute.length).fill(-1);
-    for (var k = 1; k <= ROUTE_ROUNDS && marked.length; k++) {
+    for (var k = 1; k <= rounds && marked.length; k++) {
       var pBest = best.slice(), pKind = bKind.slice(), pRound = bRound.slice(), qList = [];
       // the patterns through the stops reached in the last round, from their earliest such stop
       for (m = 0; m < marked.length; m++) {
@@ -5849,7 +5855,7 @@
           for (var x = lo; x < nT; x++) {
             var sch = tt.times[tOff + x * L + i];
             if (sch > limit || (bI >= 0 && sch > bT + 1800)) break;
-            if (k === 1 && ban && ban[a0 + x]) continue;
+            if (ban && ban[a0 + x]) continue;   // v98: in every round (from round 2 the same trip was boarded again from your own stop, so "the next vehicle" came out as the main way and was dropped)
             var lv = ov[a0 + x], tx = lv ? lv.t[i] : sch;
             if (tx === R_SKIP || tx < need || tx < dep) continue;
             if (tx < bT) { bT = tx; bI = x; }
@@ -5934,7 +5940,8 @@
       for (var i = 0; i < list.length && list[i].d <= lim; i++) out.push({ s: list[i].s, sec: walkSecM(list[i].d), d: list[i].d });
       return out;
     }
-    var access = within(near), egress = within(far), ways = [], all, fastest, fWay, fDist, main = null;
+    var access = within(near), egress = within(far), ways = [], all, fastest, fWay, fDist, main = null, direct = null, easySig = '';
+    function easyCost(w) { return w.arr + (EASY_WALK_WEIGHT - 1) * w.walk; }
     function run(acc, ban) { runs++; return raptor(acc, egress, dep, ov, ban); }
     // the closest pole (twin stops of one place together) that does the job, from the nearest outwards
     var g = 0, tries = 0, seen = {};
@@ -5965,11 +5972,28 @@
       return closest();
     }).then(function () {
       if (!fastest) return null;
-      ways.push(main || fWay);
+      // v97: one vehicle, with stops at most DIRECT_WALK_M from you and from the place (the bus that goes there)
+      var accD = access.filter(function (a) { return a.d <= DIRECT_WALK_M; }), egD = egress.filter(function (e) { return e.d <= DIRECT_WALK_M; });
+      if (!accD.length || !egD.length) return null;
+      return nextTask().then(function () {
+        runs++;
+        var rD = raptor(accD, egD, dep, ov, null, 1);
+        if (rD.results.length) direct = makeWay(rD, rD.results[0]);
+      });
+    }).then(function () {
+      if (!fastest) return null;
+      // v97: the closest stop's way gives way to one with fewer vehicles that's as good (walking counted extra): at
+      // European Union the metro under you won by 99 m with M2 + X9, against X9 from the stop across the street, same arrival
+      var mainWay = main || fWay;
+      [fWay, direct].forEach(function (w) { if (w && w.rides < mainWay.rides && easyCost(w) <= easyCost(mainWay) + FEWER_CHANGES_S) mainWay = w; });
+      ways.push(mainWay);
       ways.push(fWay);
-      // fewest vehicles (up to 20 min later than the fastest)
-      var few = all.results.filter(function (x) { return x.arr <= fastest.arr + 1200; })[0];
-      if (few) ways.push(makeWay(all, few));
+      // fewest vehicles (up to FEW_SLACK_S later than the fastest); v97: of two ways with as few vehicles, the one
+      // with less walking unless it arrives much later (a minute on foot counts as EASY_WALK_WEIGHT minutes)
+      var few = all.results.filter(function (x) { return x.arr <= fastest.arr + FEW_SLACK_S; })[0], fewWay = few ? makeWay(all, few) : null;
+      if (direct && direct.arr <= fastest.arr + FEW_SLACK_S && (!fewWay || direct.rides < fewWay.rides || easyCost(direct) < easyCost(fewWay))) fewWay = direct;
+      if (fewWay) ways.push(fewWay);
+      if (fewWay && fewWay === direct) easySig = direct.sig;   // "Easiest" only for a way with short walks at both ends
       // the next vehicle after the main way's first one, from the main way's own stop(s)
       var first = ways[0].legs.filter(function (l) { return l.kind === 'ride'; })[0];
       if (!first) return null;
@@ -5990,7 +6014,11 @@
       if (!ways.length || ww.legs[0].m <= WALK_ONLY_M || ww.arr <= ways[0].arr + WALK_PREFER_S) {
         if (!ways.length || ww.arr <= ways[0].arr + WALK_PREFER_S) ways.unshift(ww); else ways.push(ww);
       }
-      ways = ways.slice(0, ROUTE_OPTIONS + (ways.some(function (w) { return w.sig === 'walk'; }) ? 1 : 0));
+      var cut = ROUTE_OPTIONS + (ways.some(function (w) { return w.sig === 'walk'; }) ? 1 : 0), easy = null;
+      ways.forEach(function (w) { w.easy = !!easySig && w.sig === easySig && w.sig !== fWay.sig; if (w.easy) easy = w; });   // labelled unless it's also the fastest
+      // v97: the easiest way stays among those shown (it arrives later, so sorting by arrival put it last, then it was cut)
+      if (easy && ways.indexOf(easy) >= cut) { ways.splice(ways.indexOf(easy), 1); ways.splice(cut - 1, 0, easy); }
+      ways = ways.slice(0, cut);
       routeInfo = { ms: Math.round(performance.now() - t0), runs: runs, at: Date.now(), n: ways.length };
       return { ways: ways, dep: dep };
     });
@@ -6582,7 +6610,8 @@
   function sumHtml(way, nowS) {
     var walkMin = Math.round(way.walk / 60), meta = way.rides === 0 ? 'on foot' :
       (way.rides === 1 ? 'no change' : (way.rides - 1) + (way.rides === 2 ? ' change' : ' changes')) + (walkMin ? ' · ' + walkMin + ' min walk' : '');
-    return '<div class="rt-sum"><b>Arrive ' + relClock(way.liveArr) + '</b><span class="rt-dur">' + durTxt(way.liveArr - nowS) + '</span><span class="rt-meta">' + meta + '</span></div>';
+    return '<div class="rt-sum"><b>Arrive ' + relClock(way.liveArr) + '</b><span class="rt-dur">' + durTxt(way.liveArr - nowS) + '</span>' +
+      (way.easy ? '<span class="rt-easy" title="One vehicle and the least walking">Easiest</span>' : '') + '<span class="rt-meta">' + meta + '</span></div>';   // v97
   }
   function chainHtml(way, nowS, place) {
     var rows = [], t = nowS, me = loc.fix && loc.fix.ll;
