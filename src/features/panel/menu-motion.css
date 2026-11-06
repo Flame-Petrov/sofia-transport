@@ -1,0 +1,81 @@
+  /* =====================================================================================================
+     v78 — Menu motion. Calm and light: each section moves as one surface, no bounce, no scaling.
+     Expand: the filter pill, then the menu card 40 ms later, each fading in while sliding down from 8 px
+     above (240 ms, ease-out). Collapse: the reverse (menu card first), 180 ms. The space a section takes
+     opens and closes with it (grid row 0fr ↔ 1fr), so the tracking card and suggestions below glide
+     instead of jumping. All CSS transitions: a toggle mid-way simply turns them round (no queue, no
+     flicker). Folded sections are inert (no focus, no clicks) and hidden once faded out.
+     ===================================================================================================== */
+  :root { --ease-soft: cubic-bezier(0.22, 1, 0.36, 1); }
+  .fold-sec { display: grid; grid-template-rows: minmax(0, 1fr); }   /* minmax(0, …): a fixed-height pill must not hold its row open */
+  /* the surface keeps its own height (start-aligned) while its row opens/closes around it */
+  .fold-sec > * { min-height: 0; align-self: start; }
+  /* open */
+  .fold-sec { transition: grid-template-rows 240ms var(--ease-soft), margin-top 240ms var(--ease-soft); }
+  .fold-sec > * { transition: opacity 240ms var(--ease-soft), transform 240ms var(--ease-soft), visibility 0s linear 0s; }
+  #secMenu { transition-delay: 40ms, 40ms; }
+  #secMenu > * { transition-delay: 40ms, 40ms, 0s; }
+  /* closed (the flex gap before a closed section is taken back by the negative margin) */
+  #panel.folded .fold-sec { grid-template-rows: minmax(0, 0fr); margin-top: -10px; transition-duration: 180ms, 180ms; }
+  #panel.folded .fold-sec > * {
+    opacity: 0; transform: translateY(-8px); visibility: hidden; pointer-events: none;
+    transition: opacity 180ms ease-out, transform 180ms var(--ease-soft), visibility 0s linear 180ms;
+  }
+  #panel.folded #secMenu { transition-delay: 0s, 0s; }
+  #panel.folded #secTypes { transition-delay: 40ms, 40ms; }
+  #panel.folded #secTypes > * { transition-delay: 40ms, 40ms, 220ms; }
+  /* the chevron turns with the state: down = open me, up = fold */
+  #fold svg { transform: rotate(180deg); transition: transform 240ms var(--ease-soft); }
+  #panel.folded #fold svg { transform: rotate(0deg); transition-duration: 180ms; }
+  /* first paint: the saved state is applied without any motion */
+  #panel.fold-instant .fold-sec, #panel.fold-instant .fold-sec > *, #panel.fold-instant #fold svg { transition: none !important; }
+
+  /* filters: on/off changes fade (dot, text colour, strike-through) — 160 ms */
+  #types button { transition: background-color 160ms ease, color 160ms ease, text-decoration-color 160ms ease; text-decoration: line-through; text-decoration-color: transparent; }
+  #types button:not(.on) { text-decoration-color: rgba(142,142,147,.6); }
+  #types button i { border: 2px solid #b8b8bd; background: transparent; transition: background-color 160ms ease, border-color 160ms ease; }
+  #types button.on i { border: 2px solid var(--tc); background: var(--tc); }
+
+  /* clickable rows: a faint warm grey on hover, a little deeper while pressed */
+  :root { --row-hover: rgba(120,104,88,.08); --row-press: rgba(120,104,88,.15); }
+  #menuCard .dg-row { width: calc(100% + 16px); margin: 0 -8px; padding: 0 10px; border-radius: 14px; transition: background-color 150ms ease; }
+  .pl-item, #plAdd, #offAdd, .chip, #types button, #qClear, #fold, #stopTrack, #diagCopy, #diagClose, .pl-act { transition: background-color 150ms ease, color 150ms ease, box-shadow 150ms ease; }
+  @media (hover: hover) {
+    #menuCard .dg-row:hover, .pl-item:hover, #plAdd:hover, #offAdd:hover, #types button:hover, .chip:hover { background-color: var(--row-hover); }
+    #fold:hover, #qClear:hover, #stopTrack:hover, #diagCopy:hover, #diagClose:hover { background-color: rgba(120,104,88,.12); }
+  }
+  #menuCard .dg-row:active, .pl-item:active, #plAdd:active, #offAdd:active, #types button:active, .chip:active { background-color: var(--row-press); transition-duration: 60ms; }
+  #fold:active, #qClear:active, #stopTrack:active, #diagCopy:active, #diagClose:active, .pl-act:active { background-color: rgba(120,104,88,.2); transition-duration: 60ms; }
+
+  /* reduced motion: no movement — the sections and the chevron change at once */
+  @media (prefers-reduced-motion: reduce) {
+    .fold-sec, .fold-sec > *, #fold svg { transition: none !important; }
+    #panel.folded .fold-sec > * { transform: none; }
+  }
+
+  /* =====================================================================================================
+     v79 — Submenus move like the menu; the panel never overflows its room.
+     ===================================================================================================== */
+  /* a closed section clips what it holds: its hidden content no longer adds scroll room below
+     (the margin keeps the glass shadows) */
+  .fold-sec { overflow: clip; overflow-clip-margin: 40px; }
+  /* My places, Diagnostics, Raw log: the same reveal — row opens/closes, content fades and slides 8 px,
+     240 ms in / 180 ms out, same curve. CSS transitions only: toggling mid-way turns them round. */
+  .reveal { display: grid; grid-template-rows: minmax(0, 1fr); overflow: clip; overflow-clip-margin: 10px;
+            transition: grid-template-rows 240ms var(--ease-soft); }
+  .reveal > * { min-height: 0; align-self: start;
+                transition: opacity 240ms var(--ease-soft), transform 240ms var(--ease-soft), visibility 0s linear 0s; }
+  .reveal.closed { grid-template-rows: minmax(0, 0fr); transition-duration: 180ms; }
+  .reveal.closed > * { opacity: 0; transform: translateY(-8px); visibility: hidden; pointer-events: none;
+                       transition: opacity 180ms ease-out, transform 180ms var(--ease-soft), visibility 0s linear 180ms; }
+  /* the submenu chevrons turn with them (right → down) */
+  #menuCard .dg-row .chev { transition: transform 240ms var(--ease-soft); }
+  #plBtn[aria-expanded="true"] .chev, #diagBtn[aria-expanded="true"] .chev, #rawBtn[aria-expanded="true"] .chev { transform: rotate(90deg); }
+  /* the saved states on first paint: no motion */
+  .boot .reveal, .boot .reveal > *, .boot #menuCard .dg-row .chev { transition: none !important; }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .reveal > *, #menuCard .dg-row .chev { transition: none !important; }
+    .reveal.closed > * { transform: none; }
+  }
+  #menuCard { padding-bottom: 14px; }
+

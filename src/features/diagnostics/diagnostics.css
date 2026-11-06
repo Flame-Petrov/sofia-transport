@@ -1,0 +1,76 @@
+  /* Diagnostics: a closed row by default; open, it shows problems first, then key–value sections */
+  .dg-row {
+    display: flex; align-items: center; gap: 8px; width: 100%; height: 40px; padding: 0 2px; margin: 0;
+    border: 0; border-top: 1px solid var(--line); background: none; color: var(--muted);
+    font-size: 13px; text-align: left; cursor: pointer;
+  }
+  .dg-row svg { width: 14px; height: 14px; }
+  .dg-row .dg-lbl { flex: 1; }
+  .dg-row[hidden] { display: none; }
+  .dg-row .chev { transition: transform .15s ease; }
+  .dg-row[aria-expanded="true"] .chev { transform: rotate(90deg); }
+  .c-warn { color: var(--warn); }
+  .c-err { color: var(--err); }
+  #diagBody { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid var(--line); }
+  #diagBody[hidden] { display: none; }
+  .dg-head { display: flex; align-items: center; gap: 6px; }
+  #diagClose svg { width: 16px; height: 16px; }
+  .dg-title { flex: 1; font-size: 15px; font-weight: 600; }
+  #diagIssues { display: flex; flex-direction: column; gap: 8px; }
+  #diagIssues:empty { display: none; }
+  .dg-issue { display: flex; gap: 8px; padding: 10px 12px; border-radius: 10px; font-size: 13px; line-height: 1.4; color: var(--text); }
+  .dg-issue svg { width: 16px; height: 16px; margin-top: 1px; }
+  .dg-issue.warn { background: rgba(242,193,78,.12); border: 1px solid rgba(242,193,78,.35); }
+  .dg-issue.warn svg { color: var(--warn); }
+  .dg-issue.err { background: rgba(255,107,107,.12); border: 1px solid rgba(255,107,107,.35); }
+  .dg-issue.err svg { color: var(--err); }
+  #diagSections { display: flex; flex-direction: column; gap: 8px; }
+  .dg-sec-lbl { padding: 4px 2px 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); }
+  .dg-card { padding: 2px 12px; border-radius: 10px; background: var(--surface-2); }
+  .dg-kv { display: flex; justify-content: space-between; gap: 12px; padding: 7px 0; font-size: 13px; border-bottom: 1px solid var(--line); }
+  .dg-kv:last-child { border-bottom: 0; }
+  .dg-kv > span:first-child { color: var(--muted); white-space: nowrap; }
+  .dg-kv > span:last-child { color: var(--text); text-align: right; }
+  /* performance overlay switch: a real checkbox, visually hidden, inside the label */
+  .dg-switch { display: flex; align-items: center; justify-content: space-between; height: 44px; font-size: 14px; color: var(--text); cursor: pointer; }
+  /* v84: the row is the hidden checkbox's positioning box. Without it the checkbox was placed relative to the
+     whole panel, and tapping the switch made the browser scroll the menu shell to "show" it: the menu went blank */
+  .dg-switch { position: relative; }
+  .dg-switch input { position: absolute; left: 0; top: 50%; width: 1px; height: 1px; margin: 0; opacity: 0; pointer-events: none; }
+  .dg-switch .sw { position: relative; flex: none; width: 40px; height: 24px; border-radius: 12px; background: var(--border); transition: background .15s ease; }
+  .dg-switch .sw::after {
+    content: ''; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%;
+    background: #fff; transition: transform .15s ease;
+  }
+  .dg-switch input:checked + .sw { background: var(--ok); }
+  .dg-switch input:checked + .sw::after { transform: translateX(16px); }
+  .dg-switch input:focus-visible + .sw { outline: 2px solid var(--muted); outline-offset: 2px; }
+  #diagRaw {
+    display: block; width: 100%; height: 240px; max-height: 240px; padding: 10px; border: 0; border-radius: 8px; resize: none;
+    background: #151517; color: var(--muted); font: 11px/1.45 ui-monospace, "JetBrains Mono", Consolas, monospace;
+    white-space: pre; overflow: auto;
+  }
+  #diagRaw[hidden] { display: none; }
+
+  /* performance overlay (Debug info → "Show performance overlay"): bottom-left, never takes taps */
+  #perf {
+    position: fixed; z-index: 900; left: 10px; bottom: 24px; pointer-events: none;
+    padding: 6px 8px; border-radius: 8px; background: rgba(20,20,22,.82); color: #e8e8ea;
+    font: 11px/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+  #perf[hidden] { display: none; }
+  #perf .pr > span { margin-right: 8px; }
+  #perf .pth, #pfCnt { display: block; }
+  #perf .pth span { margin-right: 8px; }
+  #perf .on { color: #7EE0A5; }
+  #perf .off { color: #8a8a90; }
+  #perf .bad { color: #ff8a80; }
+  #pfSpark { display: block; width: 100px; height: 24px; margin-top: 4px; }
+  @media (max-width: 700px) {
+    #perf { left: 6px; bottom: 20px; padding: 4px 6px; font-size: 10px; }
+    #perf .pth, #pfCnt { display: inline; }
+    #pfSpark { display: none; }
+  }
+
+

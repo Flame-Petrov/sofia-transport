@@ -1,0 +1,9 @@
+  /* status line */
+  #status { display: flex; align-items: center; gap: 8px; min-height: 16px; padding: 0 2px; font-size: 12px; color: var(--muted); }
+  #status .sdot { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--muted); }
+  #status.ok .sdot { background: var(--ok); }
+  #status.warn .sdot { background: var(--warn); }
+  #status.err .sdot { background: var(--err); }
+  #status.loading .sdot { animation: sPulse 1.2s ease-in-out infinite; }
+  @keyframes sPulse { 50% { opacity: .25; } }
+

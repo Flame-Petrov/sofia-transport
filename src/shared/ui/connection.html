@@ -1,0 +1,15 @@
+<div id="reloadDlg" hidden>
+  <div id="reloadCard" role="alertdialog" aria-modal="true" aria-labelledby="reloadT" aria-describedby="reloadMsg">
+    <svg class="rd-ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.34 5.66M20 4v7h-7" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <h2 id="reloadT">Live data is out of date</h2>
+    <p id="reloadMsg">The connection to the live feed was lost. Reload to get the latest vehicles and arrivals.</p>
+    <button id="reloadBtn" type="button">Reload</button>
+    <details id="reloadAdv">
+      <summary>Still not loading?</summary>
+      <p>The browser may be blocking the feed (CORS). Enter a CORS proxy prefix (the feed URL gets appended, URL-encoded):</p>
+      <input id="proxy" placeholder="https://corsproxy.io/?url=" aria-label="CORS proxy prefix">
+      <button id="saveProxy" type="button">Save &amp; reload</button>
+    </details>
+  </div>
+</div>
+

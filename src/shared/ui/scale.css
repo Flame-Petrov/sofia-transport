@@ -1,0 +1,15 @@
+  /* ---------- Everything over the map scales with the screen (v74) ----------
+     --ui is set by setUiScale() from the window size: 1 on a large phone (412×860+) and a desktop
+     window of 1280×760+, smaller on smaller screens, never below 0.75 on phones / 0.8 on PC (text stays
+     readable, tap areas ≥ 33 px). CSS zoom shrinks an element as a whole: text, padding, icons, borders. Under zoom, px and
+     vh lengths (also insets like bottom: 96px) are multiplied by it, % heights are not: screen shares
+     are written in %, and the JS that places or measures these elements accounts for --ui. */
+  :root { --ui: 1; }
+  #panel, #sheet, #follow, #stopProg, #perf, .leaflet-bottom { zoom: var(--ui); }
+  /* popups: the parts inside Leaflet's box, which Leaflet measures and places itself */
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip-container { zoom: var(--ui); }
+  /* map markers: vehicle labels and stop icons (centred on their spot, so they shrink around it) */
+  .veh .pill, .stop-ic { zoom: var(--ui); }
+  .leaflet-popup-content { font-size: 13px; line-height: 1.45; }
+  .leaflet-popup-content b { font-size: 15px; }
+

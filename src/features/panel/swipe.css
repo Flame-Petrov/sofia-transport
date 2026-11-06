@@ -1,0 +1,11 @@
+  /* ---------- Phones: swipe the panel down to open, up to fold (v75) ---------- */
+  html, body { overscroll-behavior: none; }   /* a downward swipe must not pull-to-refresh the page */
+  @media (max-width: 700px) {
+    .p-head { touch-action: pan-x; }   /* vertical swipes on the search row are ours (the chips still scroll sideways) */
+    /* grab handle: the hint that the panel can be pulled */
+    #panel::after {
+      content: ''; position: absolute; left: 50%; bottom: 4px; width: 36px; height: 4px; margin-left: -18px;
+      border-radius: 2px; background: #4A4A4F; pointer-events: none;
+    }
+  }
+

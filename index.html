@@ -1505,7 +1505,7 @@
   // Zoom levels are Leaflet's, as everywhere else (the MapLibre map itself runs one level lower).
   var VIEW3D_PITCH = 55;              // tilt when 3D opens (degrees)
   var VIEW3D_MAX_PITCH = 60;          // most tilt allowed (MapLibre calls more than 60° experimental)
-  var VIEW3D_DPR_MAX = 2;             // the 3D map draws at most this many pixels per CSS pixel (GPU memory, fill rate)
+  var MAP_DPR_MAX = 2;                // WebGL drawing-buffer cap (phone layouts use 1.5)
   var VIEW3D_BUILDING_ZOOM = 15;      // 3D map: buildings stand up from this zoom
   var VIEW3D_BUILDING_OPACITY = 0.75; // a little see-through, so vehicles and lines behind buildings still show
   var VIEW3D_RETRY_MS = 864e5;        // after the 3D map ran out of memory on this device, its button is hidden this long
@@ -1895,6 +1895,11 @@
   // Preferred base map: OpenFreeMap — OpenStreetMap roads (the same map Sofia's route shapes are traced on),
   // drawn as vector graphics so it's sharp at every zoom, free, no key, and allowed from a file opened from disk.
   // Falls back to the image tiles above if WebGL or OpenFreeMap isn't available.
+  // Cap the two WebGL drawing buffers on high-density phones. UI text and
+  // Leaflet overlays still use the screen's native resolution.
+  function mapPixelRatio() {
+    return Math.min(window.devicePixelRatio || 1, isPhone() ? 1.5 : MAP_DPR_MAX);
+  }
   var OFM_STYLE = 'https://tiles.openfreemap.org/styles/liberty';
   var OFM_TILEJSON = 'https://tiles.openfreemap.org/planet';   // the style's vector source
   var tileReq = 0, tileDone = 0, tileHits = 0, tileOk = 0, mapIdle = false, mapMode = '', glLayer = null, builtStyle = null;   // glLayer: the vector map layer
@@ -2129,7 +2134,7 @@
       builtStyle = style;
       setProgress('map', 0.15, 'Map');
       gl = L.maplibreGL({
-        style: style,
+        style: style, pixelRatio: mapPixelRatio(),
         // map pieces appear at once instead of fading in, and stay in memory for every zoom level
         // between the starting view and street level, so zooming back and forth doesn't rebuild them
         // labels that the map adds or drops while it moves fade in 0.12 s instead of blinking on/off
@@ -3254,6 +3259,8 @@
     var w = pathWeights(map.getZoom());
     if (pathCase) pathCase.setStyle({ weight: w.casing });
     if (pathLine) pathLine.setStyle({ weight: w.line });
+    if (headCase) headCase.setStyle({ weight: w.casing });
+    if (headLine) headLine.setStyle({ weight: w.line });
     if (pathEnd) pathEnd.setRadius(w.end);
     if (pathPreview) pathPreview.setStyle({ weight: w.preview });
   }
@@ -3515,7 +3522,7 @@
     refreshPopup(v);
   }
 
-  var pathCase = null, pathLine = null, pathSyncAt = 0;
+  var pathCase = null, pathLine = null, headCase = null, headLine = null, pathSyncAt = 0;
   function drawPath(v) {
     var r3 = drawPath2d(v);
     if (view3d.on) view3d.pathChanged();   // v101: the same line on the 3D map
@@ -3523,7 +3530,7 @@
   }
   function drawPath2d(v) {
     pathLayer.clearLayers();
-    pathCase = pathLine = pathEnd = pathPreview = null;
+    headCase = headLine = pathCase = pathLine = pathEnd = pathPreview = null;
     var w = pathWeights(map.getZoom());
     var d = v.d, m = routeMetaFor(d);
     v.nextRun = null;
@@ -3567,10 +3574,12 @@
       renderer: pathRenderer, color: '#1a1a1a', weight: w.casing, opacity: 0.55,
       lineCap: 'round', lineJoin: 'round', interactive: false
     }).addTo(pathLayer);
+    headCase = L.polyline([], pathCase.options).addTo(pathLayer);
     pathLine = L.polyline(r.path, {
       renderer: pathRenderer, color: d.color, weight: w.line, opacity: 0.85,
       lineCap: 'round', lineJoin: 'round', interactive: false
     }).addTo(pathLayer);
+    headLine = L.polyline([], pathLine.options).addTo(pathLayer);
     // end of the line
     pathEnd = L.circleMarker(r.path[r.path.length - 1], {
       renderer: pathRenderer, radius: w.end, color: '#1a1a1a', weight: 3, opacity: 0.9,
@@ -3589,8 +3598,12 @@
     if (!pathLine || !flow || !v.pos || zooming) return;
     var now = performance.now();
     if (now - pathSyncAt < 8) return;   // every frame: at 30/s the line's start trailed the icon
+    if (flow.drawLat === v.pos[0] && flow.drawLon === v.pos[1] &&
+        flow.drawAlong === v.along && flow.draw3d === view3d.on) return;
+    flow.drawLat = v.pos[0]; flow.drawLon = v.pos[1];
+    flow.drawAlong = v.along; flow.draw3d = view3d.on;
     pathSyncAt = now;
-    var m = flow.m, latlngs;
+    var m = flow.m;
     if (v.mo && v.mo.kind === 'route' && v.mo.m === m && typeof v.along === 'number') {
       flow.along = v.along;
       var lo = 0, hi = m.cum.length - 1;
@@ -3602,15 +3615,19 @@
         flow._lastLo = lo;
         flow._tail = m._latLngs.slice(lo);
       }
-      latlngs = [L.latLng(v.pos[0], v.pos[1])].concat(flow._tail);
-    } else {
-      latlngs = pathLine.getLatLngs().slice();
-      latlngs[0] = L.latLng(v.pos[0], v.pos[1]);
+    } else if (!flow._tail) {
+      flow._tail = pathLine.getLatLngs().slice(1);
     }
-    if (latlngs.length < 2) return;
-    if (view3d.on) { view3d.pathMoved(latlngs); return; }   // v101: only the 3D line (the 2D one is redrawn on return)
-    pathCase.setLatLngs(latlngs);
-    pathLine.setLatLngs(latlngs);
+    var tail = flow._tail;
+    var head = tail.length ? [L.latLng(v.pos[0], v.pos[1]), tail[0]] : [];
+    if (view3d.on) { view3d.pathMoved(head, tail); return; }
+    if (flow.drawnTail !== tail) {
+      pathCase.setLatLngs(tail);
+      pathLine.setLatLngs(tail);
+      flow.drawnTail = tail;
+    }
+    headCase.setLatLngs(head);
+    headLine.setLatLngs(head);
   }
 
   // ---------- Sliding direction arrows (Hardware-accelerated Canvas overlay) ----------
@@ -3672,8 +3689,8 @@
   }
   function arrowFrame(now) {
     arrowRaf = 0;
-    if (!flow) return;
-    if (zooming || view3d.on) { arrowRaf = requestAnimationFrame(arrowFrame); return; }   // v101: 3D has its own arrows
+    if (!flow || view3d.on) return;
+    if (zooming) { arrowRaf = requestAnimationFrame(arrowFrame); return; }   // v101: 3D has its own arrows
     syncArrowCanvas();
     var size = map.getSize(), w = size.x, h = size.y;
     arrowCtx.setTransform(arrowDpr, 0, 0, arrowDpr, 0, 0);
@@ -3703,7 +3720,7 @@
     flow = null;
     if (arrowCtx) arrowCtx.clearRect(0, 0, arrowCanvas.width, arrowCanvas.height);
   }
-  function clearPath() { pathLayer.clearLayers(); pathCase = pathLine = pathEnd = pathPreview = null; stopArrows(); if (view3d.on) view3d.pathChanged(); }
+  function clearPath() { pathLayer.clearLayers(); headCase = headLine = pathCase = pathLine = pathEnd = pathPreview = null; stopArrows(); if (view3d.on) view3d.pathChanged(); }
 
   function refreshPopup(v) {
     refreshVehPopup(v);
@@ -3962,7 +3979,7 @@
   var popupClosedAt = 0;
   map.on('popupclose', function () { popupClosedAt = Date.now(); });
   map.on('click', function () {
-    if (placing) return;   // this tap puts a flag down (My places)
+    if (savedPlaces && savedPlaces.isPlacing) return;   // this tap puts a flag down (My places)
     if (sheetStop || sheetVeh || sheetRoute) { closeSheet(); return; }
     if (Date.now() - popupClosedAt < 400) return;   // this tap just closed a popup
     if (selected) deselect();
@@ -5635,7 +5652,7 @@
     if (loc.acc) { map.removeLayer(loc.acc); loc.acc = null; }
     loc.state = 'off'; loc.follow = false; loc.fix = null; loc.show = null; loc.hist = null; loc.camHold = false; loc.heading = null; loc.headingSrc = ''; loc.drawnFixT = 0;
     updLocUI();
-    drawDestLine();
+    if (savedPlaces) savedPlaces.refreshDestination();
     if (route) { route.state = 'wait'; route.ways = []; routeLayer.clearLayers(); renderRoute(); }   // v93: a route needs your location
   }
   function locError(msg) {
@@ -5825,7 +5842,10 @@
     var cone = el.querySelector('.me-cone');
     cone.hidden = !(fresh && loc.heading !== null);
     if (loc.heading !== null) cone.style.setProperty('--h', loc.heading.toFixed(1) + 'deg');
-    if (loc.fix.t !== loc.drawnFixT) { loc.drawnFixT = loc.fix.t; drawDestLine(); }   // the way to your destination
+    if (loc.fix.t !== loc.drawnFixT) {
+      loc.drawnFixT = loc.fix.t;
+      if (savedPlaces) savedPlaces.refreshDestination();
+    }
   }
   // rows for Diagnostics
   function locDiag() {
@@ -5860,26 +5880,6 @@
     a.title = t; a.setAttribute('aria-label', t);
     a.setAttribute('aria-pressed', s === 'on' && loc.follow ? 'true' : 'false');
   }
-  // ---------- My places (v75): named flags anywhere on the map; one of them is your destination ----------
-  // A library of places (Home, Work, …) saved on the device (localStorage 'sofia_places'). Add one with
-  // "New place" in the panel (name it, then tap the map) or by long-pressing the map (right-click on PC).
-  // Drag a flag to move it, or Move + tap the map. Picking a place in the list makes it your destination
-  // (pink flag, 'sofia_dest'); with your location on, a dotted line and the distance lead there.
-  var PLACES_MAX = 50;
-  map.createPane('pinPane').style.zIndex = 615;   // over vehicles and stops, under your location dot
-  var places = [], destId = store('sofia_dest') || '', pinMarkers = {}, destLine = null, placing = null, pinDlgCb = null, plHtml = '';
-  try {
-    places = (JSON.parse(store('sofia_places') || '[]') || []).filter(function (p) {
-      return p && p.id && p.name && isFinite(p.lat) && isFinite(p.lon);
-    });
-  } catch (e) { places = []; }
-  if (destId && !placeById(destId)) destId = '';
-  function savePlaces() { store('sofia_places', JSON.stringify(places)); store('sofia_dest', destId); }
-  function placeById(id) { for (var i = 0; i < places.length; i++) if (places[i].id === id) return places[i]; return null; }
-  function fmtM(m) { return m >= 1000 ? (m / 1000).toFixed(m >= 10000 ? 0 : 1) + ' km' : Math.round(m / 10) * 10 + ' m'; }
-  function distFromMe(p) {
-    return loc && loc.fix && loc.state === 'on' ? distM([loc.fix.ll.lat, loc.fix.ll.lng], [p.lat, p.lon]) : null;
-  }
   // the flag: the foot of the pole is the exact spot
   var FLAG_SVG = '<svg viewBox="0 0 26 32" aria-hidden="true"><path d="M5 30V2.5" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/>' +
     '<path d="M6 2.5h17l-4.5 6 4.5 6H6z" fill="currentColor" stroke="#fff" stroke-width="1.4" stroke-linejoin="round"/>' +
@@ -5889,198 +5889,8 @@
   var DEL_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>';
   var ROUTE_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 13.5V9.5C3 7.6 4.3 6.5 6.2 6.5H13M10 3.5l3 3-3 3" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg>';
 
-  function pinIcon(p) {
-    return L.divIcon({ className: 'pin-mk' + (p.id === destId ? ' dest' : ''), iconSize: null,
-      html: '<div class="pin-ic">' + FLAG_SVG + '</div><div class="pin-lbl">' + esc(p.name) + '</div>' });
-  }
-  function pinPopupHtml(p) {
-    var d = distFromMe(p), isDest = p.id === destId;
-    return '<div class="pp" data-pin="' + esc(p.id) + '"><div class="pp-name">' + esc(p.name) + '</div>' +
-      '<div class="pp-sub">' + (d !== null ? fmtM(d) + ' from you' : isDest ? 'Your destination' : 'Saved place') + '</div>' +
-      '<div class="pp-btns"><button type="button" class="pp-route" data-pin-act="route">' + ROUTE_SVG + 'Start route</button>' +
-      '<button type="button" class="pp-dest' + (isDest ? ' on' : '') + '" data-pin-act="dest">' +
-        (isDest ? 'Clear destination' : 'Set as destination') + '</button>' +
-      '<button type="button" data-pin-act="move">Move</button><button type="button" data-pin-act="rename">Rename</button>' +
-      '<button type="button" class="pp-del" data-pin-act="del">Delete</button></div></div>';
-  }
-  // markers follow the library
-  function redrawPins() {
-    var seen = {};
-    places.forEach(function (p) {
-      var id = p.id, key = p.name + '|' + (id === destId), mk = pinMarkers[id];
-      seen[id] = true;
-      if (!mk) {
-        mk = pinMarkers[id] = L.marker([p.lat, p.lon], { icon: pinIcon(p), pane: 'pinPane', draggable: true, autoPan: true, keyboard: false });
-        mk._key = key;
-        mk.bindPopup(function () { var q = placeById(id); return q ? pinPopupHtml(q) : ''; }, { className: 'pin-pop', offset: [0, -28], maxWidth: 260 });
-        mk.on('dragstart', function () { mk.closePopup(); });
-        mk.on('dragend', function () {
-          var q = placeById(id), ll = mk.getLatLng();
-          if (!q) return;
-          q.lat = +ll.lat.toFixed(6); q.lon = +ll.lng.toFixed(6);
-          savePlaces(); drawDestLine();
-          if (route && route.placeId === id) { route.fitted = false; route.ways = []; routeSearch(); }   // v93
-        });
-        mk.addTo(map);
-      } else {
-        if (mk._key !== key) { mk.setIcon(pinIcon(p)); mk._key = key; }
-        if (!mk.getLatLng().equals([p.lat, p.lon])) mk.setLatLng([p.lat, p.lon]);
-      }
-      mk.setZIndexOffset(id === destId ? 1000 : 0);
-    });
-    Object.keys(pinMarkers).forEach(function (id) {
-      if (!seen[id]) { map.removeLayer(pinMarkers[id]); delete pinMarkers[id]; }
-    });
-    updateDestLabel();
-  }
-  // the destination's label also shows how far it is
-  function updateDestLabel() {
-    if (view3d.on) view3d.placesChanged();   // v100: the flags on the 3D map follow the library too
-    var p = placeById(destId), mk = p && pinMarkers[p.id], el = mk && mk.getElement(), lbl = el && el.querySelector('.pin-lbl');
-    if (!lbl) return;
-    var d = distFromMe(p), html = esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '');
-    if (lbl._h !== html) { lbl.innerHTML = html; lbl._h = html; }
-  }
-  // dotted line from you to your destination (needs your location)
-  function drawDestLine() {
-    if (!places) return;   // (called by the location code before this section has run)
-    var p = placeById(destId);
-    if (!p || !loc.fix || loc.state !== 'on' || (route && route.ways && route.ways.length)) {   // v93: a route shows the real way
-      if (destLine) { map.removeLayer(destLine); destLine = null; }
-    } else {
-      var pts = [loc.fix.ll, L.latLng(p.lat, p.lon)];
-      if (!destLine) {
-        destLine = L.polyline(pts, { renderer: meSvg, pane: 'meAccPane', interactive: false, color: '#D6336C',
-          weight: 3, opacity: 0.85, dashArray: '1 8', lineCap: 'round' }).addTo(map);
-      } else destLine.setLatLngs(pts);
-    }
-    updateDestLabel();
-    renderPlaces();
-  }
-  function setDest(id) {
-    destId = id || '';
-    savePlaces(); redrawPins(); drawDestLine();
-  }
-  function addPlace(name, ll) {
-    if (places.length >= PLACES_MAX) { toast('You have ' + PLACES_MAX + ' places — delete one to add another.'); return; }
-    var p = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: name,
-              lat: +ll.lat.toFixed(6), lon: +ll.lng.toFixed(6) };
-    places.push(p);
-    setDest(p.id);   // a new flag is where you want to go
-    toast('“' + name + '” saved. It’s your destination now.', 3000);
-  }
-  function deletePlace(p) {
-    places = places.filter(function (q) { return q !== p; });
-    if (destId === p.id) destId = '';
-    if (route && route.placeId === p.id) endRoute();   // v93
-    map.closePopup();
-    savePlaces(); redrawPins(); drawDestLine();
-  }
-  // Show a place: becomes your destination; with your location on, both you and it come into view
-  function goToPlace(p) {
-    if (destId !== p.id) setDest(p.id);
-    var mk = pinMarkers[p.id];
-    if (!mk) return;
-    setLocFollow(false);
-    var me = loc.fix && loc.state === 'on' ? loc.fix.ll : null;
-    if (me && distM([me.lat, me.lng], [p.lat, p.lon]) < 30000) {
-      var size = map.getSize();
-      map.flyToBounds(L.latLngBounds([me, mk.getLatLng()]), {
-        paddingTopLeft: [50, freeTop() + 60], paddingBottomRight: [70, size.y - freeBottom() + 40], maxZoom: 17, duration: 0.8 });
-    } else {
-      mk.openPopup();
-      focusOn(mk.getLatLng(), mk.getPopup());
-    }
-  }
-
-  // ---- the list in the panel ----
-  function renderPlaces() {
-    document.getElementById('plCount').textContent = places.length ? String(places.length) : '';
-    var html = places.map(function (p) {
-      var d = distFromMe(p), n = esc(p.name), isDest = p.id === destId;
-      return '<div class="pl-item' + (isDest ? ' dest' : '') + '" role="listitem" data-pin="' + esc(p.id) + '">' +
-        '<button type="button" class="pl-go" data-pin-act="go" title="Show on the map and go there">' + FLAG_SVG +
-          '<span class="pl-n">' + n + '</span>' +
-          (d !== null ? '<span class="pl-d">' + fmtM(d) + '</span>' : isDest ? '<span class="pl-d">destination</span>' : '') + '</button>' +
-        '<button type="button" class="pl-act pl-route" data-pin-act="route" title="Start route" aria-label="Start route to ' + n + '">' + ROUTE_SVG + '</button>' +
-        '<button type="button" class="pl-act" data-pin-act="move" title="Move (tap the map)" aria-label="Move ' + n + '">' + MOVE_SVG + '</button>' +
-        '<button type="button" class="pl-act" data-pin-act="rename" title="Rename" aria-label="Rename ' + n + '">' + EDIT_SVG + '</button>' +
-        '<button type="button" class="pl-act" data-pin-act="del" title="Delete" aria-label="Delete ' + n + '">' + DEL_SVG + '</button></div>';
-    }).join('');
-    if (html !== plHtml) { plHtml = html; document.getElementById('plList').innerHTML = html; }
-  }
-  function setPlacesOpen(on) {
-    reveal(document.getElementById('plBody'), on);
-    document.getElementById('plBtn').setAttribute('aria-expanded', on ? 'true' : 'false');
-    store('sofia_places_open', on ? '1' : '0');
-  }
-  document.getElementById('plBtn').onclick = function () { setPlacesOpen(!isRevealed(document.getElementById('plBody'))); };
-  document.getElementById('plAdd').onclick = function () {
-    openPinDlg('New place', '', function (name) { startPlacing({ name: name }); });
-  };
-  // buttons in the list and in a flag's popup (capture: Leaflet stops clicks inside popups from bubbling)
-  document.addEventListener('click', function (e) {
-    var b = e.target && e.target.closest && e.target.closest('[data-pin-act]');
-    if (!b) return;
-    e.preventDefault(); e.stopPropagation();
-    var box = b.closest('[data-pin]'), p = box && placeById(box.getAttribute('data-pin')), act = b.getAttribute('data-pin-act');
-    if (!p) return;
-    if (act === 'go') goToPlace(p);
-    else if (act === 'route') startRoute(p);   // v93
-    else if (act === 'dest') {
-      setDest(destId === p.id ? '' : p.id);
-      var mk = pinMarkers[p.id];
-      if (mk && mk.isPopupOpen()) mk.getPopup().setContent(pinPopupHtml(p));
-    }
-    else if (act === 'move') startPlacing({ p: p });
-    else if (act === 'rename') openPinDlg('Rename place', p.name, function (name) { p.name = name; savePlaces(); redrawPins(); renderPlaces(); });
-    else if (act === 'del') {
-      if (!b.classList.contains('confirm')) {   // first tap asks, a second one within 3 s deletes
-        var was = b.innerHTML;
-        b.classList.add('confirm');
-        b.textContent = box.classList.contains('pl-item') ? 'Delete?' : 'Tap again to delete';
-        setTimeout(function () { if (b.isConnected) { b.classList.remove('confirm'); b.innerHTML = was; } }, 3000);
-        return;
-      }
-      deletePlace(p);
-    }
-  }, true);
-
-  // ---- putting a flag down: tap the map ----
-  function startPlacing(job) {
-    // v100: flags are put down and moved on the flat map (tapping a spot on a tilted map is imprecise)
-    if (view3d.on) { view3d.close('placing a flag'); toast('Placing a flag works in 2D.', 3000); }
-    placing = job;
-    map.closePopup();
-    if (sheetStop || sheetVeh) closeSheet();
-    document.getElementById('map').classList.add('placing');
-    document.getElementById('placeTxt').innerHTML = 'Tap the map to place <b>' + esc(job.p ? job.p.name : job.name) + '</b>';
-    document.getElementById('placeBar').hidden = false;
-    if (isPhone()) setFolded(true);   // more map to tap on
-  }
-  function endPlacing() {
-    placing = null;
-    document.getElementById('map').classList.remove('placing');
-    document.getElementById('placeBar').hidden = true;
-  }
-  document.getElementById('placeCancel').onclick = endPlacing;
-  map.on('click', function (e) {
-    if (!placing) return;
-    var job = placing;
-    endPlacing();
-    if (job.p) {
-      job.p.lat = +e.latlng.lat.toFixed(6); job.p.lon = +e.latlng.lng.toFixed(6);
-      savePlaces(); redrawPins(); drawDestLine();
-      if (route && route.placeId === job.p.id) { route.fitted = false; route.ways = []; routeSearch(); }   // v93
-    } else addPlace(job.name, e.latlng);
-  });
-  // long-press on a phone / right-click on PC: a new place right there
-  map.on('contextmenu', function (e) {
-    if (placing || !e.latlng) return;
-    openPinDlg('New place here', '', function (name) { addPlace(name, e.latlng); });
-  });
-
   // ---- the name dialog ----
+  var pinDlgCb = null;
   var pinDlg = document.getElementById('pinDlg'), pinName = document.getElementById('pinName');
   function openPinDlg(title, value, cb, opt) {
     opt = opt || {};
@@ -6103,15 +5913,239 @@
   };
   document.getElementById('pinCancel').onclick = closePinDlg;
   pinDlg.addEventListener('click', function (e) { if (e.target === pinDlg) closePinDlg(); });
-  document.addEventListener('keydown', function (e) {
-    if (e.key !== 'Escape') return;
-    if (!pinDlg.hidden) closePinDlg(); else if (placing) endPlacing();
-  });
+  // ---------- My places (v75): named flags anywhere on the map; one of them is your destination ----------
+  // A library of places (Home, Work, …) saved on the device (localStorage 'sofia_places'). Add one with
+  // "New place" in the panel (name it, then tap the map) or by long-pressing the map (right-click on PC).
+  // Drag a flag to move it, or Move + tap the map. Picking a place in the list makes it your destination
+  // (pink flag, 'sofia_dest'); with your location on, a dotted line and the distance lead there.
+  var savedPlaces = (function () {
+    var PLACES_MAX = 50;
+    map.createPane('pinPane').style.zIndex = 615;   // over vehicles and stops, under your location dot
+    var places = [], destId = store('sofia_dest') || '', pinMarkers = {}, destLine = null, placing = null, plHtml = '';
+    try {
+      places = (JSON.parse(store('sofia_places') || '[]') || []).filter(function (p) {
+        return p && p.id && p.name && isFinite(p.lat) && isFinite(p.lon);
+      });
+    } catch (e) { places = []; }
+    if (destId && !placeById(destId)) destId = '';
+    function savePlaces() { store('sofia_places', JSON.stringify(places)); store('sofia_dest', destId); }
+    function placeById(id) { for (var i = 0; i < places.length; i++) if (places[i].id === id) return places[i]; return null; }
+    function distFromMe(p) {
+      return loc && loc.fix && loc.state === 'on' ? distM([loc.fix.ll.lat, loc.fix.ll.lng], [p.lat, p.lon]) : null;
+    }
+    function pinIcon(p) {
+      return L.divIcon({ className: 'pin-mk' + (p.id === destId ? ' dest' : ''), iconSize: null,
+        html: '<div class="pin-ic">' + FLAG_SVG + '</div><div class="pin-lbl">' + esc(p.name) + '</div>' });
+    }
+    function pinPopupHtml(p) {
+      var d = distFromMe(p), isDest = p.id === destId;
+      return '<div class="pp" data-pin="' + esc(p.id) + '"><div class="pp-name">' + esc(p.name) + '</div>' +
+        '<div class="pp-sub">' + (d !== null ? fmtM(d) + ' from you' : isDest ? 'Your destination' : 'Saved place') + '</div>' +
+        '<div class="pp-btns"><button type="button" class="pp-route" data-pin-act="route">' + ROUTE_SVG + 'Start route</button>' +
+        '<button type="button" class="pp-dest' + (isDest ? ' on' : '') + '" data-pin-act="dest">' +
+          (isDest ? 'Clear destination' : 'Set as destination') + '</button>' +
+        '<button type="button" data-pin-act="move">Move</button><button type="button" data-pin-act="rename">Rename</button>' +
+        '<button type="button" class="pp-del" data-pin-act="del">Delete</button></div></div>';
+    }
+    // markers follow the library
+    function redrawPins() {
+      var seen = {};
+      places.forEach(function (p) {
+        var id = p.id, key = p.name + '|' + (id === destId), mk = pinMarkers[id];
+        seen[id] = true;
+        if (!mk) {
+          mk = pinMarkers[id] = L.marker([p.lat, p.lon], { icon: pinIcon(p), pane: 'pinPane', draggable: true, autoPan: true, keyboard: false });
+          mk._key = key;
+          mk.bindPopup(function () { var q = placeById(id); return q ? pinPopupHtml(q) : ''; }, { className: 'pin-pop', offset: [0, -28], maxWidth: 260 });
+          mk.on('dragstart', function () { mk.closePopup(); });
+          mk.on('dragend', function () {
+            var q = placeById(id), ll = mk.getLatLng();
+            if (!q) return;
+            q.lat = +ll.lat.toFixed(6); q.lon = +ll.lng.toFixed(6);
+            savePlaces(); drawDestLine();
+            if (route && route.placeId === id) { route.fitted = false; route.ways = []; routeSearch(); }   // v93
+          });
+          mk.addTo(map);
+        } else {
+          if (mk._key !== key) { mk.setIcon(pinIcon(p)); mk._key = key; }
+          if (!mk.getLatLng().equals([p.lat, p.lon])) mk.setLatLng([p.lat, p.lon]);
+        }
+        mk.setZIndexOffset(id === destId ? 1000 : 0);
+      });
+      Object.keys(pinMarkers).forEach(function (id) {
+        if (!seen[id]) { map.removeLayer(pinMarkers[id]); delete pinMarkers[id]; }
+      });
+      updateDestLabel();
+    }
+    // the destination's label also shows how far it is
+    function updateDestLabel() {
+      if (view3d.on) view3d.placesChanged();   // v100: the flags on the 3D map follow the library too
+      var p = placeById(destId), mk = p && pinMarkers[p.id], el = mk && mk.getElement(), lbl = el && el.querySelector('.pin-lbl');
+      if (!lbl) return;
+      var d = distFromMe(p), html = esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '');
+      if (lbl._h !== html) { lbl.innerHTML = html; lbl._h = html; }
+    }
+    // dotted line from you to your destination (needs your location)
+    function drawDestLine() {
+      var p = placeById(destId);
+      if (!p || !loc.fix || loc.state !== 'on' || (route && route.ways && route.ways.length)) {   // v93: a route shows the real way
+        if (destLine) { map.removeLayer(destLine); destLine = null; }
+      } else {
+        var pts = [loc.fix.ll, L.latLng(p.lat, p.lon)];
+        if (!destLine) {
+          destLine = L.polyline(pts, { renderer: meSvg, pane: 'meAccPane', interactive: false, color: '#D6336C',
+            weight: 3, opacity: 0.85, dashArray: '1 8', lineCap: 'round' }).addTo(map);
+        } else destLine.setLatLngs(pts);
+      }
+      updateDestLabel();
+      renderPlaces();
+    }
+    function setDest(id) {
+      destId = id || '';
+      savePlaces(); redrawPins(); drawDestLine();
+    }
+    function addPlace(name, ll) {
+      if (places.length >= PLACES_MAX) { toast('You have ' + PLACES_MAX + ' places — delete one to add another.'); return; }
+      var p = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: name,
+                lat: +ll.lat.toFixed(6), lon: +ll.lng.toFixed(6) };
+      places.push(p);
+      setDest(p.id);   // a new flag is where you want to go
+      toast('“' + name + '” saved. It’s your destination now.', 3000);
+    }
+    function deletePlace(p) {
+      places = places.filter(function (q) { return q !== p; });
+      if (destId === p.id) destId = '';
+      if (route && route.placeId === p.id) endRoute();   // v93
+      map.closePopup();
+      savePlaces(); redrawPins(); drawDestLine();
+    }
+    // Show a place: becomes your destination; with your location on, both you and it come into view
+    function goToPlace(p) {
+      if (destId !== p.id) setDest(p.id);
+      var mk = pinMarkers[p.id];
+      if (!mk) return;
+      setLocFollow(false);
+      var me = loc.fix && loc.state === 'on' ? loc.fix.ll : null;
+      if (me && distM([me.lat, me.lng], [p.lat, p.lon]) < 30000) {
+        var size = map.getSize();
+        map.flyToBounds(L.latLngBounds([me, mk.getLatLng()]), {
+          paddingTopLeft: [50, freeTop() + 60], paddingBottomRight: [70, size.y - freeBottom() + 40], maxZoom: 17, duration: 0.8 });
+      } else {
+        mk.openPopup();
+        focusOn(mk.getLatLng(), mk.getPopup());
+      }
+    }
 
-  redrawPins();
-  renderPlaces();
-  if (store('sofia_places_open') === '1') setPlacesOpen(true);
+    // ---- the list in the panel ----
+    function renderPlaces() {
+      document.getElementById('plCount').textContent = places.length ? String(places.length) : '';
+      var html = places.map(function (p) {
+        var d = distFromMe(p), n = esc(p.name), isDest = p.id === destId;
+        return '<div class="pl-item' + (isDest ? ' dest' : '') + '" role="listitem" data-pin="' + esc(p.id) + '">' +
+          '<button type="button" class="pl-go" data-pin-act="go" title="Show on the map and go there">' + FLAG_SVG +
+            '<span class="pl-n">' + n + '</span>' +
+            (d !== null ? '<span class="pl-d">' + fmtM(d) + '</span>' : isDest ? '<span class="pl-d">destination</span>' : '') + '</button>' +
+          '<button type="button" class="pl-act pl-route" data-pin-act="route" title="Start route" aria-label="Start route to ' + n + '">' + ROUTE_SVG + '</button>' +
+          '<button type="button" class="pl-act" data-pin-act="move" title="Move (tap the map)" aria-label="Move ' + n + '">' + MOVE_SVG + '</button>' +
+          '<button type="button" class="pl-act" data-pin-act="rename" title="Rename" aria-label="Rename ' + n + '">' + EDIT_SVG + '</button>' +
+          '<button type="button" class="pl-act" data-pin-act="del" title="Delete" aria-label="Delete ' + n + '">' + DEL_SVG + '</button></div>';
+      }).join('');
+      if (html !== plHtml) { plHtml = html; document.getElementById('plList').innerHTML = html; }
+    }
+    function setPlacesOpen(on) {
+      reveal(document.getElementById('plBody'), on);
+      document.getElementById('plBtn').setAttribute('aria-expanded', on ? 'true' : 'false');
+      store('sofia_places_open', on ? '1' : '0');
+    }
+    document.getElementById('plBtn').onclick = function () { setPlacesOpen(!isRevealed(document.getElementById('plBody'))); };
+    document.getElementById('plAdd').onclick = function () {
+      openPinDlg('New place', '', function (name) { startPlacing({ name: name }); });
+    };
+    // buttons in the list and in a flag's popup (capture: Leaflet stops clicks inside popups from bubbling)
+    document.addEventListener('click', function (e) {
+      var b = e.target && e.target.closest && e.target.closest('[data-pin-act]');
+      if (!b) return;
+      e.preventDefault(); e.stopPropagation();
+      var box = b.closest('[data-pin]'), p = box && placeById(box.getAttribute('data-pin')), act = b.getAttribute('data-pin-act');
+      if (!p) return;
+      if (act === 'go') goToPlace(p);
+      else if (act === 'route') startRoute(p);   // v93
+      else if (act === 'dest') {
+        setDest(destId === p.id ? '' : p.id);
+        var mk = pinMarkers[p.id];
+        if (mk && mk.isPopupOpen()) mk.getPopup().setContent(pinPopupHtml(p));
+      }
+      else if (act === 'move') startPlacing({ p: p });
+      else if (act === 'rename') openPinDlg('Rename place', p.name, function (name) { p.name = name; savePlaces(); redrawPins(); renderPlaces(); });
+      else if (act === 'del') {
+        if (!b.classList.contains('confirm')) {   // first tap asks, a second one within 3 s deletes
+          var was = b.innerHTML;
+          b.classList.add('confirm');
+          b.textContent = box.classList.contains('pl-item') ? 'Delete?' : 'Tap again to delete';
+          setTimeout(function () { if (b.isConnected) { b.classList.remove('confirm'); b.innerHTML = was; } }, 3000);
+          return;
+        }
+        deletePlace(p);
+      }
+    }, true);
 
+    // ---- putting a flag down: tap the map ----
+    function startPlacing(job) {
+      // v100: flags are put down and moved on the flat map (tapping a spot on a tilted map is imprecise)
+      if (view3d.on) { view3d.close('placing a flag'); toast('Placing a flag works in 2D.', 3000); }
+      placing = job;
+      map.closePopup();
+      if (sheetStop || sheetVeh) closeSheet();
+      document.getElementById('map').classList.add('placing');
+      document.getElementById('placeTxt').innerHTML = 'Tap the map to place <b>' + esc(job.p ? job.p.name : job.name) + '</b>';
+      document.getElementById('placeBar').hidden = false;
+      if (isPhone()) setFolded(true);   // more map to tap on
+    }
+    function endPlacing() {
+      placing = null;
+      document.getElementById('map').classList.remove('placing');
+      document.getElementById('placeBar').hidden = true;
+    }
+    document.getElementById('placeCancel').onclick = endPlacing;
+    map.on('click', function (e) {
+      if (!placing) return;
+      var job = placing;
+      endPlacing();
+      if (job.p) {
+        job.p.lat = +e.latlng.lat.toFixed(6); job.p.lon = +e.latlng.lng.toFixed(6);
+        savePlaces(); redrawPins(); drawDestLine();
+        if (route && route.placeId === job.p.id) { route.fitted = false; route.ways = []; routeSearch(); }   // v93
+      } else addPlace(job.name, e.latlng);
+    });
+    // long-press on a phone / right-click on PC: a new place right there
+    map.on('contextmenu', function (e) {
+      if (placing || !e.latlng) return;
+      openPinDlg('New place here', '', function (name) { addPlace(name, e.latlng); });
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key !== 'Escape') return;
+      if (!pinDlg.hidden) closePinDlg(); else if (placing) endPlacing();
+    });
+
+    redrawPins();
+    renderPlaces();
+    if (store('sofia_places_open') === '1') setPlacesOpen(true);
+
+    return {
+      find: placeById,
+      forEach: function (visit) { places.forEach(visit); },
+      get destinationId() { return destId; },
+      get destinationLine() { return destLine; },
+      get isPlacing() { return !!placing; },
+      cancelPlacement: endPlacing,
+      setDestination: setDest,
+      refreshDestination: drawDestLine,
+      distanceFromMe: distFromMe,
+      popupHtml: pinPopupHtml,
+      add: addPlace
+    };
+  })();
   // ---------- v93: Route to a place ----------
   // "Start route" on a flag (or ➜ in My places): the ways from where you are to that place by bus, tram,
   // trolleybus and metro, from today's timetable (v92) with the live predictions folded in, and Sofia's own
@@ -6711,7 +6745,7 @@
   // the walking parts of the ways shown, along the streets (the main way first); each one re-draws as it arrives
   var streetGen = 0;
   function streetWalks() {
-    var me = loc.fix ? loc.fix.ll : null, pl = route && placeById(route.placeId), gen = ++streetGen;
+    var me = loc.fix ? loc.fix.ll : null, pl = route && savedPlaces.find(route.placeId), gen = ++streetGen;
     if (!me || !pl) return;
     var jobs = [];
     route.ways.forEach(function (w) { w.legs.forEach(function (lg) { if (lg.kind === 'walk' && !lg.street) jobs.push({ w: w, lg: lg }); }); });
@@ -6784,7 +6818,7 @@
   // ---- starting, searching, ending ----
   function startRoute(p) {
     map.closePopup();
-    if (destId !== p.id) setDest(p.id);
+    if (savedPlaces.destinationId !== p.id) savedPlaces.setDestination(p.id);
     route = { placeId: p.id, ways: [], sig: '', state: 'wait', msg: '', at: 0, fitted: false };
     if (loc.state === 'off' || loc.state === 'err') {
       startLocation();      // inside the tap (iPhone asks for location and compass only then)
@@ -6799,12 +6833,12 @@
     updateRouteVehs();   // v99
     routeLayer.clearLayers();
     showRoute();
-    drawDestLine();
+    savedPlaces.refreshDestination();
   }
   var routeBusy = false;
   function routeSearch() {
     if (!route || routeBusy) return;
-    var p = placeById(route.placeId);
+    var p = savedPlaces.find(route.placeId);
     if (!p) { endRoute(); return; }
     var me = loc.fix && loc.state === 'on' ? loc.fix.ll : null;
     if (!me) {
@@ -6824,7 +6858,7 @@
     }).then(function (res) {
       routeBusy = false;
       if (!route || !res) return;
-      if (placeById(route.placeId) !== p) { routeSearch(); return; }   // another place was picked meanwhile: search for it
+      if (savedPlaces.find(route.placeId) !== p) { routeSearch(); return; }   // another place was picked meanwhile: search for it
       // the way you picked stays the main one while it's still there
       var ways = res.ways, keep = route.sig && ways.filter(function (w) { return w.sig === route.sig; })[0];
       if (keep && ways[0] !== keep) { ways.splice(ways.indexOf(keep), 1); ways.unshift(keep); }
@@ -6884,8 +6918,8 @@
   function routeColorOf(lg) { return routeColor(tt.patRoute[lg.p]); }
   function drawRoute() {
     routeLayer.clearLayers();
-    drawDestLine();
-    var way = route && route.ways[0], p = route && placeById(route.placeId), me = loc.fix ? loc.fix.ll : null;
+    savedPlaces.refreshDestination();
+    var way = route && route.ways[0], p = route && savedPlaces.find(route.placeId), me = loc.fix ? loc.fix.ll : null;
     if (!way || !p || !me) return;
     var w = pathWeights(map.getZoom()), nRide = 0;
     way.legs.forEach(function (lg, n) {
@@ -6921,7 +6955,7 @@
     }).addTo(routeLayer);
   }
   function fitRoute() {
-    var way = route && route.ways[0], p = route && placeById(route.placeId), me = loc.fix ? loc.fix.ll : null;
+    var way = route && route.ways[0], p = route && savedPlaces.find(route.placeId), me = loc.fix ? loc.fix.ll : null;
     if (!way || !p || !me) return;
     var pts = [[me.lat, me.lng], [p.lat, p.lon]];
     way.legs.forEach(function (lg) { if (lg.kind === 'ride') pts = pts.concat(ridePath(lg) || []); else if (lg.street) pts = pts.concat(lg.pts); });
@@ -7062,7 +7096,7 @@
     return '<ol class="rt-chain">' + rows.join('') + '</ol>';
   }
   function routeHtml() {
-    var p = placeById(route.placeId), name = p ? p.name : 'your place', nowS = tt ? (Date.now() - tt.base) / 1000 : 0;
+    var p = savedPlaces.find(route.placeId), name = p ? p.name : 'your place', nowS = tt ? (Date.now() - tt.base) / 1000 : 0;
     var h = '<div class="rt-head"><span class="rt-flag">' + FLAG_SVG + '</span><div class="rt-tt"><div class="rt-small">Route to</div>' +
       '<div class="rt-name">' + esc(name) + '</div></div>' +
       '<button type="button" class="rt-x" data-rt-close aria-label="Close the route" title="Close the route">' + CLOSE_SVG + '</button></div>';
@@ -7087,7 +7121,7 @@
   }
   function routeBarHtml() {   // phones, sheet closed: a short bar in the panel
     if (route.go && route.ways.length) return courseBannerHtml(false);   // v95: the next step
-    var p = placeById(route.placeId), way = route.ways[0], nowS = tt ? (Date.now() - tt.base) / 1000 : 0, txt;
+    var p = savedPlaces.find(route.placeId), way = route.ways[0], nowS = tt ? (Date.now() - tt.base) / 1000 : 0, txt;
     if (way) {
       realize(way);
       var lg = way.legs.filter(function (l) { return l.kind === 'ride'; })[0];
@@ -7260,7 +7294,7 @@
     var lg = curLeg();
     route.phase = legPhase(lg);
     if (route.phase === 'done') {
-      var pl = placeById(route.placeId);
+      var pl = savedPlaces.find(route.placeId);
       toast('You\'ve arrived' + (pl ? ' at ' + pl.name : '') + '.', 6000);
       buzz([200, 100, 200]);   // v96
       courseTrack();
@@ -7287,7 +7321,7 @@
   }
   function courseTick() {
     if (!route || !route.go || !route.ways.length || !loc.fix || route.phase === null || route.phase === 'done' || routeBusy) return;
-    var way = realize(route.ways[0]), lg = way.legs[route.leg], me = loc.fix.ll, meA = [me.lat, me.lng], pl = placeById(route.placeId), now = Date.now();
+    var way = realize(route.ways[0]), lg = way.legs[route.leg], me = loc.fix.ll, meA = [me.lat, me.lng], pl = savedPlaces.find(route.placeId), now = Date.now();
     var acc = Math.min(loc.fix.acc || 0, 60), speed = meSpeed();
     if (!lg || !pl) return;
     if (route.phase === 'walk') {
@@ -7333,7 +7367,7 @@
   setInterval(courseTick, 2000);   // also between fixes (the vehicles move)
   // the next step, for the banner (phones: in the panel; PC: on top of the card)
   function courseBannerHtml(inCard) {
-    var way = realize(route.ways[0]), lg = way.legs[route.leg], pl = placeById(route.placeId), me = loc.fix ? loc.fix.ll : null;
+    var way = realize(route.ways[0]), lg = way.legs[route.leg], pl = savedPlaces.find(route.placeId), me = loc.fix ? loc.fix.ll : null;
     var nowS = (Date.now() - tt.base) / 1000, top = '', bot = '', badge = '', cls = '';
     if (route.phase === 'done' || !lg) { top = 'You\'ve arrived'; bot = pl ? esc(pl.name) : ''; cls = ' ok'; }
     else if (route.phase === 'walk') {
@@ -7392,7 +7426,7 @@
   (function () {
     var c = null;
     try { c = JSON.parse(store('sofia_course') || 'null'); } catch (e) {}
-    var p = c && placeById(c.placeId);
+    var p = c && savedPlaces.find(c.placeId);
     if (!p || Date.now() - c.at > COURSE_KEEP_MS) { store('sofia_course', ''); return; }
     setTimeout(function () {
       startRoute(p);
@@ -7486,12 +7520,18 @@
   var feedInterval = 10000;   // measured time between new reports (ms)
   var lastNewDataAt = 0;
 
-  function setPos(v, lat, lon) {
+  function syncMarkerPosition(marker, pos, tolerance) {
+    var ll = marker.getLatLng();
+    if (ll.lat === pos[0] && ll.lng === pos[1]) return;
+    if (tolerance && Math.abs(ll.lng - pos[1]) < tolerance.lng && Math.abs(ll.lat - pos[0]) < tolerance.lat) return;
+    marker.setLatLng(pos);
+  }
+  function setPos(v, lat, lon, tolerance) {
     if (!v.pos) v.pos = [lat, lon];
     else { v.pos[0] = lat; v.pos[1] = lon; }
     if (view3d.on) return;   // v100: the 2D map is hidden; its markers are put back on v.pos when 3D closes
-    v.dot.setLatLng(v.pos);
-    if (v.pillInMap) v.pill.setLatLng(v.pos);
+    if (v.dotInMap) syncMarkerPosition(v.dot, v.pos, tolerance);
+    if (v.pillInMap) syncMarkerPosition(v.pill, v.pos, tolerance);
     if (hoverV === v) hoverTip.setLatLng(v.pos);
   }
   function routeMetaFor(d) {
@@ -7643,10 +7683,15 @@
     if (zooming) { lastFull = 0; pathSyncAt = 0; return; }   // catch up in full right after the zoom
     var now = Date.now();
     var full = now - lastFull > 500;
-    if (!viewBounds01 || following || view3d.on) updateMotionViewBounds();
+    if (!viewBounds01) updateMotionViewBounds();
     var minLat = viewBounds01.minLat, maxLat = viewBounds01.maxLat, minLon = viewBounds01.minLon, maxLon = viewBounds01.maxLon;
+    // Ordinary markers are drawn at whole pixels. Accumulate fractional
+    // movement against the displayed coordinate, then catch up on full ticks.
+    var halfPixel = 180 / (256 * Math.pow(2, map.getZoom()));
+    var tolerance = { lng: halfPixel, lat: halfPixel * Math.cos(toRad((minLat + maxLat) / 2)) };
     var count = 0;
-    var batch = onScreenCount < 150 || ts - lastBatch > 50;
+    var interval = view3d.on ? 1000 / VIEW3D_VEH_HZ : onScreenCount < 150 ? 0 : 50;
+    var batch = ts - lastBatch >= interval;
     if (batch) lastBatch = ts;
     if (full) lastFull = now;
     for (var k in vehicles) {
@@ -7657,7 +7702,7 @@
       if (vis) count++;
       if (v === selected || (vis && batch) || full) {
         var p = posAt(v, now);
-        if (p) setPos(v, p[0], p[1]);
+        if (p) setPos(v, p[0], p[1], (full || v === selected || v === hoverV) ? null : tolerance);
       }
     }
     if (batch || full) onScreenCount = count;
@@ -7964,8 +8009,23 @@
       map.fitBounds(matched.map(function (v) { return [v.d.lat, v.d.lon]; }), { padding: [60, 60], maxZoom: 16, animate: false });
     }
 
+    labelsBySearch = toks.length > 0 && matched.length <= LABEL_MAX;
+    if (view3d.on) view3d.feedChanged(matched);
+    else renderVehicleMarkers(keys, matched);
+    renderChips(toks);
+    updateSearchStops(toks, matched);
+    renderStops();
+    updatePopupPadding();
+    // status: Live (green) / Delayed, no new data for > 30 s (yellow) / feed failing (red) / Loading
+    var at = feedTime ? new Date(feedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
+    if (feedFailed) setStatus('err', 'Live feed unavailable');
+    else if (!feedTime) setStatus('loading', 'Loading…');
+    else if (Date.now() - lastNewDataAt > 30000) setStatus('warn', 'Delayed · last data ' + at);
+    else setStatus('ok', 'Live · ' + (toks.length ? fmtN(matched.length) + ' of ' : '') + fmtN(keys.length) + ' vehicles · ' + at);
+  }
+
+  function renderVehicleMarkers(keys, matched) {
     switching = true;
-    labelsBySearch = toks.length > 0 && matched.length <= LABEL_MAX;   // shown in the performance overlay
     var labels = viewZoom() >= LABEL_ZOOM || labelsBySearch;
     var b = viewLBounds(0.2);
     var minLat = b.getSouth(), maxLat = b.getNorth(), minLon = b.getWest(), maxLon = b.getEast();
@@ -7979,12 +8039,12 @@
         var dotOpen = v.dot.isPopupOpen();
         if (v.dotInMap) { dotLayer.removeLayer(v.dot); v.dotInMap = false; }
         var p = ensurePill(v);
-        if (!v.pillInMap) { pillLayer.addLayer(p); v.pillInMap = true; keepTop(v); }
+        if (!v.pillInMap) { syncMarkerPosition(p, v.pos); pillLayer.addLayer(p); v.pillInMap = true; keepTop(v); }
         if (dotOpen && !p.isPopupOpen()) { p.openPopup(); popupClosedAt = 0; }
       } else {
         var pillOpen = !!(v.pill && v.pill.isPopupOpen());
         if (v.pillInMap) { pillLayer.removeLayer(v.pill); v.pillInMap = false; }
-        if (!v.dotInMap) { dotLayer.addLayer(v.dot); v.dotInMap = true; }
+        if (!v.dotInMap) { syncMarkerPosition(v.dot, v.pos); dotLayer.addLayer(v.dot); v.dotInMap = true; }
         if (pillOpen && !v.dot.isPopupOpen()) { v.dot.openPopup(); popupClosedAt = 0; }
       }
     });
@@ -7992,22 +8052,11 @@
       if (isMatch[k]) return;
       var v = vehicles[k];
       if (v.dotInMap) { dotLayer.removeLayer(v.dot); v.dotInMap = false; }
-      if (routeVeh[k]) { var rp = ensurePill(v); if (!v.pillInMap) { pillLayer.addLayer(rp); v.pillInMap = true; } return; }   // v99: yours stays
+      if (routeVeh[k]) { var rp = ensurePill(v); if (!v.pillInMap) { syncMarkerPosition(rp, v.pos); pillLayer.addLayer(rp); v.pillInMap = true; } return; }   // v99: yours stays
       if (v.pillInMap) { pillLayer.removeLayer(v.pill); v.pillInMap = false; }
     });
 
     switching = false;
-    if (view3d.on) view3d.feedChanged(matched);   // v101: the vehicles the 3D map shows (same filters and search)
-    renderChips(toks);
-    updateSearchStops(toks, matched);
-    renderStops();
-    updatePopupPadding();
-    // status: Live (green) / Delayed, no new data for > 30 s (yellow) / feed failing (red) / Loading
-    var at = feedTime ? new Date(feedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
-    if (feedFailed) setStatus('err', 'Live feed unavailable');
-    else if (!feedTime) setStatus('loading', 'Loading…');
-    else if (Date.now() - lastNewDataAt > 30000) setStatus('warn', 'Delayed · last data ' + at);
-    else setStatus('ok', 'Live · ' + (toks.length ? fmtN(matched.length) + ' of ' : '') + fmtN(keys.length) + ' vehicles · ' + at);
   }
 
   function renderChips(toks) {
@@ -8079,7 +8128,7 @@
 
   // v96: the route and its guidance, for Diagnostics and Copy report
   function routeDiag() {
-    var p = placeById(route.placeId), w = route.ways[0], lg = w && w.legs[route.leg];
+    var p = savedPlaces.find(route.placeId), w = route.ways[0], lg = w && w.legs[route.leg];
     return [
       ['To', p ? p.name : '—'],
       ['State', route.state + (route.go ? ' · guiding: ' + (route.phase || 'planning') + ' (step ' + Math.min(route.leg + 1, w ? w.legs.length : route.leg + 1) + ' of ' + (w ? w.legs.length : '?') + ')' : '')],
@@ -8107,6 +8156,13 @@
       if (d.via === 'trip-update') viaTu++;
       if (vehicles[k].parked) parked++;
     });
+    // issue counter on the closed row: errors win over warnings
+    var issues = diagIssues(keys.length, withLine);
+    var nErr = issues.filter(function (i) { return i.level === 'err'; }).length, nWarn = issues.length - nErr;
+    drawOnce('diagCount', nErr ? '<span class="c-err">' + nErr + (nErr === 1 ? ' error' : ' errors') + '</span>'
+      : nWarn ? '<span class="c-warn">' + nWarn + (nWarn === 1 ? ' warning' : ' warnings') + '</span>' : '');
+    if (!diagOpen) return;   // the rest is only drawn while Diagnostics is open
+
     var rIds = Object.keys(routes).slice(0, 5).map(function (id) { return id + '→' + routes[id].short + ' (t' + routes[id].type + ')'; });
     var tIds = Object.keys(trips).slice(0, 2);
     var samples = keys.slice(0, 4).map(function (k) {
@@ -8150,13 +8206,6 @@
     ].join('\n');
     var raw = document.getElementById('diagRaw');
     if (isRevealed(raw) && raw.value !== diagRawText && document.activeElement !== raw) raw.value = diagRawText;
-
-    // issue counter on the closed row: errors win over warnings
-    var issues = diagIssues(keys.length, withLine);
-    var nErr = issues.filter(function (i) { return i.level === 'err'; }).length, nWarn = issues.length - nErr;
-    drawOnce('diagCount', nErr ? '<span class="c-err">' + nErr + (nErr === 1 ? ' error' : ' errors') + '</span>'
-      : nWarn ? '<span class="c-warn">' + nWarn + (nWarn === 1 ? ' warning' : ' warnings') + '</span>' : '');
-    if (!diagOpen) return;   // the rest is only drawn while Diagnostics is open
 
     drawOnce('diagIssues', issues.map(function (i) {
       return '<div class="dg-issue ' + i.level + '" role="note">' + WARN_SVG + '<span>' + esc(i.text) + '</span></div>';
@@ -8436,11 +8485,16 @@
     perfSet(pf.pfBld, (view3d.on ? '3D≥' + bldZ : (phone ? '3D' : '3D bldg ') + (image ? ' n/a' : bldZ !== null ? '≥' + bldZ : ' …')), bldZ !== null && z >= bldZ ? 'on' : 'off');
     perfSet(pf.pfFps, fps + ' fps · ' + (phone ? '' : 'worst ') + worst + ' ms', fps < 30 ? 'bad' : '');
 
-    var b = map.getBounds();
-    var minLat = b.getSouth(), maxLat = b.getNorth(), minLon = b.getWest(), maxLon = b.getEast();
-    var veh = countInView(dotLayer, minLat, maxLat, minLon, maxLon), lab = countInView(pillLayer, minLat, maxLat, minLon, maxLon);
-    var stp = countInView(stopLayer, minLat, maxLat, minLon, maxLon) + countInView(routeStopLayer, minLat, maxLat, minLon, maxLon) + countInView(focusLayer, minLat, maxLat, minLon, maxLon);
-    if (view3d.on && view3d.counts) { var c3 = view3d.counts(); veh = c3.dots; lab = c3.labels; stp = c3.stops; }   // v103: the 3D map's own
+    var veh, lab, stp;
+    if (view3d.on) {
+      var c3 = view3d.counts();
+      veh = c3.dots; lab = c3.labels; stp = c3.stops;
+    } else {
+      var b = map.getBounds();
+      var minLat = b.getSouth(), maxLat = b.getNorth(), minLon = b.getWest(), maxLon = b.getEast();
+      veh = countInView(dotLayer, minLat, maxLat, minLon, maxLon); lab = countInView(pillLayer, minLat, maxLat, minLon, maxLon);
+      stp = countInView(stopLayer, minLat, maxLat, minLon, maxLon) + countInView(routeStopLayer, minLat, maxLat, minLon, maxLon) + countInView(focusLayer, minLat, maxLat, minLon, maxLon);
+    }
     perfSet(pf.pfCnt, phone ? 'v' + veh + ' l' + lab + ' s' + stp : 'drawn: ' + veh + ' dots · ' + lab + ' labels · ' + stp + ' stops');
 
     // FPS sparkline: the last 10 s
@@ -8508,7 +8562,7 @@
     var hiddenAt = 0, hideTimer = 0, addedAt = 0, lp = null;
     // v101: vehicles, the tracked one, its route and stops
     var shown = [], drawn = [], vehDue = 0, vehN = 0, farN = 0, vehMs = [], inkOf = {}, trkMk = null, stopMks = {}, stopsQueued = false, freed = false;
-    var trk = { color: '#888', tailRef: null, tailLen: -1 }, fontB = ['Noto Sans Bold'];
+    var trk = { color: '#888', tailRef: null }, fontB = ['Noto Sans Bold'];
     // v102: following cameras, route to a place
     var headingUp = store('sofia_3d_heading') !== 'north', fc = { off: null, at: 0 }, lc = { off: null, at: 0, rest: false };
     var stopsDrawn = [], terrainOn = store('sofia_3d_terrain') === null ? VIEW3D_TERRAIN : store('sofia_3d_terrain') === '1', demAttr = false;   // v103
@@ -8586,7 +8640,7 @@
     }
     function open() {
       if (view3d.on || !available()) return;
-      if (placing) endPlacing();
+      if (savedPlaces && savedPlaces.isPlacing) savedPlaces.cancelPlacement();
       map.closePopup();
       var c = map.getCenter(), z = map.getZoom();
       el = document.createElement('div');
@@ -8598,7 +8652,7 @@
         m3 = new maplibregl.Map({
           container: el, style: style3d(), center: [c.lng, c.lat], zoom: z - 1, pitch: 0, bearing: 0,
           minZoom: 8, maxZoom: 18, maxPitch: VIEW3D_MAX_PITCH,
-          pixelRatio: Math.min(window.devicePixelRatio || 1, VIEW3D_DPR_MAX),
+          pixelRatio: mapPixelRatio(),
           fadeDuration: 120, maxTileCacheZoomLevels: 3, attributionControl: false, renderWorldCopies: false,
           dragRotate: true, touchPitch: true, pitchWithRotate: true
         });
@@ -8609,6 +8663,10 @@
         return;
       }
       view3d.on = true; ready = false; closing = false;
+      viewBounds01 = null;
+      function invalidateBounds() { viewBounds01 = null; }
+      m3.on('move', invalidateBounds);
+      m3.on('resize', invalidateBounds);
       info.opens++; info.tiles0 = tileReq; info.hits0 = tileHits;
       store(OPEN_KEY, String(Date.now()));
       handlers(false);
@@ -8630,7 +8688,7 @@
       m3.on('movestart', function (e) { if (e && e.originalEvent) userMoving = true; });
       m3.on('moveend', function () {
         var now = performance.now();
-        if (selfMove) { if (now - lastRender > 1000) { lastRender = now; render(false); } return; }
+        if (selfMove) { if (now - lastRender > 1000) { lastRender = now; renderStops(); } return; }
         camBusy = false; userMoving = false; lastRender = now;
         if (view3d.on) render(false);
       });
@@ -8780,6 +8838,7 @@
       var tag = label(10.5);
       tag['text-field'] = ['get', 'tag']; tag['icon-image'] = 'v3pill-#D6336C'; tag['text-offset'] = [0, 2.1];
       m3.addLayer({ id: 'v3-veh-tag', type: 'symbol', source: 'v3-veh', filter: ['==', ['get', 'm'], 1], layout: tag, paint: { 'text-color': '#fff' } });
+      pointSnapshots = {};
       shown = []; vehDue = 0; rtSig = ''; dimNow = null;
       view3d.followChanged(following);
       render(false);          // the vehicles to show (fills `shown`)
@@ -8793,6 +8852,24 @@
     // Near vehicles (inside the clipped view, + 30 %) go to 'v3-veh' 15 times a second; the far ones, toward the
     // horizon, only as dots and twice a second ('v3-veh-far'), so a tilted view doesn't update the whole city 15×/s.
     var farDue = 0, farDrawn = [];
+    // Keep snapshots per map instance. Compare geometry, styling and order so a
+    // colour change or a disappearing vehicle still reaches the worker.
+    var pointSnapshots = {};
+    function submitPointSource(id, features, tolerance) {
+      var snapshot = pointSnapshots[id], previous = snapshot ? snapshot.features : [];
+      // Let small movements accumulate against the last submitted position.
+      // Flush the exact endpoint within half a second, even at city zoom.
+      if (snapshot && performance.now() - snapshot.at >= 500) tolerance = 0;
+      var lngStep = tolerance ? tolerance.lng : 0, latStep = tolerance ? tolerance.lat : 0;
+      if (previous.length === features.length && features.every(function (f, i) {
+        var old = previous[i], a = f.geometry.coordinates, b = old.geometry.coordinates;
+        if (Math.abs(a[0] - b[0]) > lngStep || Math.abs(a[1] - b[1]) > latStep) return false;
+        for (var key in f.properties) if (f.properties[key] !== old.properties[key]) return false;
+        return true;
+      })) return;
+      setSrc(id, { type: 'FeatureCollection', features: features });
+      pointSnapshots[id] = { features: features, at: performance.now() };
+    }
     function buildVeh() {
       if (!m3 || !m3.getSource('v3-veh')) return;
       var t0 = performance.now(), nb = view3d.bounds(0.3), b = m3.getBounds(), now = performance.now(), doFar = now >= farDue;
@@ -8819,8 +8896,10 @@
       }
       for (var i = 0; i < shown.length; i++) add(shown[i]);
       for (var k in routeVeh) add(vehicles[k]);
-      setSrc('v3-veh', { type: 'FeatureCollection', features: feats });
-      if (doFar) setSrc('v3-veh-far', { type: 'FeatureCollection', features: far });
+      var halfPixel = 180 / (512 * Math.pow(2, m3.getZoom()));
+      var tolerance = { lng: halfPixel, lat: halfPixel * Math.cos(toRad(m3.getCenter().lat)) };
+      submitPointSource('v3-veh', feats, tolerance);
+      if (doFar) submitPointSource('v3-veh-far', far, tolerance);
       vehN = feats.length; farN = farDrawn.length;
       vehMs.push(performance.now() - t0);
       if (vehMs.length > 100) vehMs.shift();
@@ -8848,6 +8927,8 @@
       }
       var k = iconKey(v.d);
       if (k !== trkMk._k) { trkMk._k = k; trkMk.getElement().innerHTML = iconFor(v.d).options.html; }
+      var atMarker = trkMk.getLngLat();
+      if (atMarker.lng === at[0] && atMarker.lat === at[1]) return;
       trkMk.setLngLat(at);
       if (pop && popKind === 'veh' && popRef === v) pop.setLngLat(at);
     }
@@ -8938,11 +9019,17 @@
       return typeof v.d.bearing === 'number' && !v.parked ? v.d.bearing : null;
     }
     function lockOn(st, ll, y, bearing, dt, tau) {
-      var fp = padAt(y);
+      var fp = padAt(y), center = m3.getCenter(), padding = m3.getPadding();
       if (!st.off) { var c = m3.unproject([m3.getCanvas().clientWidth / 2, fp.y]); st.off = [c.lng - ll[0], c.lat - ll[1]]; }
       var k = reduceMotion ? 0 : Math.exp(-dt / tau);
       st.off[0] *= k; st.off[1] *= k;
-      selfJump({ center: [ll[0] + st.off[0], ll[1] + st.off[1]], bearing: bearing, padding: fp.pad });
+      var lng = ll[0] + st.off[0], lat = ll[1] + st.off[1];
+      var quarterPixel = 90 / (512 * Math.pow(2, m3.getZoom()));
+      if (Math.abs(center.lng - lng) < quarterPixel &&
+          Math.abs(center.lat - lat) < quarterPixel * Math.cos(toRad(lat)) &&
+          Math.abs(m3.getBearing() - bearing) < 0.005 &&
+          Math.abs(padding.top - fp.pad.top) < 0.1 && Math.abs(padding.bottom - fp.pad.bottom) < 0.1) return;
+      selfJump({ center: [lng, lat], bearing: bearing, padding: fp.pad });
     }
     function followCam3() {
       var v = selected;
@@ -9013,7 +9100,7 @@
       rtAt = now;
       var sig = '', dim = mapEl.classList.contains('rt-dim');
       routeLayer.eachLayer(function (l) { sig += L.stamp(l) + ','; });
-      if (destLine) { var d0 = destLine.getLatLngs()[0]; sig += 'd' + d0.lat.toFixed(6) + ',' + d0.lng.toFixed(6); }
+      if (savedPlaces.destinationLine) { var d0 = savedPlaces.destinationLine.getLatLngs()[0]; sig += 'd' + d0.lat.toFixed(6) + ',' + d0.lng.toFixed(6); }
       if (sig !== rtSig) { rtSig = sig; syncRoute(); }
       if (dim !== dimNow) { dimNow = dim; applyDim(dim); }
       mapEl.classList.toggle('rt-far', viewZoom() < ROUTE_TAG_ZOOM);
@@ -9031,7 +9118,7 @@
         if (!rtMks[id]) rtMks[id] = new maplibregl.Marker({ element: mkEl('rt-mk', html, 3), pitchAlignment: 'viewport', rotationAlignment: 'viewport' }).setLngLat([ll.lng, ll.lat]).addTo(m3);
       });
       Object.keys(rtMks).forEach(function (id) { if (!seen[id]) { rtMks[id].remove(); delete rtMks[id]; } });
-      if (destLine) line(destLine.getLatLngs(), destLine.options.color, destLine.options.opacity, true, false);
+      if (savedPlaces.destinationLine) line(savedPlaces.destinationLine.getLatLngs(), savedPlaces.destinationLine.options.color, savedPlaces.destinationLine.options.opacity, true, false);
       setSrc('v3-rt', { type: 'FeatureCollection', features: feats });
     }
     // while a route is open, the other vehicles are dimmed (its own keep their pink ring), as in 2D
@@ -9049,8 +9136,9 @@
     }
     view3d.pathChanged = function () {
       if (!m3 || !m3.getSource('v3-trk-tail')) return;
+      if (flow) flow.draw3d = null;   // resync the head when the sources are replaced
       var lls = pathLine ? pathLine.getLatLngs() : null, x = [];
-      trk.color = pathLine ? pathLine.options.color : '#888'; trk.tailRef = null; trk.tailLen = -1;
+      trk.color = pathLine ? pathLine.options.color : '#888'; trk.tailRef = null;
       setSrc('v3-trk-tail', lls && lls.length > 1 ? lineFeat(lls, trk.color) : EMPTY);
       setSrc('v3-trk-head', EMPTY);
       if (pathPreview) { var f = lineFeat(pathPreview.getLatLngs(), pathPreview.options.color); f.properties.dash = 1; x.push(f); }
@@ -9058,13 +9146,13 @@
       setSrc('v3-trk-x', { type: 'FeatureCollection', features: x });
     };
     // every frame: only the short piece from the vehicle to the next point of the route changes
-    view3d.pathMoved = function (lls) {
-      if (!m3 || !m3.getSource('v3-trk-tail') || lls.length < 2) return;
-      if (trk.tailRef !== lls[1] || trk.tailLen !== lls.length) {
-        trk.tailRef = lls[1]; trk.tailLen = lls.length;
-        setSrc('v3-trk-tail', lls.length > 2 ? lineFeat(lls.slice(1), trk.color) : EMPTY);
+    view3d.pathMoved = function (head, tail) {
+      if (!m3 || !m3.getSource('v3-trk-tail')) return;
+      if (trk.tailRef !== tail) {
+        trk.tailRef = tail;
+        setSrc('v3-trk-tail', tail.length > 1 ? lineFeat(tail, trk.color) : EMPTY);
       }
-      setSrc('v3-trk-head', lineFeat([lls[0], lls[1]], trk.color));
+      setSrc('v3-trk-head', head.length ? lineFeat(head, trk.color) : EMPTY);
     };
 
     // ---- v101: stops — the same markers as on the 2D map: the tracked vehicle's stops and "your stop" ----
@@ -9104,7 +9192,7 @@
         feats.push({ type: 'Feature', properties: { img: 'v3stop-' + (mk._color || 'x'), sel: sel }, geometry: { type: 'Point', coordinates: [st.lon, st.lat] } });
         stopsDrawn.push({ mk: mk, c: [st.lon, st.lat] });
       });
-      setSrc('v3-stops', { type: 'FeatureCollection', features: feats });
+      submitPointSource('v3-stops', feats);
     }
     function stopAtPoint(p) {
       var best = null, bd = Infinity, rad = 14 * ui;
@@ -9163,7 +9251,7 @@
         var mm = m3, e3 = el, c = null, z = null;
         try { if (mm) { c = mm.getCenter(); z = mm.getZoom() + 1; } } catch (e) {}
         view3d.on = false; closing = false; ready = false; camBusy = false;
-        m3 = null; el = null;
+        m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
         trkMk = null; stopMks = {}; stopsDrawn = []; shown = []; drawn = []; farDrawn = []; labelsBy = null; rtMks = {}; rtSig = ''; fc.off = lc.off = null; userMoving = pointerDown = false;
         window.removeEventListener('mouseup', pointerOff, true); window.removeEventListener('touchend', pointerOff, true); window.removeEventListener('touchcancel', pointerOff, true);
@@ -9355,18 +9443,18 @@
 
     // ---- My places: the flags (read only here; placing and moving one is done in 2D) ----
     function pinHtml(p) {
-      var d = p.id === destId ? distFromMe(p) : null;
+      var d = p.id === savedPlaces.destinationId ? savedPlaces.distanceFromMe(p) : null;
       return '<div class="pin-ic">' + FLAG_SVG + '</div><div class="pin-lbl">' + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
     }
     function syncPins() {
       if (!m3) return;
       var seen = {};
-      places.forEach(function (p) {
-        var id = p.id, m = pinMks[id], html = pinHtml(p), dest = id === destId;
+      savedPlaces.forEach(function (p) {
+        var id = p.id, m = pinMks[id], html = pinHtml(p), dest = id === savedPlaces.destinationId;
         seen[id] = true;
         if (!m) {
           var e = mkEl('pin-mk', '', 0);
-          e.addEventListener('click', function (ev) { ev.stopPropagation(); var q = placeById(id); if (q) openPop('pin', q); });
+          e.addEventListener('click', function (ev) { ev.stopPropagation(); var q = savedPlaces.find(id); if (q) openPop('pin', q); });
           m = pinMks[id] = new maplibregl.Marker({ element: e, pitchAlignment: 'viewport', rotationAlignment: 'viewport' }).setLngLat([p.lon, p.lat]).addTo(m3);
         }
         var e2 = m.getElement();
@@ -9378,8 +9466,8 @@
       });
       Object.keys(pinMks).forEach(function (id) { if (!seen[id]) { pinMks[id].remove(); delete pinMks[id]; } });
       if (pop && popKind === 'pin') {
-        var q = placeById(popRef.id);
-        if (!q) closePop(); else pop.setHTML(pinPopupHtml(q));
+        var q = savedPlaces.find(popRef.id);
+        if (!q) closePop(); else pop.setHTML(savedPlaces.popupHtml(q));
       }
     }
     view3d.placesChanged = function () { if (m3) syncPins(); };
@@ -9391,7 +9479,7 @@
       var ll = L.latLng(lngLat.lat, lngLat.lng);
       close('adding a place');
       toast('Places are added in 2D.', 2500);
-      openPinDlg('New place here', '', function (name) { addPlace(name, ll); });
+      openPinDlg('New place here', '', function (name) { savedPlaces.add(name, ll); });
     }
 
     // ---- popups (PC and phones: the flag's card) ----
@@ -9403,7 +9491,7 @@
       var p = new maplibregl.Popup({ className: 'v3-pop ' + (kind === 'veh' ? 'veh-pop' : kind === 'stop' ? 'stop-pop' : 'pin-pop'), closeButton: false, closeOnClick: false,
         anchor: kind === 'veh' ? 'top' : undefined,   // v100's card: always below the vehicle
         offset: kind === 'pin' ? POP_OFF : kind === 'veh' ? [0, Math.round(VP_GAP * ui) - 8] : popOffset(18), maxWidth: 'none', focusAfterOpen: false });
-      if (kind === 'pin') p.setLngLat([ref.lon, ref.lat]).setHTML(pinPopupHtml(ref));
+      if (kind === 'pin') p.setLngLat([ref.lon, ref.lat]).setHTML(savedPlaces.popupHtml(ref));
       else if (kind === 'veh') { var el = vehPopupEl(ref); patchVeh(el, ref); p.setLngLat([ref.pos[1], ref.pos[0]]).setDOMContent(el); }
       else {
         var st = ref._stop, se = ref._spEl;
@@ -9527,6 +9615,7 @@
   }
   function esc(s) { return String(s).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); }
 
+  function fmtM(m) { return m >= 1000 ? (m / 1000).toFixed(m >= 10000 ? 0 : 1) + ' km' : Math.round(m / 10) * 10 + ' m'; }
   // ---------- Start ----------
   loadStatic();
   update(true);

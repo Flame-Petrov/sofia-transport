@@ -1,0 +1,53 @@
+  /* ---------- v100: 3D view ----------
+     A second, native MapLibre map (#map3d) inside #map, above Leaflet's map pane (400) and under its controls
+     (800+). It fades in once it has drawn; then the Leaflet pane is hidden (visibility, so Leaflet keeps its size). */
+  #map3d { position: absolute; inset: 0; z-index: 450; opacity: 0; transition: opacity .25s ease; }
+  #map3d:not(.ready) { pointer-events: none; }
+  #map3d.ready { opacity: 1; }
+  #map3d.leaving { opacity: 0; pointer-events: none; }
+  #map.v3on .leaflet-map-pane { visibility: hidden; }
+  .leaflet-container .leaflet-control-3d, .leaflet-container .leaflet-control-north { border-radius: 50%; }
+  .leaflet-control-3d[hidden], .leaflet-control-north[hidden] { display: none; }
+  .leaflet-container .leaflet-control-3d a { display: flex; align-items: center; justify-content: center; font: 700 15px/48px var(--font); letter-spacing: -.01em; color: #3a3a3c; }
+  .leaflet-container .leaflet-control-3d.on a { background: var(--ink); color: #fff; }
+  .leaflet-container .leaflet-control-north a { display: flex; align-items: center; justify-content: center; color: #3a3a3c; }
+  .leaflet-control-north svg { width: 24px; height: 24px; }
+  .leaflet-container .leaflet-control-north.hu a { color: var(--trolley); }
+  /* markers on the 3D map: a 0 × 0 box on the spot, the same icon HTML as in 2D inside it */
+  .v3-mk { width: 0; height: 0; }
+  #map3d .me-mk .me-cone { display: none; }   /* the beam is its own marker there, lying on the ground */
+  .me-beam { width: 0; height: 0; }
+  .me-beam svg { position: absolute; left: 0; top: 0; width: 120px; height: 120px; transform: translate(-50%, -50%); zoom: var(--ui); transition: opacity .3s; }
+  .me-beam.off svg { opacity: 0; }
+  /* popups on the 3D map (PC): the same cards as the 2D popups, in glass */
+  .v3-pop { z-index: 5; }
+  .v3-pop .maplibregl-popup-content {
+    padding: 0; border-radius: 16px; background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); color: var(--ink); zoom: var(--ui); font-size: 13px; line-height: 1.45;
+  }
+  .v3-pop.pin-pop .maplibregl-popup-content { padding: 14px; min-width: 210px; }
+  .v3-pop .maplibregl-popup-tip { display: none; }
+  /* v101: the vehicle and stop cards (PC), and "your stop"'s name above its marker */
+  .v3-pop.stop-pop .maplibregl-popup-content { padding: 16px; }
+  /* v100's vehicle card on the 3D map: the same ivory card hanging below the vehicle, its pointer rising to the marker */
+  .v3-pop.veh-pop .maplibregl-popup-content {
+    box-sizing: border-box; padding: 22px 17px 20px; border-radius: 34px; background: var(--vp-card); border: 1px solid rgba(255,255,255,.95);
+    box-shadow: 0 18px 44px rgba(70,40,36,.20), 0 3px 10px rgba(70,40,36,.08), inset 0 1px 0 #fff; -webkit-backdrop-filter: none; backdrop-filter: none;
+  }
+  .v3-pop.veh-pop .maplibregl-popup-tip {
+    display: block; position: relative; z-index: 1; width: 16px; height: 16px; margin-bottom: -9px; box-sizing: border-box; zoom: var(--ui);
+    border: 1px solid rgba(255,255,255,.95); border-right: 0; border-bottom: 0; border-radius: 3px 0 0 0; background: var(--vp-card); transform: rotate(45deg);
+  }
+  .v3-pop.stop-pop .sp-head { background: transparent; }
+  .v3-flabel {
+    position: absolute; left: 0; top: 0; transform: translate(-50%, calc(-100% - 22px)); white-space: nowrap; pointer-events: none;
+    background: #00a86b; color: #fff; font: 600 calc(12px * var(--ui))/1.35 var(--font); padding: calc(3px * var(--ui)) calc(8px * var(--ui));
+    border-radius: calc(8px * var(--ui)); box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  }
+  /* menu: the note after a 3D crash on this device, with Try again */
+  #v3Box { display: flex; flex-direction: column; gap: 8px; padding: 6px 0 10px; }
+  #v3Box[hidden], #v3TerRow[hidden] { display: none; }
+  #v3Retry {
+    height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer;
+    border: 1.5px solid var(--border); background: none; color: var(--text); font-size: 14px; font-weight: 500;
+  }

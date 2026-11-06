@@ -1,0 +1,67 @@
+  /* =====================================================================================================
+     v80 — One scroll area, nothing squeezed. The search pill and the filter pill (.p-head) stay put; the
+     panel's content area (#panelBody: tracking, error box, menu card) is the one place that scrolls, and
+     fitPanel() limits only the panel. Every section, header, card and wrapper keeps its natural height
+     (flex: 0 0 auto): before, a flex column with a limited height shrank them to fit — "My places" became
+     a thin strip when Diagnostics opened.
+     ===================================================================================================== */
+  #panelBody {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    /* room around the cards for their shadows, and under the last row so it scrolls fully into view;
+       no negative bottom margin any more, so the scroll area ends where the panel ends */
+    padding: 2px 14px 18px; margin: -2px -14px 0; scroll-padding-bottom: 18px;
+    scrollbar-width: thin; scrollbar-color: rgba(60,60,67,.3) transparent;
+  }
+  #panelBody::-webkit-scrollbar { display: block; width: 6px; }
+  #panelBody::-webkit-scrollbar-thumb { border-radius: 3px; background: rgba(60,60,67,.3); }
+  #panelBody::-webkit-scrollbar-track { background: transparent; margin: 10px 0 18px; }
+  .p-head, .p-head > *, #panelBody > *, #menuCard > *, #plBody > *, #offBody > *, #diagBody > *, #diagSections > *,
+  .dg-sec, .dg-card, .dg-kv, .dg-head, .dg-issue, .pl-item, .reveal, .fold-sec { flex: 0 0 auto; }
+  #menuCard { overflow: visible; max-height: none; }
+  /* the sections' grid column never grows past the panel: a long place name ellipsizes instead of
+     pushing the whole card off the right edge (auto columns took the content's full width) */
+  .fold-sec, .reveal { grid-template-columns: minmax(0, 1fr); }
+  .fold-sec > *, .reveal > * { min-width: 0; }
+  /* comfortable targets: headers and buttons about 44 px */
+  .dg-head { min-height: 44px; justify-content: flex-start; }   /* v81: just Copy report */
+  #diagCopy { height: 40px; }
+  #diagClose { width: 40px; height: 40px; }
+  #diagCopy::after, #diagClose::after, .pl-act::after { content: ''; position: absolute; inset: -4px; }
+  .pl-act { width: 36px; height: 36px; }
+  /* narrow widths: a long value wraps under its label instead of crowding it; the row grows */
+  .dg-kv { flex-wrap: wrap; align-items: baseline; column-gap: 12px; row-gap: 2px; }
+  .dg-kv > span:first-child { flex: 0 1 auto; min-width: 0; white-space: normal; }
+  .dg-kv > span:last-child { flex: 1 1 9em; min-width: 0; margin-left: auto; overflow-wrap: anywhere; }
+  .dg-issue span { min-width: 0; overflow-wrap: anywhere; }
+  .pl-go .pl-n { min-width: 0; }
+
+  /* =====================================================================================================
+     v83 — The My places / Diagnostics bubble: a fixed shell with its own scroll inside.
+     #menuCard is the shell: glass background, border, rounded corners, no shadow, overflow hidden; it
+     never moves and fitPanel() gives it the room between the filters and the bottom map controls.
+     #menuScroll fills it and is what scrolls (wheel, trackpad, touch, keyboard) — with no visible
+     scrollbar. All four corners stay in view at every scroll position (before, the whole card scrolled
+     inside the panel, so its rounded ends were cut off, and a scrollbar showed beside it).
+     ===================================================================================================== */
+  #menuCard {
+    /* v84: clip, not hidden — "hidden" still lets the browser scroll the shell (focus, find-in-page), which
+       slid every row out of view and left an empty bubble; a clipped box cannot be scrolled at all */
+    display: flex; flex-direction: column; padding: 0; overflow: hidden; overflow: clip; box-shadow: none;
+    border-radius: 24px; /* max-height: set by fitPanel() */
+  }
+  #menuCard::before, #menuCard::after { box-shadow: none; }
+  #menuScroll {
+    flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch;
+    display: flex; flex-direction: column;
+    padding: 4px 16px 16px; scroll-padding: 8px 0 16px;   /* first and last rows fully clear of the rounded edges */
+    scrollbar-width: none; -ms-overflow-style: none;
+  }
+  #menuScroll::-webkit-scrollbar { display: none; width: 0; height: 0; }
+  #menuScroll > * { flex: 0 0 auto; }   /* sections never shrink: opening one makes the content taller */
+  #menuScroll:focus-visible { outline: 2px solid rgba(10,108,240,.35); outline-offset: -2px; border-radius: 24px; }
+  /* the panel's own content area no longer needs to scroll for the bubble; no scrollbar there either */
+  #panelBody { scrollbar-width: none; }
+  /* the raw log box is never taller than the bubble (short screens): it scrolls its own text */
+  #diagRaw { height: min(240px, calc(var(--bubble-h, 300px) - 44px)); min-height: 96px; max-height: none; }
+  #panelBody::-webkit-scrollbar { display: none; width: 0; }
+

@@ -1,0 +1,82 @@
+  /* =====================================================================================================
+     v100 — The selected vehicle's card (design images/selected-vehicle-popup-reference.png). A warm ivory
+     card hangs below the vehicle, its pointer rising to the round marker: line badge and destination with
+     the live line, the next stop as the headline, your stop in a tinted row, then Follow and All stops.
+     ===================================================================================================== */
+  :root { --vp-card: rgba(253,249,246,.97); --vp-acc: #D41F55; --vp-acc-2: #C8174B; --vp-ink: #161312; --vp-gray: #6B6461; }
+  /* the tracked vehicle: a round marker in its line's colour, the vehicle type's glyph, thick white rim */
+  .veh .pill.vsel, .veh .pill.vsel.mine {
+    --s: 1; width: 46px; height: 46px; padding: 0; gap: 0; justify-content: center; box-sizing: border-box;
+    border-radius: 50%; border: 4px solid #fff; background-image: linear-gradient(180deg, rgba(255,255,255,.14), rgba(0,0,0,.07));
+    box-shadow: 0 4px 14px rgba(50,20,20,.30), 0 1px 3px rgba(0,0,0,.22);
+  }
+  .veh .pill.vsel.mine { box-shadow: 0 0 0 3px var(--dest), 0 4px 14px rgba(50,20,20,.30); }
+  .veh .pill.vsel svg { display: block; width: 22px; height: 22px; }
+  body.vp-card .veh .pill.vsel .vtag { display: none; }
+  .vp-under { opacity: 0 !important; pointer-events: none !important; transition: opacity .15s ease; }   /* the card is where its pointer would be */
+  /* the card: below its spot (placeBelow), the pointer drawn over the card's top edge so both read as one shape */
+  .veh-pop.vp-below { margin-bottom: 0; margin-top: calc(11px * var(--ui)); }
+  .veh-pop.vp-below .leaflet-popup-content-wrapper {
+    border-radius: 34px; background: var(--vp-card); border: 1px solid rgba(255,255,255,.95);
+    box-shadow: 0 18px 44px rgba(70,40,36,.20), 0 3px 10px rgba(70,40,36,.08), inset 0 1px 0 #fff;
+  }
+  .veh-pop.vp-below .leaflet-popup-content { margin: 22px 17px 20px; }
+  .veh-pop.vp-below .leaflet-popup-tip-container { top: -11px; width: 32px; height: 12px; margin: 0 0 0 -16px; z-index: 1; }
+  .veh-pop.vp-below .leaflet-popup-tip {
+    width: 16px; height: 16px; padding: 0; margin: 4px auto 0; box-sizing: border-box; border-radius: 3px 0 0 0;
+    background: var(--vp-card); border: 1px solid rgba(255,255,255,.95); border-right: 0; border-bottom: 0; box-shadow: none;
+  }
+  .veh-pop .vp { gap: 0; color: var(--vp-ink); font-family: var(--font); font-size: 15px; line-height: 1.3; }
+  /* header: badge, "To …" over the live line, × */
+  .vp .vp-head { align-items: flex-start; gap: 16px; padding-left: 8px; }
+  .vp .vp-badge { min-width: 62px; height: 40px; padding: 0 10px; border-radius: 11px; font-size: 26px; font-weight: 750; letter-spacing: -.01em; }
+  .vp .vp-dest { font-size: 21px; font-weight: 700; line-height: 1.2; letter-spacing: -.01em; color: var(--vp-ink); }
+  .vp .vp-meta { margin-top: 5px; gap: 2px 7px; font-size: 15px; color: var(--vp-gray); }
+  .vp .vp-meta .sep { color: #B3AAA6; }
+  .vp .vp-fresh, .vp .vp-fresh.live, .vp .vp-fresh.delayed, .vp .vp-fresh.old { gap: 8px; font-weight: 400; color: var(--vp-gray); }
+  .vp .vp-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #A39B98; }
+  .vp .vp-fresh.live .vp-dot { background: #E5467A; }
+  .vp .vp-fresh.delayed .vp-dot { background: #E0A100; }
+  .vp .vp-x { width: 40px; height: 40px; margin: -10px -9px 0 0; background: none; }
+  .vp .vp-x svg { width: 16px; height: 16px; }
+  .vp .vp-x:hover { background: rgba(70,40,36,.06); }
+  /* the next stop: the headline */
+  .vp-hero { display: flex; align-items: center; gap: 14px; margin-top: 22px; padding: 0 8px; }
+  .vp-hero .vp-mid, .vp-mine .vp-mid { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+  .vp .vp-lbl { font-size: 16px; color: var(--vp-gray); }
+  .vp-hname { margin-top: 1px; font-size: 28px; font-weight: 700; line-height: 1.15; letter-spacing: -.015em; overflow-wrap: anywhere; }
+  .vp-eta { position: relative; flex: none; padding-left: 24px; color: var(--vp-acc); }
+  .vp-eta::before { content: ''; position: absolute; left: 0; top: 50%; width: 2px; height: 40px; margin-top: -20px; border-radius: 1px; background: #EFE4E0; }
+  .vp-eta > span { display: inline-flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+  .vp-eta .vp-n { font-size: 54px; font-weight: 700; line-height: 1; letter-spacing: -.03em; }
+  .vp-eta .vp-u { font-size: 30px; font-weight: 700; line-height: 1; }
+  .vp-eta .now .vp-u { font-size: 36px; }
+  /* your stop: a quieter tinted row */
+  .vp-mine, .vp .vp-next { display: flex; align-items: center; gap: 12px; margin-top: 20px; padding: 11px 18px 11px 20px; border: 0; border-radius: 16px; background: #F7F0ED; color: var(--vp-ink); }
+  .vp-mine .vp-lbl, .vp .vp-next .vp-lbl { font-size: 14px; color: var(--vp-gray); font-weight: 400; }
+  .vp-mname, .vp .vp-next .vp-name { font-size: 18px; font-weight: 700; line-height: 1.25; white-space: normal; overflow-wrap: anywhere; }
+  .vp-mmin, .vp .vp-next .vp-min { flex: none; font-size: 21px; font-weight: 500; color: #5E5755; white-space: nowrap; }
+  .vp .vp-next > svg { color: var(--vp-gray); }
+  .vp .vp-help { margin-top: 8px; padding: 0 8px; font-size: 13px; color: var(--vp-gray); }
+  /* All stops, expanded in place */
+  .vp .vp-list { margin-top: 16px; border-top: 1px solid #EFE6E2; }
+  .vp .vp-row { padding: 10px 8px; border-top-color: #F1E9E6; }
+  .vp .vp-name { font-size: 16px; white-space: normal; overflow-wrap: anywhere; }
+  .vp .vp-list .vp-min { font-size: 16px; font-weight: 700; color: var(--vp-acc); }
+  .vp .vp-clock { font-size: 13px; color: var(--vp-gray); }
+  .vp .vp-pick:hover { background: rgba(212,31,85,.05); }
+  /* Follow (solid) and All stops (outlined): two pills side by side */
+  .vp .vp-actions { margin-top: 16px; gap: 8px; }
+  .vp .vp-btn { flex: 1 1 0; min-width: 0; height: 50px; padding: 0 10px; border-radius: 25px; gap: 12px; font-size: 18px; font-weight: 700; white-space: nowrap; }
+  .vp .vp-btn svg { width: 22px; height: 22px; }
+  .vp .vp-go, .vp .vp-go[aria-pressed="false"] {
+    border: 0; color: #fff; background: linear-gradient(180deg, #DC2D61, #CF1C51);
+    box-shadow: 0 6px 16px rgba(208,28,81,.26), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .vp .vp-go[aria-pressed="true"] { border: 0; color: #fff; background: linear-gradient(180deg, #B4184A, #9E123E); box-shadow: inset 0 2px 4px rgba(0,0,0,.18); }
+  .vp .vp-all { border: 1.5px solid #EDA6B8; background: #FDF9F7; color: var(--vp-acc-2); }
+  .vp .vp-btn:focus-visible, .vp .vp-x:focus-visible { outline: 2px solid var(--vp-acc); outline-offset: 2px; }
+  @media (max-width: 700px) {
+    .vp .vp-list { max-height: calc(28vh / var(--ui)); }   /* the card is over the map now: a shorter list */
+    body.vp-card #stopProg { display: none; }               /* it would run across the card; the card shows the same minutes */
+  }

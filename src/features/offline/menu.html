@@ -1,0 +1,15 @@
+    <!-- v85: map areas kept on the phone (downloaded once, updated monthly) -->
+    <button id="offBtn" class="dg-row" type="button" aria-expanded="false" aria-controls="offBody">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M1.5 3.5l4.3-1.5 4.4 1.5 4.3-1.5v10.5l-4.3 1.5-4.4-1.5-4.3 1.5z M5.8 2v10.5M10.2 3.5V14" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <span class="dg-lbl">Offline map</span><span id="offCount"></span>
+      <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="reveal closed" inert><div id="offBody">
+      <div id="offList" role="list"></div>
+      <button id="offAdd" type="button">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg>
+        Save this view
+      </button>
+      <div class="pl-hint">Move the map to a place you want without waiting (another town, a trip), then tap Save this view.</div>
+      <div class="pl-hint" id="offInfo"></div>
+    </div></div>

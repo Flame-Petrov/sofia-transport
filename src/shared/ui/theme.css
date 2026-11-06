@@ -1,0 +1,228 @@
+  /* =====================================================================================================
+     v76 — "Liquid glass" (reference: design variations/02-liquid-glass.png)
+     Map first: the controls are softly rounded frosted-glass pieces floating over a light, muted map.
+     Glass = translucent white + strong backdrop blur + thin white edge + top highlight + soft shadow.
+     This block overrides the older (dark panel) styling above; colours of the vehicle types are in :root.
+     ===================================================================================================== */
+  :root {
+    --glass: rgba(255,255,255,.62);          /* small floating controls */
+    --glass-strong: rgba(255,255,255,.82);   /* text-heavy cards: popups, sheets, menu, dialogs */
+    --glass-edge: rgba(255,255,255,.8);
+    --glass-blur: saturate(180%) blur(22px);
+    --glass-shadow: 0 12px 32px rgba(40,44,60,.16), 0 2px 6px rgba(40,44,60,.08),
+                    inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(255,255,255,.35);
+    --ink: #1d1d1f; --ink-2: #3c3c43; --hair: rgba(60,60,67,.13); --fill: rgba(118,118,128,.14);
+    --ok: #34C759; --warn: #FFB800; --err: #FF3B30;
+  }
+  #panel .qrow, #types, #tracking, #menuCard, #cityCard, #follow, #stopProg, #toast, #placeBar, #secBar, #pinForm, .chip,
+  #sheet, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-tooltip.hover-tip,
+  .leaflet-container .leaflet-bar, .leaflet-container .leaflet-control-attribution {
+    background: var(--glass); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); color: var(--ink);
+  }
+  #menuCard, #sheet, #pinForm, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-tooltip.hover-tip { background: var(--glass-strong); }
+  /* browsers without backdrop blur: nearly opaque, so text stays readable over the map */
+  @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    #panel .qrow, #types, #tracking, #menuCard, #cityCard, #follow, #stopProg, #toast, #placeBar, #secBar, #pinForm, .chip,
+    #sheet, .leaflet-popup-content-wrapper, .leaflet-popup-tip, .leaflet-tooltip.hover-tip,
+    .leaflet-container .leaflet-bar { background: rgba(255,255,255,.94); }
+  }
+
+  /* ---- the panel: no box of its own any more, a stack of glass pieces ---- */
+  #panel {
+    --bg: transparent; --surface: rgba(255,255,255,.6); --surface-2: rgba(255,255,255,.5); --line: var(--hair);
+    --border: rgba(60,60,67,.2); --text: var(--ink); --muted: #6e6e73; --ok: #1FA34A; --warn: #A86F00; --err: #D70015;
+    top: calc(16px + env(safe-area-inset-top)); left: 16px; width: 420px; max-height: calc(100% - 150px);
+    padding: 0; gap: 10px; border-radius: 0; background: none; box-shadow: none; overflow: visible;
+    color: var(--ink); font-family: var(--font); font-size: 15px; pointer-events: none;
+  }
+  #panel > * { pointer-events: auto; }
+  #panel::after { display: none; }
+  /* the scrolling part keeps room around its cards so their shadows aren't cut off */
+  #panelBody { gap: 10px; padding: 2px 14px 20px; margin: -2px -14px -20px; scrollbar-width: none; }
+  #panelBody::-webkit-scrollbar { display: none; }
+  .p-head { gap: 10px; }
+  /* search: a wide pill, black icon, generous padding */
+  #panel .qrow { height: 56px; padding: 0 8px 0 20px; gap: 6px; border-radius: 28px; }
+  #panel .qrow:focus-within { box-shadow: var(--glass-shadow), 0 0 0 3px rgba(10,108,240,.28); }
+  #panel .sbox { height: 100%; padding: 0; gap: 14px; border-radius: 0; background: none; color: var(--ink); }
+  #panel .sbox:focus-within { outline: none; }
+  #panel .sbox > svg { width: 22px; height: 22px; }
+  #q { font-size: 17px; color: var(--ink); letter-spacing: -.01em; }
+  #q::placeholder { color: rgba(29,29,31,.72); }
+  #qClear { width: 34px; height: 34px; border-radius: 50%; background: var(--fill); color: var(--ink-2); }
+  #qClear svg { width: 12px; height: 12px; }
+  #fold { width: 40px; height: 40px; border-radius: 50%; background: rgba(255,255,255,.6); color: var(--ink); box-shadow: inset 0 0 0 1px rgba(60,60,67,.1); }
+  @media (hover: hover) { #fold:hover { background: rgba(255,255,255,.85); } }
+  /* suggestions under the search: small glass pills */
+  #chips { gap: 8px; padding: 0 4px; }
+  .chip { height: 36px; padding: 0 14px; border-radius: 18px; font-size: 14px; }
+  .chip small { color: #6e6e73; }
+  /* transport filters: one glass pill, a coloured dot per type, thin dividers; off = grey text, hollow dot */
+  #types { flex-wrap: nowrap; gap: 0; height: 52px; margin: 0 6px; padding: 5px; border-radius: 26px; }
+  #types button {
+    flex: 1 1 0; min-width: 0; height: 100%; padding: 0 4px; border: 0; border-radius: 21px; background: transparent;
+    justify-content: center; gap: 9px; font-size: 16px; font-weight: 500; color: #8e8e93; transition: background .15s ease, color .15s ease;
+  }
+  #types button + button::after { content: ''; position: absolute; left: 0; top: 11px; bottom: 11px; width: 1px; background: rgba(60,60,67,.18); }
+  #types button i { width: 12px; height: 12px; border: 2px solid #b8b8bd; }
+  #types button.on { border: 0; background: transparent; color: var(--ink); }
+  #types button.on i { border: 0; background: var(--tc); }
+  #types button:not(.on) { text-decoration: line-through; text-decoration-color: rgba(142,142,147,.6); }
+  @media (hover: hover) { #types button:hover { background: rgba(255,255,255,.5); } }
+  #types button[data-t="3"]  { --tc: var(--bus); }
+  #types button[data-t="0"]  { --tc: var(--tram); }
+  #types button[data-t="11"] { --tc: var(--trolley); }
+  #types button[data-t="1"]  { --tc: var(--metro); }
+  /* tracking: its own glass card under the filters */
+  #tracking { gap: 12px; padding: 12px 12px 12px 14px; border-radius: 22px; }
+  .tb-badge { min-width: 44px; height: 30px; border-radius: 9px; font-size: 15px; }
+  .tb-top { font-size: 13px; color: #6e6e73; }
+  .tb-bot { font-size: 15px; font-weight: 600; color: var(--ink); }
+  #stopTrack, #diagCopy { height: 36px; padding: 0 16px; border: 0; border-radius: 18px; background: var(--fill); color: var(--ink); font-size: 14px; font-weight: 600; }
+  /* the menu (≡ in the search pill): My places and Diagnostics in one glass card */
+  #menuCard { display: flex; flex-direction: column; padding: 4px 16px 12px; border-radius: 24px; }
+  #menuCard .dg-row { height: 50px; padding: 0 2px; gap: 12px; font-size: 15px; font-weight: 500; color: var(--ink); border-top: 1px solid var(--hair); }
+  #menuCard > .dg-row:first-child, #menuScroll > .dg-row:first-child { border-top: 0; }
+  #menuCard .dg-row > svg:first-child { width: 18px; height: 18px; color: #6e6e73; }
+  #menuCard .dg-row .chev { width: 14px; height: 14px; color: #aeaeb2; }
+  #plCount, #diagCount { font-size: 14px; font-weight: 500; color: #6e6e73; }
+  #diagBody { gap: 14px; padding: 2px 0 8px; border-top: 0; }   /* v81: opens under its row like My places */
+  .dg-title { font-size: 17px; font-weight: 700; }
+  .dg-card { border-radius: 14px; background: rgba(255,255,255,.62); border: 1px solid rgba(60,60,67,.08); }
+  .dg-kv { font-size: 14px; }
+  .dg-issue { border-radius: 14px; font-size: 14px; }
+  .dg-issue.warn { background: rgba(255,184,0,.14); border-color: rgba(168,111,0,.3); }
+  .dg-issue.err { background: rgba(215,0,21,.07); border-color: rgba(215,0,21,.25); }
+  .dg-switch .sw { background: rgba(120,120,128,.32); }
+  .dg-switch input:checked + .sw { background: #34C759; }
+  #diagRaw { border-radius: 12px; background: rgba(255,255,255,.72); color: var(--ink-2); border: 1px solid rgba(60,60,67,.1); }
+  #diagClose { border-radius: 50%; background: var(--fill); color: var(--ink); }
+  /* My places inside the menu */
+  #plBody { gap: 8px; padding: 2px 0 8px; }
+  .pl-item { min-height: 48px; border-radius: 14px; background: rgba(255,255,255,.62); border: 1px solid rgba(60,60,67,.08); }
+  .pl-item.dest { box-shadow: inset 0 0 0 1.5px var(--dest); }
+  .pl-go { height: 48px; padding-left: 12px; color: var(--ink); font-size: 15px; }
+  .pl-go svg { color: #8e8e93; }
+  .pl-item.dest .pl-go .pl-d { color: var(--dest); }
+  .pl-go .pl-d { color: #6e6e73; }
+  .pl-act { color: #6e6e73; border-radius: 50%; }
+  .pl-act:hover { background: var(--fill); color: var(--ink); }
+  .pl-act.confirm { border-radius: 16px; background: #FDE7E6; color: #C4161C; }
+  #plAdd { height: 44px; border-radius: 14px; border-color: rgba(60,60,67,.28); background: rgba(255,255,255,.4); color: var(--ink); font-size: 15px; }
+  #offAdd { height: 44px; border-radius: 14px; border-color: rgba(60,60,67,.28); background: rgba(255,255,255,.4); color: var(--ink); font-size: 15px; }
+  #offBody { gap: 8px; padding: 2px 0 8px; }
+  .pl-hint { font-size: 13px; color: #6e6e73; }
+
+  /* ---- bottom left: city and live state ---- */
+  #cityCard {
+    position: fixed; z-index: 1000; left: 16px; bottom: calc(18px + env(safe-area-inset-bottom));
+    max-width: calc(100% - 132px); padding: 14px 24px 15px 20px; border-radius: 28px; font-family: var(--font); zoom: var(--ui);
+  }
+  .cc-name { font-size: 22px; font-weight: 700; line-height: 1.15; letter-spacing: -.015em; }
+  #cityCard #status {
+    margin-top: 4px; padding: 0; gap: 9px; min-height: 0; font-size: 15px; color: var(--ink);
+    font-variant-numeric: tabular-nums; white-space: nowrap;
+  }
+  #cityCard #status span { overflow: hidden; text-overflow: ellipsis; }
+  #status .sdot { width: 10px; height: 10px; background: #aeaeb2; }
+  #status.ok .sdot { background: var(--ok); box-shadow: 0 0 0 3px rgba(52,199,89,.22); }
+  #status.warn .sdot { background: var(--warn); }
+  #status.err .sdot { background: var(--err); }
+
+  /* ---- bottom right: one stack on one centre line (50 px from the edge): zoom, location, Follow, progress ---- */
+  .leaflet-container .leaflet-bar { border-radius: 24px; overflow: hidden; background-clip: border-box; }
+  .leaflet-container .leaflet-bar a {
+    width: 48px; height: 48px; line-height: 48px; background: transparent; color: var(--ink);
+    border-bottom: 1px solid var(--hair); font: 300 24px/48px var(--font);
+  }
+  .leaflet-container .leaflet-bar a:last-child { border-bottom: 0; }
+  @media (hover: hover) { .leaflet-container .leaflet-bar a:hover { background: rgba(255,255,255,.55); } }
+  .leaflet-container .leaflet-bar a.leaflet-disabled { color: #c7c7cc; background: transparent; }
+  .leaflet-right .leaflet-control { margin-right: 26px; }
+  .leaflet-bottom .leaflet-control { margin-bottom: 10px; }
+  .leaflet-container .leaflet-control-locate { border-radius: 50%; }
+  .leaflet-control-locate svg { width: 21px; height: 21px; }
+  .leaflet-container .leaflet-control-attribution {
+    margin: 0 16px 6px 0 !important; padding: 1px 8px; border-radius: 10px; box-shadow: none; border: 0;
+    background: rgba(255,255,255,.55); font: 10px/1.5 var(--font); color: #6e6e73;
+  }
+  .leaflet-container .leaflet-control-attribution a { color: #3c3c43; }
+  #follow {
+    top: auto; bottom: 150px; right: 16px; width: 68px; height: 68px; padding: 0; border-radius: 50%;
+    justify-content: center; gap: 3px; font: 600 13px var(--font); letter-spacing: -.01em;
+  }
+  #follow .ic { width: 22px; height: 22px; }
+  @media (hover: hover) { #follow:not(.on):hover { background: rgba(255,255,255,.8); } }
+  #follow.on { background: rgba(10,108,240,.9); color: #fff; border-color: rgba(255,255,255,.55); }
+  #stopProg { top: auto; right: 18px; transform: none; width: 64px; padding: 12px 6px; border-radius: 32px; color: var(--ink); }
+  #stopProg .pg-track { background: rgba(60,60,67,.18); }
+  #stopProg .pg-arrow { border-bottom-color: var(--ink); }
+  #stopProg .pg-badge { border-color: #fff; }
+  #stopProg .pg-dist { color: #6e6e73; }
+  #stopProg .pg-dot { background: #fff; border-color: var(--ink); }
+
+  /* ---- sheets, popups, hover card: the same glass, stronger ---- */
+  #sheet { border-bottom: 0; border-radius: 28px 28px 0 0; box-shadow: 0 -10px 32px rgba(40,44,60,.18), inset 0 1px 0 rgba(255,255,255,.95); }
+  #sheet .grab { background: rgba(60,60,67,.28); }
+  .sp-head { background: transparent; }
+  .leaflet-popup-content-wrapper, .veh-pop .leaflet-popup-content-wrapper, .stop-pop .leaflet-popup-content-wrapper,
+  .pin-pop .leaflet-popup-content-wrapper { border-radius: 24px; }
+  .leaflet-popup-tip { box-shadow: none; }
+  .leaflet-container a.leaflet-popup-close-button { color: #6e6e73; }
+  .leaflet-tooltip.hover-tip { border-radius: calc(24px * var(--ui)); }
+  .leaflet-tooltip.hover-tip::before { display: none; }
+  .vp, .sp { font-family: var(--font); color: var(--ink); }
+  .vp-x, .sp-x { background: var(--fill); }
+  .vp-row { border-top-color: var(--hair); }
+  .vp-stops { border-top-color: var(--hair); }
+  .vp-pick:hover { background: rgba(255,255,255,.55); }
+  .vp-next { border-radius: 16px; background: rgba(255,255,255,.6); border: 1px solid rgba(60,60,67,.08); }
+  .vp-btn { height: 42px; border-radius: 21px; border: 1px solid rgba(60,60,67,.14); background: rgba(255,255,255,.7); color: var(--ink); }
+  .vp-btn[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: #fff; }
+  .vp-ph { background: rgba(118,118,128,.16); }
+  .sp-card { border-radius: 18px; border-color: rgba(60,60,67,.1); background: rgba(255,255,255,.66); }
+  .sp-chip.est { background: rgba(255,255,255,.85); }
+  .sp-more { color: var(--ink-2); }
+  .pp-name { color: var(--ink); }
+  .pp-btns button { height: 38px; border-radius: 19px; border-color: rgba(60,60,67,.14); background: rgba(255,255,255,.7); color: var(--ink); }
+  .pp-btns .pp-dest { background: var(--dest); border-color: var(--dest); color: #fff; }
+  .pp-btns .pp-dest.on { background: rgba(255,255,255,.8); color: var(--dest); }
+  .pp-btns .pp-del { color: #C4161C; }
+  .pp-btns .pp-del.confirm { background: #E5221B; border-color: #E5221B; color: #fff; }
+
+  /* ---- notes, place bar, naming dialog ---- */
+  #toast, #placeBar, #secBar { bottom: calc(112px + env(safe-area-inset-bottom)); border-radius: 22px; font-family: var(--font); color: var(--ink); }
+  #secBar { padding: 10px 8px 10px 18px; }
+  #secBar button { height: 38px; border-radius: 19px; background: var(--fill); color: var(--ink); font-family: var(--font); }
+  #secBar #secOpen { background: #1A73E8; color: #fff; }
+  /* phones: left of the button column (location, zoom) instead of across it */
+  @media (max-width: 700px) { #secBar { left: 12px; right: 84px; width: auto; max-width: none; transform: none; } }
+  #placeBar { padding: 8px 8px 8px 18px; }
+  #placeBar b { color: var(--dest); }
+  #placeCancel { height: 38px; padding: 0 16px; border-radius: 19px; background: var(--fill); color: var(--ink); font-family: var(--font); }
+  #pinDlg { background: rgba(30,32,40,.22); }
+  #pinForm { border-radius: 26px; padding: 20px; color: var(--ink); font-family: var(--font); }
+  #pinName { height: 46px; border-radius: 14px; border-color: rgba(60,60,67,.2); background: rgba(255,255,255,.85); color: var(--ink); font-family: var(--font); }
+  .pd-btns button { height: 42px; border-radius: 21px; font-family: var(--font); }
+  .pd-btns #pinCancel { background: var(--fill); color: var(--ink); }
+  #perf { bottom: 120px; z-index: 1050; }   /* v80: above the panel (it was hidden behind it) — it never takes taps */
+  #loader .lbar { background: var(--fill); }
+
+  /* ---- the image map (fallback when the vector map can't run): toned down to match ---- */
+  .leaflet-tile-pane img.leaflet-tile { filter: saturate(.7) brightness(1.04) contrast(.94); }
+
+  /* ---- phones: same hierarchy, tighter margins ---- */
+  @media (max-width: 700px) {
+    #panel { top: calc(10px + env(safe-area-inset-top)); left: 12px; right: 12px; width: auto; padding: 0; max-height: min(70%, calc(100% - 150px)); }
+    #panel .qrow { height: 54px; padding-left: 18px; border-radius: 27px; }
+    #types { height: 50px; margin: 0 6px; }
+    #types button { font-size: 15px; gap: 7px; }
+    #cityCard { left: 12px; bottom: calc(14px + env(safe-area-inset-bottom)); max-width: calc(100% - 118px); padding: 12px 20px 13px 18px; border-radius: 26px; }
+    .cc-name { font-size: 20px; }
+    #cityCard #status { font-size: 14px; }
+    #follow { right: 12px; }
+    .leaflet-right .leaflet-control { margin-right: 22px; }
+    #stopProg { right: 14px; width: 64px; }
+  }
+

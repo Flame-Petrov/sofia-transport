@@ -1,0 +1,11 @@
+  /* v76 "liquid glass": one light design for every screen. Vivid type colours, chosen so white line
+     numbers keep ≥ 4.5:1 contrast on them (tram orange gets dark text instead). */
+  :root {
+    --bg: #F6F3EE; --fg: #1d1d1f; --muted: #6e6e73; --line: rgba(60,60,67,.14); --chip: rgba(118,118,128,.14);
+    --bus: #E5221B; --tram: #FF9500; --trolley: #0A6CF0; --metro: #9B3BD9; --other: #6e6e73;
+    --font: -apple-system, BlinkMacSystemFont, "SF Pro Text", Inter, "Segoe UI Variable Text", "Segoe UI", Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; font-family: var(--font); background: var(--bg); color: var(--fg); }
+  #map { position: fixed; inset: 0; }
+

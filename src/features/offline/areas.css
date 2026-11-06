@@ -1,0 +1,13 @@
+  /* v85: Offline map — the same rows as My places */
+  #offBody { display: flex; flex-direction: column; gap: 8px; padding-bottom: 4px; }
+  #offList { display: flex; flex-direction: column; gap: 6px; }
+  #offList:empty { display: none; }
+  #offAdd {
+    height: 40px; display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 10px; cursor: pointer;
+    border: 1.5px dashed var(--border); background: none; color: var(--text); font-size: 14px; font-weight: 500;
+  }
+  #offAdd svg { width: 14px; height: 14px; }
+  #offInfo:empty { display: none; }
+  .off-item { position: relative; overflow: hidden; }
+  .off-item.ok .pl-go svg { color: #34C759; }
+  .off-bar { position: absolute; left: 0; bottom: 0; height: 3px; width: calc(var(--p) * 100%); background: var(--trolley); border-radius: 0 2px 2px 0; transition: width 300ms ease; }

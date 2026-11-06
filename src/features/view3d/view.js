@@ -1,0 +1,1065 @@
+  // ---------- v100: 3D view ----------
+  // The 3D button (bottom right, only on the vector map) opens a second, native MapLibre map (#map3d) over the 2D one,
+  // at the same place, which then tilts so Sofia's buildings stand up (reports/3D city map - plan.md). Leaflet can't
+  // tilt: everything it draws sits in flat screen space and would slide off the streets, so the 3D map draws its own.
+  // The 2D map stays the source of truth: the feed, the motion planner, tracking, the route planner and guidance keep
+  // running in the 2D code, and the 3D map only draws what they already know (v.pos, loc.show, places…). While it's
+  // open, Leaflet's map pane is hidden (its size is kept) and its handlers are off; 2D flattens the view, hands the
+  // centre and zoom back to Leaflet, and frees the 3D map. Zooms here are Leaflet's (the 3D map runs one level lower).
+  (function () {
+    var MEMO_KEY = 'sofia_3d_memo', OPEN_KEY = 'sofia_3d_open', PAD0 = { top: 0, bottom: 0, left: 0, right: 0 };
+    var EMPTY = { type: 'FeatureCollection', features: [] };
+    var mapEl = map.getContainer();
+    var m3 = null, el = null, ready = false, closing = false, revealTimer = 0;
+    var camBusy = false, camTimer = 0;   // one of our own camera moves is running (the cameras that follow wait for it)
+    var meMk = null, beamMk = null, meKey = '', accKey = '', pinMks = {};
+    var pop = null, popKind = '', popRef = null, popClosedAt = 0;
+    var info = { opens: 0, lastClose: '', tiles0: 0, hits0: 0, lost: 0 };
+    var hiddenAt = 0, hideTimer = 0, addedAt = 0, lp = null;
+    // v101: vehicles, the tracked one, its route and stops
+    var shown = [], drawn = [], vehDue = 0, vehN = 0, farN = 0, vehMs = [], inkOf = {}, trkMk = null, stopMks = {}, stopsQueued = false, freed = false;
+    var trk = { color: '#888', tailRef: null }, fontB = ['Noto Sans Bold'];
+    // v102: following cameras, route to a place
+    var headingUp = store('sofia_3d_heading') !== 'north', fc = { off: null, at: 0 }, lc = { off: null, at: 0, rest: false };
+    var stopsDrawn = [], terrainOn = store('sofia_3d_terrain') === null ? VIEW3D_TERRAIN : store('sofia_3d_terrain') === '1', demAttr = false;   // v103
+    var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
+    var VEH_LAYERS = ['v3-veh-dot', 'v3-veh-ring', 'v3-veh-lbl', 'v3-veh-mine', 'v3-veh-tag'];
+    var HANDLERS = ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'];
+
+    // ---- after a crash: the button stays hidden for VIEW3D_RETRY_MS ----
+    function memo() {
+      try { var m = JSON.parse(store(MEMO_KEY) || 'null'); return m && Date.now() - m.t < VIEW3D_RETRY_MS ? m : null; } catch (e) { return null; }
+    }
+    function unstore(k) { try { localStorage.removeItem(k); } catch (e) {} }
+    // WebKit can kill and reload a page that uses too much memory without any event: a 3D view still marked open at
+    // start-up (opened less than 10 min ago) means the last session died in it. A normal reload or close clears the
+    // mark (pagehide).
+    (function () {
+      var t = +(store(OPEN_KEY) || 0);
+      if (t && Date.now() - t < 10 * 60e3) store(MEMO_KEY, JSON.stringify({ t: Date.now(), why: 'the page reloaded while 3D was open' }));
+      unstore(OPEN_KEY);
+    })();
+    window.addEventListener('pagehide', function () { unstore(OPEN_KEY); });
+    function available() { return /^vector/.test(mapMode) && !!builtStyle && !memo(); }
+
+    // ---- the buttons and the menu note ----
+    function refresh() {
+      var show = view3d.on || available(), a = box3d.querySelector('a'), relayout = false;
+      if (box3d.hidden === show) { box3d.hidden = !show; relayout = true; }
+      if (northBox.hidden === view3d.on) { northBox.hidden = !view3d.on; relayout = true; }
+      box3d.classList.toggle('on', view3d.on);
+      var t = view3d.on ? 'Back to the flat map' : 'Show the city in 3D';
+      setText(a, view3d.on ? '2D' : '3D');
+      if (a.title !== t) { a.title = t; a.setAttribute('aria-label', t); }
+      a.setAttribute('aria-pressed', view3d.on ? 'true' : 'false');
+      document.getElementById('v3TerRow').hidden = !/^vector/.test(mapMode);   // v103
+      var m = memo(), bx = document.getElementById('v3Box');
+      bx.hidden = !m || !/^vector/.test(mapMode);
+      if (m) setText(document.getElementById('v3Note'), '3D was turned off on this device after it ran out of graphics memory (' + clockHM(m.t) + ', ' + m.why + '). It comes back by itself after a day.');
+      if (relayout) layoutRightEdge();
+    }
+    document.getElementById('v3Retry').onclick = function () { unstore(MEMO_KEY); refresh(); };
+
+    // ---- the 3D style: the 2D map's finished style, changed for 3D only ----
+    function firstOf(type) {
+      var ls = m3.getStyle().layers || [];
+      for (var i = 0; i < ls.length; i++) if (ls[i].type === type) return ls[i].id;
+      return undefined;
+    }
+    function style3d() {
+      var s = JSON.parse(JSON.stringify(builtStyle)), z = VIEW3D_BUILDING_ZOOM - 1;
+      (s.layers || []).forEach(function (l) {
+        if (l.type === 'fill-extrusion') {
+          l.minzoom = z;
+          l.paint = l.paint || {};
+          l.paint['fill-extrusion-opacity'] = VIEW3D_BUILDING_OPACITY;
+          // a gentle tint by height: most buildings have no height in OpenStreetMap and are drawn 5 m tall
+          l.paint['fill-extrusion-color'] = ['interpolate', ['linear'], ['to-number', ['get', 'render_height'], 0], 0, '#E6E0D7', 60, '#F2EEE8'];
+        } else if (l.type === 'fill' && l['source-layer'] === 'building' && typeof l.maxzoom === 'number') l.maxzoom = z;
+      });
+      // light from the south-west, fixed to the map, so walls have shade whichever way the camera turns
+      s.light = { anchor: 'map', position: [1.5, 225, 35], intensity: 0.35, color: '#FFFFFF' };
+      // a pale sky, and fog that matches the land and hides the coarse tiles near the horizon
+      s.sky = { 'sky-color': '#DCE9F5', 'horizon-color': '#F6F3EE', 'fog-color': '#F6F3EE',
+                'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.85 };
+      return s;
+    }
+
+    // ---- open / close ----
+    function handlers(on) {
+      HANDLERS.forEach(function (h) {
+        var x = map[h];
+        if (!x) return;
+        if (on) { if (x._v3off) { x._v3off = false; x.enable(); } }
+        else if (x.enabled()) { x._v3off = true; x.disable(); }
+      });
+    }
+    function open() {
+      if (view3d.on || !available()) return;
+      if (savedPlaces && savedPlaces.isPlacing) savedPlaces.cancelPlacement();
+      map.closePopup();
+      var c = map.getCenter(), z = map.getZoom();
+      el = document.createElement('div');
+      el.id = 'map3d';
+      mapEl.insertBefore(el, map._controlContainer);   // above the map pane, under the buttons
+      L.DomEvent.disableClickPropagation(el);           // taps here are the 3D map's, not Leaflet's
+      L.DomEvent.disableScrollPropagation(el);
+      try {
+        m3 = new maplibregl.Map({
+          container: el, style: style3d(), center: [c.lng, c.lat], zoom: z - 1, pitch: 0, bearing: 0,
+          minZoom: 8, maxZoom: 18, maxPitch: VIEW3D_MAX_PITCH,
+          pixelRatio: mapPixelRatio(),
+          fadeDuration: 120, maxTileCacheZoomLevels: 3, attributionControl: false, renderWorldCopies: false,
+          dragRotate: true, touchPitch: true, pitchWithRotate: true
+        });
+      } catch (e) {
+        if (el) el.remove();
+        el = null; m3 = null;
+        toast('The 3D view could not start: ' + (e && e.message || e), 6000);
+        return;
+      }
+      view3d.on = true; ready = false; closing = false;
+      viewBounds01 = null;
+      function invalidateBounds() { viewBounds01 = null; }
+      m3.on('move', invalidateBounds);
+      m3.on('resize', invalidateBounds);
+      info.opens++; info.tiles0 = tileReq; info.hits0 = tileHits;
+      store(OPEN_KEY, String(Date.now()));
+      handlers(false);
+      m3.getCanvas().addEventListener('webglcontextlost', onLost, false);
+      // our layers go in as soon as the style is there ('load' waits for the first complete picture)
+      m3.once('style.load', onLoad);
+      m3.on('styleimagemissing', function (e) {
+        if (!m3 || m3.hasImage(e.id)) return;
+        if (/^v3pill-/.test(e.id)) addPill(e.id);        // v101: a pill per line colour
+        else if (/^v3stop-/.test(e.id)) addStopImg(e.id);   // v103: the stop icon, in a searched line's colour
+      });
+      // shown once it has drawn (the 2D map stays visible under it until then); on a slow connection after 8 s,
+      // with a note after 1.5 s
+      m3.once('idle', reveal);
+      revealTimer = setTimeout(reveal, 8000);
+      setTimeout(function () { if (view3d.on && !ready && !closing) toast('Loading the 3D view…', 2500); }, 1500);
+      // v102: the follow cameras move the map every frame (jumpTo): their moveend refreshes labels and stops at most
+      // once a second; a user's gesture pauses them until it ends
+      m3.on('movestart', function (e) { if (e && e.originalEvent) userMoving = true; });
+      m3.on('moveend', function () {
+        var now = performance.now();
+        if (selfMove) { if (now - lastRender > 1000) { lastRender = now; renderStops(); } return; }
+        camBusy = false; userMoving = false; lastRender = now;
+        if (view3d.on) render(false);
+      });
+      // dragging takes over from a following camera once the map has moved DRAG_TAKEOVER_PX (as in 2D)
+      // a finger or the mouse on the map pauses the follow cameras: their jumpTo every frame would stop MapLibre's
+      // gesture handlers (jumpTo calls stop()), so a drag could never start and the release counted as a tap
+      var cont = m3.getCanvasContainer();
+      cont.addEventListener('mousedown', pointerOn, true);
+      cont.addEventListener('touchstart', pointerOn, { capture: true, passive: true });
+      window.addEventListener('mouseup', pointerOff, true);
+      window.addEventListener('touchend', pointerOff, true);
+      window.addEventListener('touchcancel', pointerOff, true);
+      m3.on('dragstart', function () { dragFrom = m3.getCenter(); dragAt = Date.now(); });
+      m3.on('drag', function () {
+        if (!dragFrom) return;
+        var p = m3.project(dragFrom), c = m3.project(m3.getCenter());
+        if (Math.sqrt((p.x - c.x) * (p.x - c.x) + (p.y - c.y) * (p.y - c.y)) < DRAG_TAKEOVER_PX) return;
+        dragFrom = null;
+        if (following) setFollow(false);
+        setLocFollow(false);
+      });
+      m3.on('dragend', function () { dragFrom = null; dragAt = Date.now(); });
+      m3.on('rotate', needle);
+      m3.on('click', onClick);
+      m3.on('contextmenu', function (e) { cancelPress(); addHere(e.lngLat); });
+      // a long press: Android and PC send their own (contextmenu, above); iPhones don't, so there it is timed here
+      m3.on('touchstart', function (e) {
+        cancelPress();
+        if (!IS_IOS || e.points.length !== 1) return;
+        var at = e.point, ll = e.lngLat;
+        lp = { p: at, t: setTimeout(function () { lp = null; addHere(ll); }, 650) };
+      });
+      m3.on('touchmove', function (e) { if (lp && (e.points.length !== 1 || Math.abs(e.point.x - lp.p.x) + Math.abs(e.point.y - lp.p.y) > 8)) cancelPress(); });
+      m3.on('touchend', cancelPress);
+      m3.on('touchcancel', cancelPress);
+      refresh();
+      renderDiag();
+    }
+    function onLoad() {
+      if (!m3 || m3.getSource('v3-me-acc')) return;
+      var sym = firstOf('symbol');
+      m3.addSource('v3-me-acc', { type: 'geojson', data: EMPTY });
+      m3.addLayer({ id: 'v3-me-acc', type: 'fill', source: 'v3-me-acc',
+        paint: { 'fill-color': '#1A73E8', 'fill-opacity': 0.12, 'fill-outline-color': 'rgba(26,115,232,.45)' } }, sym);
+      accKey = '';
+      addOverlays(sym);
+      syncPins();
+      drawMe3();
+    }
+
+    // ---- v101: images, sources and layers for vehicles and the tracked route ----
+    function canvas2(w, h, draw) {
+      var cv = document.createElement('canvas'), g;
+      cv.width = w * 2; cv.height = h * 2;
+      g = cv.getContext('2d'); g.scale(2, 2); draw(g);
+      return g.getImageData(0, 0, w * 2, h * 2);
+    }
+    function rr(g, x, y, w, h, r) {
+      g.beginPath(); g.moveTo(x + r, y); g.arcTo(x + w, y, x + w, y + h, r); g.arcTo(x + w, y + h, x, y + h, r);
+      g.arcTo(x, y + h, x, y, r); g.arcTo(x, y, x + w, y, r); g.closePath();
+    }
+    // the line-number label: the line's colour with a white rim, stretched around the text (as the 2D pill)
+    function addPill(id) {
+      var color = id.slice(7), W = 20, H = 18, R = 7;
+      var img = canvas2(W, H, function (g) { g.fillStyle = '#fff'; rr(g, 0, 0, W, H, R); g.fill(); g.fillStyle = color; rr(g, 1.5, 1.5, W - 3, H - 3, R - 1.5); g.fill(); });
+      m3.addImage(id, img, { pixelRatio: 2, stretchX: [[2 * R, 2 * (W - R)]], stretchY: [[2 * R, 2 * (H - R)]], content: [6, 4, 2 * W - 6, 2 * H - 4] });
+    }
+    // v103: the 2D stop icon (white rounded square, bus glyph) as a map image; colour 'x' = the plain dark one
+    var BUS_D = (/ d="([^"]+)"/.exec(BUS_SVG) || [])[1] || '';
+    function addStopImg(id) {
+      var color = id.slice(7) === 'x' ? '#263238' : id.slice(7), S = 20;
+      var img = canvas2(S, S, function (g) {
+        g.fillStyle = '#fff'; rr(g, 0.5, 0.5, S - 1, S - 1, 6); g.fill();
+        g.lineWidth = 2; g.strokeStyle = color; rr(g, 1.5, 1.5, S - 3, S - 3, 5); g.stroke();
+        if (BUS_D && window.Path2D) { g.save(); g.translate(3.5, 3.5); g.scale(13 / 24, 13 / 24); g.fillStyle = color; g.fill(new Path2D(BUS_D)); g.restore(); }
+      });
+      m3.addImage(id, img, { pixelRatio: 2 });
+    }
+    function setSrc(id, data) { var s = m3 && m3.getSource(id); if (s) s.setData(data); }
+    function addOverlays(sym) {
+      // a small arrow ahead of each labelled vehicle, lying on the street in its direction
+      m3.addImage('v3arrow', canvas2(10, 10, function (g) {
+        g.beginPath(); g.moveTo(5, 0.8); g.lineTo(9.2, 9); g.lineTo(5, 7); g.lineTo(0.8, 9); g.closePath();
+        g.fillStyle = '#263238'; g.strokeStyle = '#fff'; g.lineWidth = 1.2; g.lineJoin = 'round'; g.stroke(); g.fill();
+      }), { pixelRatio: 2 });
+      // the tracked route's direction arrows (static here; they slide only in 2D)
+      m3.addImage('v3chev', canvas2(14, 14, function (g) {
+        g.lineCap = 'round'; g.lineJoin = 'round';
+        g.beginPath(); g.moveTo(4, 3); g.lineTo(9.5, 7); g.lineTo(4, 11);
+        g.strokeStyle = 'rgba(0,0,0,.55)'; g.lineWidth = 4; g.stroke(); g.strokeStyle = '#fff'; g.lineWidth = 2; g.stroke();
+      }), { pixelRatio: 2 });
+      (m3.getStyle().layers || []).some(function (l) {
+        var tf = l.layout && l.layout['text-font'];
+        if (Array.isArray(tf) && tf.length && tf.every(function (x) { return typeof x === 'string'; }) && tf.some(function (x) { return /Bold/.test(x); })) { fontB = tf; return true; }
+        return false;
+      });
+      // the tracked route: under the buildings (a building in front hides it, as it hides the street)
+      var under = firstOf('fill-extrusion') || sym, U = ui;
+      ['v3-trk-tail', 'v3-trk-head', 'v3-trk-x'].forEach(function (id) { m3.addSource(id, { type: 'geojson', data: EMPTY }); });
+      var caseW = ['interpolate', ['linear'], ['zoom'], 11, 5, 15, 12], lineW = ['interpolate', ['linear'], ['zoom'], 11, 3, 15, 7];
+      var round = { 'line-cap': 'round', 'line-join': 'round' };
+      m3.addLayer({ id: 'v3-trk-prev', type: 'line', source: 'v3-trk-x', filter: ['==', ['get', 'dash'], 1], layout: round,
+        paint: { 'line-color': ['get', 'c'], 'line-opacity': 0.55, 'line-width': ['interpolate', ['linear'], ['zoom'], 11, 3, 15, 6], 'line-dasharray': [0.1, 3] } }, under);
+      ['tail', 'head'].forEach(function (p) {
+        m3.addLayer({ id: 'v3-trk-case-' + p, type: 'line', source: 'v3-trk-' + p, layout: round, paint: { 'line-color': '#1a1a1a', 'line-opacity': 0.55, 'line-width': caseW } }, under);
+      });
+      ['tail', 'head'].forEach(function (p) {
+        m3.addLayer({ id: 'v3-trk-line-' + p, type: 'line', source: 'v3-trk-' + p, layout: round, paint: { 'line-color': ['get', 'c'], 'line-opacity': 0.85, 'line-width': lineW } }, under);
+      });
+      m3.addLayer({ id: 'v3-trk-arrow', type: 'symbol', source: 'v3-trk-tail',
+        layout: { 'symbol-placement': 'line', 'symbol-spacing': 70 * U, 'icon-image': 'v3chev', 'icon-size': U, 'icon-allow-overlap': true, 'icon-ignore-placement': true } }, under);
+      m3.addLayer({ id: 'v3-trk-end', type: 'circle', source: 'v3-trk-x', filter: ['==', ['get', 'end'], 1],
+        paint: { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 11, 4, 15, 7], 'circle-color': '#fff', 'circle-stroke-color': '#1a1a1a', 'circle-stroke-width': 3, 'circle-pitch-alignment': 'map' } }, under);
+      // v102: the route to a place (the same lines as 2D: walks dotted pink, rides in the line's colour with a dark casing)
+      m3.addSource('v3-rt', { type: 'geojson', data: EMPTY });
+      m3.addLayer({ id: 'v3-rt-line', type: 'line', source: 'v3-rt', filter: ['==', ['get', 'd'], 0], layout: round,
+        paint: { 'line-color': ['get', 'c'], 'line-opacity': ['get', 'o'],
+                 'line-width': ['interpolate', ['linear'], ['zoom'], 11, ['case', ['==', ['get', 'k'], 1], 5, 3], 15, ['case', ['==', ['get', 'k'], 1], 12, 7]] } }, under);
+      m3.addLayer({ id: 'v3-rt-walk', type: 'line', source: 'v3-rt', filter: ['==', ['get', 'd'], 1], layout: round,
+        paint: { 'line-color': ['get', 'c'], 'line-opacity': ['get', 'o'], 'line-width': 4, 'line-dasharray': [0.1, 2.2] } }, under);
+      // v103: all stops (from street level, as in 2D; a searched line's stops at any zoom, in its colour)
+      m3.addSource('v3-stops', { type: 'geojson', data: EMPTY });
+      m3.addLayer({ id: 'v3-stops', type: 'symbol', source: 'v3-stops',
+        layout: { 'icon-image': ['get', 'img'], 'icon-size': ['case', ['==', ['get', 'sel'], 1], 1.6 * U, U], 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'symbol-sort-key': ['get', 'sel'] } });
+      // the vehicles: over everything else on the map (only the markers are above them)
+      m3.addSource('v3-veh', { type: 'geojson', data: EMPTY, buffer: 16 });
+      var LZ = LABEL_ZOOM - 1, faded = function (a) { return ['case', ['==', ['get', 'pk'], 1], a, 1]; };
+      var label = function (size) {
+        return { 'text-field': ['get', 't'], 'text-font': fontB, 'text-size': size * U, 'icon-image': ['concat', 'v3pill-', ['get', 'c']],
+          'icon-text-fit': 'both', 'icon-text-fit-padding': [1 * U, 4 * U, 1 * U, 4 * U], 'text-allow-overlap': true, 'icon-allow-overlap': true,
+          'text-ignore-placement': true, 'icon-ignore-placement': true, 'symbol-z-order': 'viewport-y' };
+      };
+      m3.addSource('v3-veh-far', { type: 'geojson', data: EMPTY, buffer: 16 });
+      var dotPaint = { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3, 12, 4.5, 15, 7], 'circle-color': ['get', 'c'], 'circle-stroke-color': '#fff',
+          'circle-stroke-width': 1.5, 'circle-opacity': faded(0.45), 'circle-stroke-opacity': faded(0.45), 'circle-pitch-alignment': 'map' };
+      m3.addLayer({ id: 'v3-veh-far', type: 'circle', source: 'v3-veh-far', paint: dotPaint });
+      m3.addLayer({ id: 'v3-veh-dot', type: 'circle', source: 'v3-veh', filter: ['==', ['get', 'm'], 0], maxzoom: LZ, paint: dotPaint });
+      m3.addLayer({ id: 'v3-veh-dir', type: 'symbol', source: 'v3-veh', minzoom: LZ, filter: ['>=', ['get', 'b'], 0],
+        layout: { 'icon-image': 'v3arrow', 'icon-size': U, 'icon-rotate': ['get', 'b'], 'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
+          'icon-offset': [0, -17], 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
+      m3.addLayer({ id: 'v3-veh-lbl', type: 'symbol', source: 'v3-veh', filter: ['==', ['get', 'm'], 0], minzoom: LZ, layout: label(11),
+        paint: { 'text-color': ['get', 'ink'], 'icon-opacity': faded(0.6), 'text-opacity': faded(0.6) } });
+      // v99's route vehicles ("Board · 4 min"): bigger, ringed in pink, with their tag, at every zoom
+      m3.addLayer({ id: 'v3-veh-ring', type: 'circle', source: 'v3-veh', filter: ['==', ['get', 'm'], 1],
+        paint: { 'circle-radius': 17 * U, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#D6336C', 'circle-stroke-width': 3, 'circle-pitch-alignment': 'viewport' } });
+      m3.addLayer({ id: 'v3-veh-mine', type: 'symbol', source: 'v3-veh', filter: ['==', ['get', 'm'], 1], layout: label(14), paint: { 'text-color': ['get', 'ink'] } });
+      var tag = label(10.5);
+      tag['text-field'] = ['get', 'tag']; tag['icon-image'] = 'v3pill-#D6336C'; tag['text-offset'] = [0, 2.1];
+      m3.addLayer({ id: 'v3-veh-tag', type: 'symbol', source: 'v3-veh', filter: ['==', ['get', 'm'], 1], layout: tag, paint: { 'text-color': '#fff' } });
+      pointSnapshots = {};
+      shown = []; vehDue = 0; rtSig = ''; dimNow = null;
+      view3d.followChanged(following);
+      render(false);          // the vehicles to show (fills `shown`)
+      view3d.pathChanged();
+      syncStops();
+      applyTerrain();   // v103
+    }
+
+    // ---- v101: vehicles (15 times a second from v.pos; the tracked one is a marker moved every frame) ----
+    var labelsBy = null;
+    // Near vehicles (inside the clipped view, + 30 %) go to 'v3-veh' 15 times a second; the far ones, toward the
+    // horizon, only as dots and twice a second ('v3-veh-far'), so a tilted view doesn't update the whole city 15×/s.
+    var farDue = 0, farDrawn = [];
+    // Keep snapshots per map instance. Compare geometry, styling and order so a
+    // colour change or a disappearing vehicle still reaches the worker.
+    var pointSnapshots = {};
+    function submitPointSource(id, features, tolerance) {
+      var snapshot = pointSnapshots[id], previous = snapshot ? snapshot.features : [];
+      // Let small movements accumulate against the last submitted position.
+      // Flush the exact endpoint within half a second, even at city zoom.
+      if (snapshot && performance.now() - snapshot.at >= 500) tolerance = 0;
+      var lngStep = tolerance ? tolerance.lng : 0, latStep = tolerance ? tolerance.lat : 0;
+      if (previous.length === features.length && features.every(function (f, i) {
+        var old = previous[i], a = f.geometry.coordinates, b = old.geometry.coordinates;
+        if (Math.abs(a[0] - b[0]) > lngStep || Math.abs(a[1] - b[1]) > latStep) return false;
+        for (var key in f.properties) if (f.properties[key] !== old.properties[key]) return false;
+        return true;
+      })) return;
+      setSrc(id, { type: 'FeatureCollection', features: features });
+      pointSnapshots[id] = { features: features, at: performance.now() };
+    }
+    function buildVeh() {
+      if (!m3 || !m3.getSource('v3-veh')) return;
+      var t0 = performance.now(), nb = view3d.bounds(0.3), b = m3.getBounds(), now = performance.now(), doFar = now >= farDue;
+      var s = nb.getSouth(), n = nb.getNorth(), w = nb.getWest(), e = nb.getEast(), feats = [], far = [], seen = {};
+      var fs = b.getSouth(), fn = b.getNorth(), fw = b.getWest(), fe = b.getEast();
+      drawn = [];
+      if (doFar) { farDue = now + 500; farDrawn = []; }
+      function add(v) {
+        if (!v || !v.pos || v === selected || seen[v.d.key]) return;
+        seen[v.d.key] = 1;
+        var d = v.d, rv = routeVeh[d.key], la = v.pos[0], lo = v.pos[1];
+        if (!rv && !labelsBySearch && (la < s || la > n || lo < w || lo > e)) {   // (a search's few vehicles: all labelled)
+          if (doFar && la >= fs && la <= fn && lo >= fw && lo <= fe) {
+            far.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [lo, la] }, properties: { k: d.key, c: d.color, pk: v.parked ? 1 : 0 } });
+            farDrawn.push({ k: d.key, c: [lo, la], m: false });
+          }
+          return;
+        }
+        var ink = inkOf[d.color] || (inkOf[d.color] = lineTones(d.color).ink);
+        drawn.push({ k: d.key, c: [lo, la], m: !!rv });
+        feats.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [lo, la] },
+          properties: { k: d.key, c: d.color, ink: ink, t: String(d.shown), b: typeof d.bearing === 'number' && !v.parked ? Math.round(d.bearing) : -1,
+                        pk: v.parked ? 1 : 0, m: rv ? 1 : 0, tag: rv ? rv.tag : '' } });
+      }
+      for (var i = 0; i < shown.length; i++) add(shown[i]);
+      for (var k in routeVeh) add(vehicles[k]);
+      var halfPixel = 180 / (512 * Math.pow(2, m3.getZoom()));
+      var tolerance = { lng: halfPixel, lat: halfPixel * Math.cos(toRad(m3.getCenter().lat)) };
+      submitPointSource('v3-veh', feats, tolerance);
+      if (doFar) submitPointSource('v3-veh-far', far, tolerance);
+      vehN = feats.length; farN = farDrawn.length;
+      vehMs.push(performance.now() - t0);
+      if (vehMs.length > 100) vehMs.shift();
+      // a search that leaves few vehicles labels them at any zoom (LABEL_MAX), as in 2D
+      if (labelsBy !== labelsBySearch) {
+        labelsBy = labelsBySearch;
+        m3.setLayoutProperty('v3-veh-dot', 'visibility', labelsBy ? 'none' : 'visible');
+        m3.setLayerZoomRange('v3-veh-lbl', labelsBy ? 0 : LABEL_ZOOM - 1, 24);
+        m3.setLayerZoomRange('v3-veh-dir', labelsBy ? 0 : LABEL_ZOOM - 1, 24);
+      }
+    }
+    view3d.feedChanged = function (list) { shown = list || []; vehDue = 0; farDue = 0; };
+    view3d.drawn = function () { return drawn; };
+    function trackFrame() {
+      var v = selected;
+      if (!v || !v.pos) { if (trkMk) { trkMk.remove(); trkMk = null; } return; }
+      var at = [v.pos[1], v.pos[0]];
+      if (!trkMk || trkMk._v !== v) {
+        if (trkMk) trkMk.remove();
+        var e = mkEl('veh', '', 7);
+        e.addEventListener('click', function (ev) { ev.stopPropagation(); if (selected) openVeh(selected); });
+        // exact (fractional) position, as the tracked vehicle in 2D (v90): rounded, it crept and jumped 1 px
+        trkMk = new maplibregl.Marker({ element: e, pitchAlignment: 'viewport', rotationAlignment: 'viewport', subpixelPositioning: true }).setLngLat(at).addTo(m3);
+        trkMk._v = v; trkMk._k = '';
+      }
+      var k = iconKey(v.d);
+      if (k !== trkMk._k) { trkMk._k = k; trkMk.getElement().innerHTML = iconFor(v.d).options.html; }
+      var atMarker = trkMk.getLngLat();
+      if (atMarker.lng === at[0] && atMarker.lat === at[1]) return;
+      trkMk.setLngLat(at);
+      if (pop && popKind === 'veh' && popRef === v) pop.setLngLat(at);
+    }
+    view3d.selectChanged = function () {
+      vehDue = 0;
+      if (pop && popKind === 'veh' && popRef !== selected) closePop();
+    };
+    // A tap: the closest drawn vehicle within reach wins (as on the 2D map): 12 px around a dot, the size of its
+    // label when labels show. Worked out from the drawn positions, not queryRenderedFeatures: on a symbol layer
+    // whose data changes 15 times a second, MapLibre 4.7 can throw "feature index out of bounds" there.
+    function vehAtPoint(p) {
+      var lbl = labelsBySearch || viewZoom() >= LABEL_ZOOM, best = null, bd = Infinity;
+      var all = drawn.concat(farDrawn);
+      for (var i = 0; i < all.length; i++) {
+        var f = all[i], q = m3.project(f.c), dx = Math.abs(q.x - p.x), dy = Math.abs(q.y - p.y);
+        var rx = f.m ? 26 * ui : lbl ? 18 * ui : 12, ry = f.m ? 16 * ui : lbl ? 12 * ui : 12;
+        if (dx > rx || dy > ry) continue;
+        var d = dx * dx + dy * dy;
+        if (d < bd) { bd = d; best = f.k; }
+      }
+      return best !== null ? vehicles[best] || null : null;
+    }
+    // a vehicle's card: phones in the bottom sheet (as in 2D), PC on the 3D map, following the vehicle
+    function openVeh(v, noFocus) {
+      if (!m3 || !v) return;
+      if (selected !== v) select(v);
+      openPop('veh', v);
+      // the vehicle and its card together in the middle of the free map area (as v100's card in 2D)
+      if (!noFocus) focusOn(v.pos || [v.d.lat, v.d.lon], null, vpTargetY(vpFreeBottom(), cardRoom3()));
+    }
+    // screen px the open 3D card takes below the vehicle (0 when none): the gap, the pointer and the card
+    function cardRoom3() {
+      var el = pop && popKind === 'veh' && pop.getElement();
+      return el ? Math.round(VP_GAP * ui) + el.offsetHeight : 0;
+    }
+    view3d.cardEl = function () { var el = pop && popKind === 'veh' && pop.getElement(); return el ? el.querySelector('.maplibregl-popup-content') : null; };
+    var cardEdgeTimer = 0;
+    view3d.openVeh = openVeh;
+    view3d.popOf = function () { return pop && popKind === 'veh' ? popRef : null; };
+    view3d.popStop = function () { return pop && popKind === 'stop' ? popRef : null; };
+    view3d.closePop = function () { closePop(); };
+
+    // ---- v102: cameras that follow (a vehicle, your location) ----
+    // Heading-up: the vehicle sits in the lower third of the free map area and the road it is about to drive fills the
+    // screen ahead of it. The direction is taken from the route ahead (as 2D's look-ahead), eased over LOOK_EASE_MS and
+    // never faster than VIEW3D_TURN_DEG_S, so it doesn't swing at corners. The centre locks on with 2D's "offset decay"
+    // (FOLLOW_TAU): it moves with the subject every frame and only the gap left from a start, a zoom or a drag shrinks.
+    // where the finger / mouse went down: a "tap" that ends more than 6 px away was a drag, not a tap (as in Leaflet)
+    var downXY = null;
+    function pointerOn(e) {
+      pointerDown = true;
+      var t = e && e.touches && e.touches[0] ? e.touches[0] : e;
+      downXY = t && typeof t.clientX === 'number' ? [t.clientX, t.clientY] : null;
+    }
+    function pointerOff(e) { if (!(e && e.touches && e.touches.length)) pointerDown = false; }
+    // someone is moving the map: a finger or the mouse is down, or one of MapLibre's gestures (wheel, pinch, glide) runs
+    function userBusy() {
+      if (pointerDown || userMoving) return true;
+      try { return m3.scrollZoom.isActive() || m3.dragPan.isActive() || m3.touchZoomRotate.isActive() || m3.dragRotate.isActive() || m3.touchPitch.isActive(); } catch (e) { return false; }
+    }
+    function selfJump(o) { selfMove = true; try { m3.jumpTo(o); } finally { selfMove = false; } }
+    // padding that puts the camera's centre at screen height y
+    function padAt(y) {
+      var H = m3.getCanvas().clientHeight;
+      return { pad: y >= H / 2 ? { top: 2 * y - H, bottom: 0, left: 0, right: 0 } : { top: 0, bottom: H - 2 * y, left: 0, right: 0 }, y: y };
+    }
+    // where the followed vehicle goes: the lower third of the free map area heading-up, the middle north-up; with its
+    // card open, the vehicle and the card together in the middle (v100's vpTargetY), the card below it
+    function followY() {
+      var room = cardRoom3(), H = m3.getCanvas().clientHeight;
+      if (room) return vpTargetY(vpFreeBottom(), room);
+      var top = freeTop(), bottom = Math.min(H, freeBottom());
+      return top + (bottom - top) * (headingUp ? 0.67 : 0.5);
+    }
+    function freePad(share) { var H = m3.getCanvas().clientHeight, top = freeTop(), bottom = Math.min(H, freeBottom()); return padAt(top + (bottom - top) * share); }
+    function turnToward(b, target, dt, tau) {
+      var d = ((target - b) % 360 + 540) % 360 - 180, step = d * (1 - Math.exp(-dt / tau)), cap = VIEW3D_TURN_DEG_S * dt / 1000;
+      return b + Math.max(-cap, Math.min(cap, step));
+    }
+    function vehBearing(v) {
+      var m = routeMetaFor(v.d);
+      if (m && v.mo && v.mo.kind === 'route' && v.mo.m === m && typeof v.along === 'number') {
+        var c = m3.getCenter(), mpp = 156543.03 * Math.cos(toRad(c.lat)) / Math.pow(2, m3.getZoom() + 1);
+        var lead = Math.max(40, Math.min(500, LOOK_AHEAD * Math.min(m3.getCanvas().clientWidth, freeBottom() - freeTop()) * mpp * 1.4));
+        var ahead = pointAt(m, Math.min(m.total, v.along + lead)).ll;
+        if (distM(v.pos, ahead) > 8) return bearingDeg(v.pos, ahead);
+      }
+      return typeof v.d.bearing === 'number' && !v.parked ? v.d.bearing : null;
+    }
+    function lockOn(st, ll, y, bearing, dt, tau) {
+      var fp = padAt(y), center = m3.getCenter(), padding = m3.getPadding();
+      if (!st.off) { var c = m3.unproject([m3.getCanvas().clientWidth / 2, fp.y]); st.off = [c.lng - ll[0], c.lat - ll[1]]; }
+      var k = reduceMotion ? 0 : Math.exp(-dt / tau);
+      st.off[0] *= k; st.off[1] *= k;
+      var lng = ll[0] + st.off[0], lat = ll[1] + st.off[1];
+      var quarterPixel = 90 / (512 * Math.pow(2, m3.getZoom()));
+      if (Math.abs(center.lng - lng) < quarterPixel &&
+          Math.abs(center.lat - lat) < quarterPixel * Math.cos(toRad(lat)) &&
+          Math.abs(m3.getBearing() - bearing) < 0.005 &&
+          Math.abs(padding.top - fp.pad.top) < 0.1 && Math.abs(padding.bottom - fp.pad.bottom) < 0.1) return;
+      selfJump({ center: [lng, lat], bearing: bearing, padding: fp.pad });
+    }
+    function followCam3() {
+      var v = selected;
+      if (!following || followHold || !v || !v.pos || camBusy || userBusy() || !ready) { fc.off = null; fc.at = 0; return; }
+      var now = performance.now(), dt = fc.at ? Math.min(250, now - fc.at) : 16;   // (250: slow phones still ease at the right speed)
+      fc.at = now;
+      var b = m3.getBearing(), tb = headingUp ? vehBearing(v) : 0;
+      if (tb !== null) b = turnToward(b, tb, dt, LOOK_EASE_MS);
+      lockOn(fc, [v.pos[1], v.pos[0]], followY(), b, dt, FOLLOW_TAU);
+    }
+    // your location: heading-up while you walk (compass, or the GPS direction); standing, it rests while the dot stays
+    // within ME_DEAD_PX of the middle, as in 2D
+    function locCam3() {
+      var sh = loc.show;
+      if (!loc.follow || following || loc.camHold || camBusy || userBusy() || !ready || !sh || (loc.state !== 'on' && loc.state !== 'wait')) { lc.off = null; lc.at = 0; return; }
+      var now = performance.now(), dt = lc.at ? Math.min(250, now - lc.at) : 16, t = Date.now();
+      lc.at = now;
+      var ll = [sh.ll.lng, sh.ll.lat], moving = meSpeed() >= 1, b = m3.getBearing();
+      var fresh = loc.heading !== null && (t - loc.compassAt < COMPASS_LIVE_MS || (loc.headingSrc === 'gps' && t - loc.headingAt < 10000));
+      if (moving && headingUp && fresh) b = turnToward(b, loc.heading, dt, 800);
+      if (moving) { lc.rest = false; lockOn(lc, ll, freePad(0.5).y, b, dt, ME_TAU); return; }
+      lc.off = null;
+      var fp = freePad(0.5), p = m3.project(ll), cx = m3.getCanvas().clientWidth / 2, gap = Math.sqrt((p.x - cx) * (p.x - cx) + (p.y - fp.y) * (p.y - fp.y));
+      if (lc.rest && gap <= ME_DEAD_PX) return;
+      lc.rest = gap < 0.5;
+      if (lc.rest) return;
+      var c = m3.unproject([cx, fp.y]), k = reduceMotion ? 1 : 1 - Math.exp(-dt / ME_RECENTRE_MS);
+      selfJump({ center: [c.lng + (ll[0] - c.lng) * k, c.lat + (ll[1] - c.lat) * k], bearing: b, padding: fp.pad });
+    }
+    function refreshNorth() {
+      var sub = following || (loc && loc.follow), a = northBox.querySelector('a');
+      northBox.classList.toggle('hu', !!(sub && headingUp));
+      var t = sub ? (headingUp ? 'Heading up (tap for north up)' : 'North up (tap for heading up)') : 'North up';
+      if (a.title !== t) { a.title = t; a.setAttribute('aria-label', t); }
+    }
+    view3d.refreshNorth = refreshNorth;
+    view3d.followChanged = function (on) {
+      fc.off = null; fc.at = 0;
+      if (m3) {   // pinch and wheel zoom around the followed vehicle (the camera's centre is it)
+        try { m3.scrollZoom.enable(on ? { around: 'center' } : undefined); m3.touchZoomRotate.enable(on ? { around: 'center' } : undefined); } catch (e) {}
+      }
+      refreshNorth();
+    };
+    // Follow switched on from a stop's list: the flight lands where the vehicle will be, already heading-up
+    view3d.flyFollow = function (v) {
+      if (!m3 || !v || !v.pos) return;
+      var dur = reduceMotion ? 0 : 900, at = posAt(v, Date.now() + dur) || v.pos, b = headingUp ? vehBearing(v) : 0;
+      fc.off = null;
+      cam({ center: [at[1], at[0]], zoom: FOLLOW_STOP_ZOOM - 1, bearing: b === null ? m3.getBearing() : b, padding: padAt(followY()).pad, duration: dur }, true);
+    };
+    // a route to a place: fitted and turned so it runs from you (bottom) up to the place (top); the tilt stays
+    view3d.fitRoute = function (pts, me, p, tl, br) {
+      if (!m3) return;
+      var b = L.latLngBounds(pts), bear = bearingDeg([me.lat, me.lng], [p.lat, p.lon]), cv = m3.getCanvas();
+      // phones: the panel and the route sheet can leave less room than MapLibre accepts (it then returns nothing):
+      // shrink the margins to keep at least 80 px of map, and if it still can't fit, just turn and centre
+      var pad = { top: tl[1], left: tl[0], bottom: br[1], right: br[0] }, H = cv.clientHeight, W = cv.clientWidth;
+      if (pad.top + pad.bottom > H - 80) { var ky = (H - 80) / (pad.top + pad.bottom); pad.top *= ky; pad.bottom *= ky; }
+      if (pad.left + pad.right > W - 80) { var kx = (W - 80) / (pad.left + pad.right); pad.left *= kx; pad.right *= kx; }
+      var c = null;
+      try { c = m3.cameraForBounds([[b.getWest(), b.getSouth()], [b.getEast(), b.getNorth()]], { padding: pad, maxZoom: 16, bearing: bear }); } catch (e) {}
+      var mid = b.getCenter();
+      cam(c ? { center: c.center, zoom: c.zoom, bearing: bear, padding: PAD0, duration: 800 } : { center: [mid.lng, mid.lat], bearing: bear, padding: PAD0, duration: 800 }, true);
+    };
+    // the route's lines and tags, mirrored from the 2D route layer whenever it changes (checked 3 times a second)
+    function routePoll(now) {
+      if (now - rtAt < 300 || !m3.getSource('v3-rt')) return;
+      rtAt = now;
+      var sig = '', dim = mapEl.classList.contains('rt-dim');
+      routeLayer.eachLayer(function (l) { sig += L.stamp(l) + ','; });
+      if (savedPlaces.destinationLine) { var d0 = savedPlaces.destinationLine.getLatLngs()[0]; sig += 'd' + d0.lat.toFixed(6) + ',' + d0.lng.toFixed(6); }
+      if (sig !== rtSig) { rtSig = sig; syncRoute(); }
+      if (dim !== dimNow) { dimNow = dim; applyDim(dim); }
+      mapEl.classList.toggle('rt-far', viewZoom() < ROUTE_TAG_ZOOM);
+    }
+    function syncRoute() {
+      var feats = [], seen = {};
+      function line(lls, c, o, dash, casing) {
+        if (lls.length > 1) feats.push({ type: 'Feature', properties: { c: c, o: o, d: dash ? 1 : 0, k: casing ? 1 : 0 }, geometry: { type: 'LineString', coordinates: lls.map(function (q) { return [q.lng, q.lat]; }) } });
+      }
+      routeLayer.eachLayer(function (l) {
+        if (l instanceof L.Polyline) { var o = l.options; line(l.getLatLngs(), o.color, o.opacity, !!o.dashArray, o.color === '#1a1a1a'); return; }
+        if (!l.getLatLng) return;
+        var id = L.stamp(l), e0 = l.getElement(), html = e0 ? e0.innerHTML : (l.options.icon && l.options.icon.options.html) || '', ll = l.getLatLng();
+        seen[id] = 1;
+        if (!rtMks[id]) rtMks[id] = new maplibregl.Marker({ element: mkEl('rt-mk', html, 3), pitchAlignment: 'viewport', rotationAlignment: 'viewport' }).setLngLat([ll.lng, ll.lat]).addTo(m3);
+      });
+      Object.keys(rtMks).forEach(function (id) { if (!seen[id]) { rtMks[id].remove(); delete rtMks[id]; } });
+      if (savedPlaces.destinationLine) line(savedPlaces.destinationLine.getLatLngs(), savedPlaces.destinationLine.options.color, savedPlaces.destinationLine.options.opacity, true, false);
+      setSrc('v3-rt', { type: 'FeatureCollection', features: feats });
+    }
+    // while a route is open, the other vehicles are dimmed (its own keep their pink ring), as in 2D
+    function applyDim(dim) {
+      var k = dim ? 0.35 : 1, f = function (a) { return ['*', k, ['case', ['==', ['get', 'pk'], 1], a, 1]]; };
+      ['v3-veh-dot', 'v3-veh-far'].forEach(function (id) { m3.setPaintProperty(id, 'circle-opacity', f(0.45)); m3.setPaintProperty(id, 'circle-stroke-opacity', f(0.45)); });
+      m3.setPaintProperty('v3-veh-lbl', 'icon-opacity', f(0.6)); m3.setPaintProperty('v3-veh-lbl', 'text-opacity', f(0.6));
+      m3.setPaintProperty('v3-veh-dir', 'icon-opacity', k);
+    }
+    view3d.routeTest = function () { return { lines: m3.getSource('v3-rt')._data.features.length, tags: Object.keys(rtMks).length }; };
+
+    // ---- v101: the tracked vehicle's route (the same points as the 2D line) ----
+    function lineFeat(lls, c) {
+      return { type: 'Feature', properties: { c: c }, geometry: { type: 'LineString', coordinates: lls.map(function (p) { return [p.lng, p.lat]; }) } };
+    }
+    view3d.pathChanged = function () {
+      if (!m3 || !m3.getSource('v3-trk-tail')) return;
+      if (flow) flow.draw3d = null;   // resync the head when the sources are replaced
+      var lls = pathLine ? pathLine.getLatLngs() : null, x = [];
+      trk.color = pathLine ? pathLine.options.color : '#888'; trk.tailRef = null;
+      setSrc('v3-trk-tail', lls && lls.length > 1 ? lineFeat(lls, trk.color) : EMPTY);
+      setSrc('v3-trk-head', EMPTY);
+      if (pathPreview) { var f = lineFeat(pathPreview.getLatLngs(), pathPreview.options.color); f.properties.dash = 1; x.push(f); }
+      if (pathEnd) { var e = pathEnd.getLatLng(); x.push({ type: 'Feature', properties: { end: 1 }, geometry: { type: 'Point', coordinates: [e.lng, e.lat] } }); }
+      setSrc('v3-trk-x', { type: 'FeatureCollection', features: x });
+    };
+    // every frame: only the short piece from the vehicle to the next point of the route changes
+    view3d.pathMoved = function (head, tail) {
+      if (!m3 || !m3.getSource('v3-trk-tail')) return;
+      if (trk.tailRef !== tail) {
+        trk.tailRef = tail;
+        setSrc('v3-trk-tail', tail.length > 1 ? lineFeat(tail, trk.color) : EMPTY);
+      }
+      setSrc('v3-trk-head', head.length ? lineFeat(head, trk.color) : EMPTY);
+    };
+
+    // ---- v101: stops — the same markers as on the 2D map: the tracked vehicle's stops and "your stop" ----
+    view3d.stopsChanged = function () {
+      if (!m3 || stopsQueued) return;
+      stopsQueued = true;
+      requestAnimationFrame(function () { stopsQueued = false; syncStops(); });
+    };
+    function syncStops() {
+      if (!m3) return;
+      var seen = {};
+      [focusLayer, routeStopLayer].forEach(function (g) {
+        g.eachLayer(function (mk) {
+          var id = L.stamp(mk);
+          if (seen[id] || !mk.getLatLng) return;
+          seen[id] = 1;
+          var src = mk.getElement(), html = src ? src.innerHTML : mk.options.icon.options.html, ll = mk.getLatLng(), m = stopMks[id];
+          if (mk.getTooltip && mk.getTooltip()) html += '<div class="v3-flabel">' + esc((mk._stop && mk._stop.name) || 'Your stop') + '</div>';
+          if (!m) {
+            var e = mkEl('stop-mk', '', 2);
+            e.addEventListener('click', function (ev) { ev.stopPropagation(); stopTap(mk); });
+            m = stopMks[id] = new maplibregl.Marker({ element: e, pitchAlignment: 'viewport', rotationAlignment: 'viewport' }).setLngLat([ll.lng, ll.lat]).addTo(m3);
+          }
+          var e2 = m.getElement();
+          if (e2._h !== html) { e2._h = html; e2.innerHTML = html; }
+          e2.style.zIndex = /\bsel\b/.test(html) || mk === focusMarker ? 3 : 2;
+        });
+      });
+      Object.keys(stopMks).forEach(function (id) { if (!seen[id]) { stopMks[id].remove(); delete stopMks[id]; } });
+      // v103: all other stops in one layer (DOM markers for hundreds of stops would be slow); the open one is enlarged
+      var feats = [];
+      stopsDrawn = [];
+      stopLayer.eachLayer(function (mk) {
+        var st = mk._stop;
+        if (!st) return;
+        var sel = mk === sheetMarker || (pop && popKind === 'stop' && popRef === mk) ? 1 : 0;
+        feats.push({ type: 'Feature', properties: { img: 'v3stop-' + (mk._color || 'x'), sel: sel }, geometry: { type: 'Point', coordinates: [st.lon, st.lat] } });
+        stopsDrawn.push({ mk: mk, c: [st.lon, st.lat] });
+      });
+      submitPointSource('v3-stops', feats);
+    }
+    function stopAtPoint(p) {
+      var best = null, bd = Infinity, rad = 14 * ui;
+      for (var i = 0; i < stopsDrawn.length; i++) {
+        var q = m3.project(stopsDrawn[i].c), dx = q.x - p.x, dy = q.y - p.y, d = dx * dx + dy * dy;
+        if (Math.abs(dx) <= rad && Math.abs(dy) <= rad && d < bd) { bd = d; best = stopsDrawn[i].mk; }
+      }
+      return best;
+    }
+    view3d.counts = function () {
+      var lbl = labelsBySearch || viewZoom() >= LABEL_ZOOM;
+      return { dots: lbl ? farN : vehN + farN, labels: lbl ? vehN : 0, stops: stopsDrawn.length + Object.keys(stopMks).length };
+    };
+    function stopTap(mk) {
+      var st = mk._stop;
+      if (!st || !m3) return;
+      if (isPhone() || !mk._spEl) { openSheet(st, mk); return; }
+      openPop('stop', mk);
+      focusOn([st.lat, st.lon]);
+    }
+    function startBearing() {
+      if (headingUp && following && selected && selected.pos) { var b = vehBearing(selected); if (b !== null) return b; }
+      if (headingUp && loc.follow && loc.heading !== null && Date.now() - loc.compassAt < COMPASS_LIVE_MS) return loc.heading;
+      return m3.getBearing();
+    }
+    function reveal() {
+      clearTimeout(revealTimer);
+      if (ready || !m3 || closing) return;
+      ready = true;
+      el.classList.add('ready');
+      // the 2D map is hidden once the 3D one has faded in over it
+      setTimeout(function () {
+        if (!view3d.on || closing) return;
+        mapEl.classList.add('v3on');
+        // v101: optionally free the 2D vector map's graphics memory while 3D is open (made again on return)
+        if (VIEW3D_FREE_2D && glLayer && map.hasLayer(glLayer)) { try { map.removeLayer(glLayer); freed = true; } catch (e) {} }
+      }, 260);
+      // v103: the tilt you last left it at (between 20° and the most allowed), else VIEW3D_PITCH
+      var keep = +(store('sofia_3d_pitch') || 0), pitch = keep >= 20 ? Math.min(VIEW3D_MAX_PITCH, keep) : VIEW3D_PITCH;
+      cam({ pitch: pitch, bearing: startBearing(), duration: 800 });
+      refresh();
+    }
+    function close(reason, instant) {
+      if (!view3d.on || closing) return;
+      closing = true;
+      info.lastClose = reason || 'button';
+      try { if (m3 && ready && m3.getPitch() >= 20) store('sofia_3d_pitch', String(Math.round(m3.getPitch()))); } catch (e) {}   // v103
+      terrainAttr(false);
+      closePop();
+      cancelPress();
+      var done = false;
+      function finish() {
+        if (done) return;
+        done = true;
+        clearTimeout(revealTimer);
+        var mm = m3, e3 = el, c = null, z = null;
+        try { if (mm) { c = mm.getCenter(); z = mm.getZoom() + 1; } } catch (e) {}
+        view3d.on = false; closing = false; ready = false; camBusy = false;
+        m3 = null; el = null; viewBounds01 = null;
+        meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
+        trkMk = null; stopMks = {}; stopsDrawn = []; shown = []; drawn = []; farDrawn = []; labelsBy = null; rtMks = {}; rtSig = ''; fc.off = lc.off = null; userMoving = pointerDown = false;
+        window.removeEventListener('mouseup', pointerOff, true); window.removeEventListener('touchend', pointerOff, true); window.removeEventListener('touchcancel', pointerOff, true);
+        mapEl.classList.remove('v3on');
+        handlers(true);
+        var wasFreed = freed;
+        if (freed) { freed = false; try { glLayer.addTo(map); hookGlMap(glLayer._glMap); } catch (x) {} }
+        if (c && isFinite(z)) map.setView([c.lat, c.lng], z, { animate: false });
+        back2d();
+        unstore(OPEN_KEY);
+        // MapLibre's remove() deliberately loses its own WebGL context: that is not a crash
+        try { if (mm) mm.getCanvas().removeEventListener('webglcontextlost', onLost, false); } catch (x) {}
+        if (e3) {
+          // fades out over the 2D map (which has redrawn under it), then is freed
+          e3.classList.add('leaving');
+          setTimeout(function () { try { mm.remove(); } catch (x) {} e3.remove(); }, instant ? 0 : wasFreed ? 900 : 300);
+        }
+        refresh();
+        renderDiag();
+      }
+      if (instant || reduceMotion || !ready || !m3) { finish(); return; }
+      // flat, north up, and on one of Leaflet's zoom steps (it snaps to whole levels), so the hand-over doesn't jump
+      var snap = map.options.zoomSnap || 1, zs = Math.round((m3.getZoom() + 1) / snap) * snap - 1;
+      m3.easeTo({ pitch: 0, bearing: 0, zoom: zs, padding: PAD0, duration: 600 });
+      m3.once('moveend', function () { requestAnimationFrame(finish); });
+      setTimeout(finish, 1000);
+    }
+    // back in 2D: every marker where the motion planner says, the cameras start fresh
+    function back2d() {
+      for (var k in vehicles) {
+        var v = vehicles[k];
+        if (!v.pos) continue;
+        v.dot.setLatLng(v.pos);
+        if (v.pillInMap && v.pill) v.pill.setLatLng(v.pos);
+      }
+      followCam.off = null; locCam.off = null; lookAt = 0; pathSyncAt = 0;
+      if (selected && shapes) drawPath(selected);
+      render(false);
+      routeTagsByZoom();   // v102
+    }
+
+    // ---- our own camera moves ----
+    function cam(o, fly) {
+      if (!m3) return;
+      if (reduceMotion) o.duration = 0;
+      if (fly && o.duration) m3.flyTo(o); else m3.easeTo(o);
+      camBusy = !!o.duration;   // after the call: starting a move ends the previous one (its moveend)
+      clearTimeout(camTimer);
+      camTimer = setTimeout(function () { camBusy = false; }, (o.duration || 0) + 400);
+    }
+    // Leaflet camera calls made by the 2D code while 3D is open (fit a route, show a place, a search…) move the
+    // 3D map instead. Pitch and bearing stay; centres are the middle of the screen, as in Leaflet.
+    function msOf(o, dflt) { return o && o.animate === false ? 0 : Math.round(((o && o.duration) || dflt) * 1000); }
+    function llOf(c) { var ll = L.latLng(c); return [ll.lng, ll.lat]; }
+    function wrap(name, fn) {
+      var orig = map[name];
+      map[name] = function () { if (view3d.on && m3) { fn.apply(this, arguments); return this; } return orig.apply(this, arguments); };
+    }
+    wrap('setView', function (c, z, o) { cam({ center: llOf(c), zoom: (typeof z === 'number' ? z : viewZoom()) - 1, padding: PAD0, duration: o && o.animate ? msOf(o, 0.5) : 0 }); });
+    wrap('flyTo', function (c, z, o) { cam({ center: llOf(c), zoom: (typeof z === 'number' ? z : viewZoom()) - 1, padding: PAD0, duration: msOf(o, 0.8) }, true); });
+    wrap('panTo', function (c, o) { cam({ center: llOf(c), padding: PAD0, duration: msOf(o, 0.45) }); });
+    function fitOpts(o) {
+      o = o || {};
+      var tl = L.point(o.paddingTopLeft || o.padding || [0, 0]), br = L.point(o.paddingBottomRight || o.padding || [0, 0]);
+      return { padding: { top: tl.y, left: tl.x, bottom: br.y, right: br.x }, maxZoom: (o.maxZoom || 18) - 1, duration: msOf(o, 0.8) };
+    }
+    function fit(b, o, fly) {
+      b = L.latLngBounds(b);
+      if (!b.isValid() || !m3) return;
+      var f = fitOpts(o);
+      try {
+        var c = m3.cameraForBounds([[b.getWest(), b.getSouth()], [b.getEast(), b.getNorth()]], { padding: f.padding, maxZoom: f.maxZoom, bearing: m3.getBearing() });
+        if (c) cam({ center: c.center, zoom: c.zoom, bearing: m3.getBearing(), padding: PAD0, duration: f.duration }, fly);
+      } catch (e) {}
+    }
+    wrap('fitBounds', function (b, o) { fit(b, o, false); });
+    wrap('flyToBounds', function (b, o) { fit(b, o, true); });
+    // put a spot at screen height targetY (the 2D focusOn / centreOnMe), at zoom z
+    view3d.focus = function (ll, z, targetY) {
+      if (!m3) return;
+      ll = L.latLng(ll);
+      var H = el.clientHeight, pad = { top: 0, bottom: 0, left: 0, right: 0 }, cur = viewZoom();
+      if (targetY > H / 2) pad.top = Math.min(H - 40, 2 * targetY - H); else pad.bottom = Math.min(H - 40, H - 2 * targetY);
+      var zoomed = Math.abs(z - cur) > 0.01;
+      cam({ center: [ll.lng, ll.lat], zoom: z - 1, padding: pad, duration: zoomed ? 800 : 450 }, zoomed);
+    };
+    view3d.zoomBy = function (d) {
+      if (!m3) return;
+      cam({ zoom: Math.max(7, Math.min(18, m3.getZoom() + d)), duration: 300 });   // (v102: the follow cameras wait for it; around the subject)
+    };
+    // the compass needle: north up; while a camera follows (a vehicle, you) it switches heading-up / north-up (kept)
+    view3d.north = function () {
+      if (!m3) return;
+      if (following || loc.follow) {
+        headingUp = !headingUp;
+        store('sofia_3d_heading', headingUp ? 'heading' : 'north');
+        refreshNorth();
+        toast(headingUp ? 'Heading up: the map turns with the way ahead.' : 'North up while following.', 2200);
+        if (!headingUp) cam({ bearing: 0, duration: 600 });   // one smooth turn; the camera then keeps north up
+        return;
+      }
+      cam({ bearing: 0, duration: 500 });
+    };
+    function needle() {
+      var g = northBox.querySelector('.nd');
+      if (g && m3) g.setAttribute('transform', 'rotate(' + (-m3.getBearing()).toFixed(1) + ' 12 12)');
+    }
+    view3d.zoom = function () { return m3 ? m3.getZoom() + 1 : map.getZoom(); };
+    // What's on screen. Tilted, the view reaches toward the horizon; it is clipped to about what the flat view at
+    // this zoom would show (0.6 × the screen's larger side from the middle, 0.5–2.5 km), so vehicles and stops near
+    // the horizon don't all count as on screen (v101: at zoom 16 a fixed 3 km put 526 stop markers on the map).
+    function clipM() {
+      var c = m3.getCenter(), mpp = 156543.03 * Math.cos(toRad(c.lat)) / Math.pow(2, m3.getZoom() + 1), cv = m3.getCanvas();
+      return Math.max(500, Math.min(2500, 0.6 * Math.max(cv.clientWidth, cv.clientHeight) * mpp));
+    }
+    view3d.bounds = function (pad) {
+      if (!m3) return map.getBounds().pad(pad);
+      var b = m3.getBounds(), c = m3.getCenter(), dLat = clipM() / 111320, dLon = dLat / Math.cos(toRad(c.lat));
+      var s = Math.max(b.getSouth(), c.lat - dLat), n = Math.min(b.getNorth(), c.lat + dLat);
+      var w = Math.max(b.getWest(), c.lng - dLon), e = Math.min(b.getEast(), c.lng + dLon);
+      if (s >= n || w >= e) { s = c.lat - dLat; n = c.lat + dLat; w = c.lng - dLon; e = c.lng + dLon; }
+      return L.latLngBounds([s, w], [n, e]).pad(pad);
+    };
+    view3d.camText = function () { return m3 ? 'p' + Math.round(m3.getPitch()) + '° b' + Math.round((m3.getBearing() + 360) % 360) + '°' : ''; };
+
+    // ---- every frame (called at the end of motionFrame while 3D is open) ----
+    view3d.frame = function () {
+      if (!m3) return;
+      drawMe3();
+      if (!m3.getSource('v3-veh')) return;
+      var now = performance.now();
+      if (now >= vehDue) { vehDue = now + 1000 / VIEW3D_VEH_HZ; buildVeh(); }
+      trackFrame();
+      followCam3();   // v102
+      locCam3();
+      routePoll(now);
+    };
+
+    // ---- your location: dot, accuracy circle, and the beam lying on the ground ----
+    var BEAM_SVG = '<svg viewBox="-60 -60 120 120" aria-hidden="true"><defs><radialGradient id="meBeam3" cx="0" cy="0" r="58" gradientUnits="userSpaceOnUse">' +
+      '<stop offset="0" stop-color="#1A73E8" stop-opacity=".55"/><stop offset="1" stop-color="#1A73E8" stop-opacity="0"/></radialGradient></defs>' +
+      '<path d="M0 0L-33.3 -47.5A58 58 0 0 1 33.3 -47.5Z" fill="url(#meBeam3)"/></svg>';
+    function mkEl(cls, html, z) {
+      var d = document.createElement('div');
+      d.className = 'v3-mk ' + cls;
+      d.innerHTML = html;
+      if (z) d.style.zIndex = z;
+      return d;
+    }
+    function circlePoly(ll, r) {
+      var pts = [], la = toRad(ll.lat);
+      for (var i = 0; i <= 40; i++) {
+        var a = i / 40 * 2 * Math.PI;
+        pts.push([ll.lng + r * Math.sin(a) / (6371000 * Math.cos(la)) * 180 / Math.PI, ll.lat + r * Math.cos(a) / 6371000 * 180 / Math.PI]);
+      }
+      return pts;
+    }
+    function setAcc(ll, r) {
+      var s = m3 && m3.getSource('v3-me-acc');
+      if (!s) return;
+      var key = ll ? ll.lat.toFixed(6) + ',' + ll.lng.toFixed(6) + ',' + Math.round(r) : '-';
+      if (key === accKey) return;
+      accKey = key;
+      s.setData(ll ? { type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [circlePoly(ll, r)] } } : EMPTY);
+    }
+    function drawMe3() {
+      var ll = loc.fix && loc.state !== 'off' && loc.state !== 'err' ? meShown() : null;
+      if (!ll) {
+        if (meMk) { meMk.remove(); meMk = null; }
+        if (beamMk) { beamMk.remove(); beamMk = null; }
+        meKey = '';
+        setAcc(null);
+        return;
+      }
+      var at = [ll.lng, ll.lat], key = ll.lat + ',' + ll.lng;
+      if (!meMk) {
+        meMk = new maplibregl.Marker({ element: mkEl('me-mk', meIcon.options.html, 6), pitchAlignment: 'viewport', rotationAlignment: 'viewport', subpixelPositioning: true }).setLngLat(at).addTo(m3);
+        beamMk = new maplibregl.Marker({ element: mkEl('me-beam', BEAM_SVG, 5), pitchAlignment: 'map', rotationAlignment: 'map', subpixelPositioning: true }).setLngLat(at).addTo(m3);
+      } else if (key !== meKey) { meMk.setLngLat(at); beamMk.setLngLat(at); }
+      meKey = key;
+      var now = Date.now(), stale = now - loc.fix.t > LOC_STALE_MS, src = loc.headingSrc;
+      var fresh = src === 'compass' ? now - loc.compassAt < COMPASS_LIVE_MS
+        : src === 'gps' && now - loc.headingAt < 10000 && (loc.fix.speed || 0) >= GPS_HEADING_SPEED;
+      meMk.getElement().classList.toggle('stale', stale);
+      beamMk.getElement().classList.toggle('off', !(fresh && loc.heading !== null && !stale));
+      if (loc.heading !== null && Math.abs(beamMk.getRotation() - loc.heading) > 0.1) beamMk.setRotation(loc.heading);
+      setAcc(ll, loc.fix.acc);
+    }
+
+    // ---- My places: the flags (read only here; placing and moving one is done in 2D) ----
+    function pinHtml(p) {
+      var d = p.id === savedPlaces.destinationId ? savedPlaces.distanceFromMe(p) : null;
+      return '<div class="pin-ic">' + FLAG_SVG + '</div><div class="pin-lbl">' + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
+    }
+    function syncPins() {
+      if (!m3) return;
+      var seen = {};
+      savedPlaces.forEach(function (p) {
+        var id = p.id, m = pinMks[id], html = pinHtml(p), dest = id === savedPlaces.destinationId;
+        seen[id] = true;
+        if (!m) {
+          var e = mkEl('pin-mk', '', 0);
+          e.addEventListener('click', function (ev) { ev.stopPropagation(); var q = savedPlaces.find(id); if (q) openPop('pin', q); });
+          m = pinMks[id] = new maplibregl.Marker({ element: e, pitchAlignment: 'viewport', rotationAlignment: 'viewport' }).setLngLat([p.lon, p.lat]).addTo(m3);
+        }
+        var e2 = m.getElement();
+        if (e2._h !== html) { e2._h = html; e2.innerHTML = html; }
+        e2.classList.toggle('dest', dest);
+        e2.style.zIndex = dest ? 4 : 3;
+        var ll = m.getLngLat();
+        if (ll.lng !== p.lon || ll.lat !== p.lat) m.setLngLat([p.lon, p.lat]);
+      });
+      Object.keys(pinMks).forEach(function (id) { if (!seen[id]) { pinMks[id].remove(); delete pinMks[id]; } });
+      if (pop && popKind === 'pin') {
+        var q = savedPlaces.find(popRef.id);
+        if (!q) closePop(); else pop.setHTML(savedPlaces.popupHtml(q));
+      }
+    }
+    view3d.placesChanged = function () { if (m3) syncPins(); };
+    // a long-press / right-click: a new place is named and put down on the flat map
+    function cancelPress() { if (lp) { clearTimeout(lp.t); lp = null; } }
+    function addHere(lngLat) {
+      if (!view3d.on || Date.now() - addedAt < 1000) return;
+      addedAt = Date.now();
+      var ll = L.latLng(lngLat.lat, lngLat.lng);
+      close('adding a place');
+      toast('Places are added in 2D.', 2500);
+      openPinDlg('New place here', '', function (name) { savedPlaces.add(name, ll); });
+    }
+
+    // ---- popups (PC and phones: the flag's card) ----
+    var POP_OFF = { top: [0, 8], 'top-left': [0, 8], 'top-right': [0, 8], bottom: [0, -34], 'bottom-left': [0, -34], 'bottom-right': [0, -34], left: [10, -16], right: [-10, -16] };
+    function popOffset(dy) { return { top: [0, 8], 'top-left': [0, 8], 'top-right': [0, 8], bottom: [0, -dy], 'bottom-left': [0, -dy], 'bottom-right': [0, -dy], left: [12, 0], right: [-12, 0] }; }
+    // kind: 'pin' (a flag), 'veh' (v101: the vehicle card, PC) or 'stop' (v101: the stop card, PC)
+    function openPop(kind, ref) {
+      closePop();
+      var p = new maplibregl.Popup({ className: 'v3-pop ' + (kind === 'veh' ? 'veh-pop' : kind === 'stop' ? 'stop-pop' : 'pin-pop'), closeButton: false, closeOnClick: false,
+        anchor: kind === 'veh' ? 'top' : undefined,   // v100's card: always below the vehicle
+        offset: kind === 'pin' ? POP_OFF : kind === 'veh' ? [0, Math.round(VP_GAP * ui) - 8] : popOffset(18), maxWidth: 'none', focusAfterOpen: false });
+      if (kind === 'pin') p.setLngLat([ref.lon, ref.lat]).setHTML(savedPlaces.popupHtml(ref));
+      else if (kind === 'veh') { var el = vehPopupEl(ref); patchVeh(el, ref); p.setLngLat([ref.pos[1], ref.pos[0]]).setDOMContent(el); }
+      else {
+        var st = ref._stop, se = ref._spEl;
+        se.style.maxHeight = Math.max(220, Math.round(window.innerHeight * 0.55)) + 'px';
+        patchStop(se, st);
+        p.setLngLat([st.lon, st.lat]).setDOMContent(se);
+        expandedStop = null;
+      }
+      p.addTo(m3);
+      var ce = p.getElement() && p.getElement().querySelector('.maplibregl-popup-content');
+      if (ce && kind !== 'pin') ce.style.width = (kind === 'veh' ? vpW() + 36 : 348) + 'px';
+      popKind = kind; popRef = ref; pop = p;
+      if (kind === 'stop') markSel(ref, true);
+      if (kind === 'veh') {   // as v100's card in 2D: body.vp-card, and the map buttons it runs under step aside
+        document.body.classList.add('vp-card');
+        clearInterval(cardEdgeTimer); cardEdgeTimer = setInterval(vpClearEdge, 250); vpClearEdge();
+      }
+      p.on('close', function () {
+        if (kind === 'veh') { ref.allStops = false; document.body.classList.remove('vp-card'); clearInterval(cardEdgeTimer); setTimeout(vpClearEdge, 0); }
+        if (kind === 'stop') { markSel(ref, false); expandedStop = null; }
+        if (pop === p) { pop = null; popKind = ''; popRef = null; popClosedAt = Date.now(); }
+      });
+    }
+    function closePop() { if (pop) { var p = pop; pop = null; try { p.remove(); } catch (e) {} popKind = ''; popRef = null; popClosedAt = Date.now(); } }
+    var leafletClosePopup = map.closePopup;
+    map.closePopup = function () { if (pop) closePop(); return leafletClosePopup.apply(this, arguments); };
+
+    // ---- a tap on the 3D map ----
+    function onClick(e) {
+      if (Date.now() - dragAt < 300) return;   // v102: the end of a drag (even a short one) isn't a tap, as in Leaflet
+      var oe = e && e.originalEvent;
+      if (downXY && oe && typeof oe.clientX === 'number' && Math.abs(oe.clientX - downXY[0]) + Math.abs(oe.clientY - downXY[1]) > 6) return;
+      var v = e && e.point ? vehAtPoint(e.point) : null;   // v101: a vehicle under the finger
+      if (v) { openVeh(v); return; }
+      var sm = e && e.point ? stopAtPoint(e.point) : null;   // v103: a stop of the all-stops layer
+      if (sm) { stopTap(sm); return; }
+      if (pop) { closePop(); return; }                    // this tap only closes the open card
+      if (sheetStop || sheetVeh || sheetRoute) { closeSheet(); return; }
+      if (Date.now() - popClosedAt < 400) return;
+      if (selected) deselect();
+    }
+
+    // ---- memory: the iPhone's ceiling ----
+    function onLost(e) {
+      if (!view3d.on || !m3 || (e && e.target && e.target !== m3.getCanvas())) return;   // only the open 3D map's own loss
+      if (e && e.preventDefault) e.preventDefault();
+      info.lost++;
+      store(MEMO_KEY, JSON.stringify({ t: Date.now(), why: 'graphics memory lost' }));
+      close('ran out of graphics memory', true);
+      toast('3D view closed: the phone ran out of graphics memory.', 7000);
+    }
+    // in the background nothing is drawn; after 10 minutes there the 3D map is closed (iOS kills hidden tabs that
+    // hold a lot of graphics memory)
+    document.addEventListener('visibilitychange', function () {
+      clearTimeout(hideTimer);
+      if (document.hidden) {
+        hiddenAt = Date.now();
+        if (view3d.on) hideTimer = setTimeout(function () { if (document.hidden) close('in the background for 10 min', true); }, 10 * 60e3);
+      } else if (view3d.on && hiddenAt && Date.now() - hiddenAt > 10 * 60e3) close('in the background for 10 min', true);
+    });
+
+    // ---- Diagnostics ----
+    view3d.diagRows = function () {
+      var m = memo(), rows = [];
+      var st = view3d.on ? (m3 ? 'On · pitch ' + Math.round(m3.getPitch()) + '° · bearing ' + Math.round((m3.getBearing() + 360) % 360) + '°' : 'On')
+        : /^image/.test(mapMode) ? 'Hidden: image map'
+        : m ? 'Hidden: stopped ' + clockHM(m.t) + ' (' + m.why + '), back at ' + clockHM(m.t + VIEW3D_RETRY_MS) + ' tomorrow'
+        : !/^vector/.test(mapMode) ? 'Waiting for the map' : 'Off';
+      rows.push(['Status', st]);
+      if (view3d.on && m3) {
+        var cv = m3.getCanvas(), dpr = cv.clientWidth ? cv.width / cv.clientWidth : 0;
+        rows.push(['Drawn at', dpr.toFixed(2) + '× pixels (screen ' + (window.devicePixelRatio || 1) + '×) · buildings from zoom ' + VIEW3D_BUILDING_ZOOM]);
+        rows.push(['Tiles since open', fmtN(tileReq - info.tiles0) + ' asked · ' + fmtN(tileHits - info.hits0) + ' from storage']);
+        if (vehMs.length) {
+          // the median (a pause for garbage collection makes the average meaningless) and the worst of the last 100
+          var sorted = vehMs.slice().sort(function (x, y) { return x - y; }), med = sorted[sorted.length >> 1], worst = sorted[sorted.length - 1];
+          rows.push(['Vehicles drawn', fmtN(vehN) + ' near + ' + fmtN(farN) + ' far · layer update ' + med.toFixed(2) + ' ms median, ' + worst.toFixed(1) + ' ms worst (' + VIEW3D_VEH_HZ + '×/s)']);
+        }
+        rows.push(['2D map while open', freed ? 'freed (VIEW3D_FREE_2D)' : 'kept (instant return)']);
+        rows.push(['Terrain', terrainOn ? 'on (Mapterhorn)' : 'off']);   // v103
+      }
+      rows.push(['Opened', info.opens + '× this session' + (info.lastClose ? ' · last closed: ' + info.lastClose : '') + (info.lost ? ' · memory lost ' + info.lost + '×' : '')]);
+      return rows;
+    };
+
+    // ---- v103: terrain (off by default): Mapterhorn's free elevation tiles (Copernicus 30 m over Bulgaria) ----
+    function terrainAttr(on) {
+      if (on === demAttr || !map.attributionControl) return;
+      demAttr = on;
+      var t = 'Terrain &copy; <a href="https://mapterhorn.com/attribution" target="_blank">Mapterhorn</a>';
+      if (on) map.attributionControl.addAttribution(t); else map.attributionControl.removeAttribution(t);
+    }
+    function applyTerrain() {
+      if (!m3 || !m3.getSource('v3-veh')) return;
+      try {
+        if (terrainOn) {
+          if (!m3.getSource('v3-dem')) m3.addSource('v3-dem', { type: 'raster-dem', tiles: ['https://tiles.mapterhorn.com/{z}/{x}/{y}.webp'], tileSize: 512, encoding: 'terrarium', maxzoom: 12 });
+          m3.setTerrain({ source: 'v3-dem', exaggeration: 1 });
+        } else if (m3.getTerrain && m3.getTerrain()) m3.setTerrain(null);
+      } catch (e) { console.warn('3D terrain failed:', e); }
+      terrainAttr(terrainOn && view3d.on);
+    }
+    var terBox = document.getElementById('v3Terrain');
+    terBox.checked = terrainOn;
+    terBox.onchange = function () { terrainOn = this.checked; store('sofia_3d_terrain', terrainOn ? '1' : '0'); applyTerrain(); };
+    view3d.terrain = function () { return { on: terrainOn, set: !!(m3 && m3.getTerrain && m3.getTerrain()) }; };
+
+    view3d.open = open;
+    view3d.close = close;
+    view3d.toggle = function () { if (view3d.on) close('2D button'); else open(); };
+    view3d.refresh = refresh;
+    view3d.map = function () { return m3; };
+    refresh();
+  })();
+

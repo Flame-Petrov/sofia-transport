@@ -1,0 +1,37 @@
+  /* stop icons */
+  .stop-mk { background: none; border: 0; }
+  .stop-ic {
+    --s: 1; --w: 20px; --b: 2px; --r: 6px; --i: 13px;   /* size, border, corner and icon at 1× */
+    position: absolute; transform: translate(-50%, -50%);
+    width: calc(var(--w) * var(--s)); height: calc(var(--w) * var(--s)); box-sizing: border-box;
+    border-radius: calc(var(--r) * var(--s));
+    display: flex; align-items: center; justify-content: center;
+    background: #fff; color: #263238; border: calc(var(--b) * var(--s)) solid #263238;
+    box-shadow: 0 1px 4px rgba(0,0,0,.35); cursor: pointer;
+    transition: --s .2s ease, box-shadow .2s ease;
+  }
+  .stop-ic.sel { --s: 1.6; box-shadow: 0 2px 8px rgba(0,0,0,.45); }
+  .stop-ic svg { width: calc(var(--i) * var(--s)); height: calc(var(--i) * var(--s)); }
+  .stop-ic.route { --w: 22px; --b: 3px; }
+  .stop-ic.focus { --w: 30px; --b: 3px; --r: 9px; --i: 17px; background: #00a86b; color: #fff; border-color: #fff; }
+  /* spinning dotted ring: the stop whose popup is open, and the green "your stop" */
+  .stop-ic.sel::before, .stop-ic.focus::after {
+    content: ''; position: absolute; inset: calc(-9px * var(--s)); border-radius: 50%;
+    border: calc(3px * var(--s)) dotted currentColor; animation: stopSpin 4s linear infinite; pointer-events: none;
+  }
+  .stop-ic.focus::after { inset: calc(-10px * var(--s)); border-color: #00a86b; }
+  .stop-ic.focus.sel::before { display: none; }
+  @keyframes stopSpin { to { transform: rotate(360deg); } }
+  /* hover (mouse only, so a tap on a phone doesn't leave things enlarged): the object under the pointer
+     grows a little, gets a stronger shadow and comes to the front. Selected objects are already bigger. */
+  @media (hover: hover) {
+    .leaflet-marker-icon.veh:hover, .leaflet-marker-icon.stop-mk:hover { z-index: 99999 !important; }
+    .veh .pill:not(.sel):hover { --s: 1.3; box-shadow: 0 3px 10px rgba(0,0,0,.5); }
+    .stop-ic:not(.sel):hover { --s: 1.3; box-shadow: 0 3px 10px rgba(0,0,0,.45); }
+    .veh .pill.sel:hover, .stop-ic.sel:hover { box-shadow: 0 3px 12px rgba(0,0,0,.6); }
+  }
+  .leaflet-tooltip.focus-label {
+    background: #00a86b; color: #fff; border: 0; font-weight: 600; font-size: calc(12px * var(--ui));
+    padding: calc(3px * var(--ui)) calc(8px * var(--ui)); border-radius: calc(8px * var(--ui)); box-shadow: 0 2px 6px rgba(0,0,0,.3);
+  }
+  .leaflet-tooltip.focus-label::before { border-top-color: #00a86b; }

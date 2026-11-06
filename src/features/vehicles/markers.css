@@ -1,0 +1,36 @@
+  /* line-number markers (only used when zoomed in or when a search narrows things down) */
+  /* Enlarged labels and stops (selected 1.6×, hovered 1.3×) are really drawn bigger — font, padding,
+     border, icon — instead of being stretched with transform: scale(), which made them blurry.
+     --s is the size factor; registered so it can be animated smoothly. */
+  @property --s { syntax: '<number>'; inherits: true; initial-value: 1; }
+  .veh { background: none; border: 0; }
+  .veh .pill {
+    --s: 1; --fs: 11px;
+    position: absolute; transform: translate(-50%, -50%); white-space: nowrap;
+    display: inline-flex; align-items: center; gap: calc(2px * var(--s));
+    padding: calc(1px * var(--s)) calc(5px * var(--s)); border-radius: calc(7px * var(--s));
+    border: calc(1.5px * var(--s)) solid #fff;
+    color: #fff; font: 700 calc(var(--fs) * var(--s)) / calc(15px * var(--s)) system-ui, sans-serif;
+    box-shadow: 0 1px 3px rgba(0,0,0,.4);
+    transition: --s .2s ease, box-shadow .2s ease;
+  }
+  .veh .pill.noline { --fs: 10px; font-weight: 500; opacity: .85; border-style: dashed; }
+  .veh .pill.parked { opacity: .6; border-style: dashed; }
+  .veh .pill.sel { --s: 1.6; box-shadow: 0 2px 8px rgba(0,0,0,.5); }
+  /* v99: while a route is open, the vehicles of your way: bigger, ringed in the route's pink, with a tag
+     ("Board · 4 min"); the other vehicles are dimmed (still tappable) */
+  .veh .pill.mine { --s: 1.3; box-shadow: 0 0 0 calc(2.5px * var(--s)) var(--dest), 0 2px 8px rgba(0,0,0,.45); }
+  .veh .pill.mine.sel { --s: 1.6; }
+  .veh .pill .vtag { position: absolute; left: 50%; top: 100%; transform: translate(-50%, 7px); padding: 0 6px; border-radius: 999px;
+    background: var(--dest); color: #fff; font: 700 10.5px/16px system-ui, sans-serif; white-space: nowrap; box-shadow: 0 1px 3px rgba(0,0,0,.35); pointer-events: none; }
+  #map.rt-dim .veh .pill:not(.mine):not(.sel), #map.rt-dim .veh-dots { opacity: .35; }
+  .veh .dir { display: inline-block; font-size: calc(9px * var(--s)); line-height: calc(9px * var(--s)); }
+  /* The follow camera moves the map by fractions of a pixel every frame. As its own layer the map is only
+     shifted on the GPU; without this Chrome repainted the whole map each frame (~20 fps on a laptop GPU). */
+  .leaflet-map-pane { will-change: transform; }
+  .leaflet-path-pane { transition: opacity .15s ease; }
+  .leaflet-path-pane.zfade { transition: opacity .06s linear; opacity: 0; }
+  .path-arrow div {
+    position: absolute; font-size: 13px; line-height: 13px; color: #fff;
+    text-shadow: 0 0 2px rgba(0,0,0,.8);
+  }

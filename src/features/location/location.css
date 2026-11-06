@@ -1,0 +1,37 @@
+  /* ---------- Your location (v75): button above the zoom buttons, blue dot, the way you face ---------- */
+  :root { --me: #1A73E8; }
+  .leaflet-control-locate a { display: flex; align-items: center; justify-content: center; color: #3a3a3c; }
+  .leaflet-control-locate svg { width: 18px; height: 18px; }
+  .leaflet-control-locate .lc-in { opacity: 0; }
+  .leaflet-control-locate.on a, .leaflet-control-locate.wait a { color: var(--me); }
+  .leaflet-control-locate.on .lc-in { opacity: 1; }
+  .leaflet-control-locate.follow a, .leaflet-control-locate.follow a:hover { background: var(--me); color: #fff; }
+  .leaflet-control-locate.wait svg { animation: lcWait 1s ease-in-out infinite; }
+  .leaflet-control-locate.err a { color: #c62828; }
+  @keyframes lcWait { 50% { opacity: .3; } }
+  .me-mk { background: none; border: 0; }
+  .me-dot, .me-cone, .me-halo { position: absolute; left: 0; top: 0; zoom: var(--ui); }
+  .me-dot {
+    width: 18px; height: 18px; transform: translate(-50%, -50%); border-radius: 50%; box-sizing: border-box;
+    background: var(--me); border: 3px solid #fff; box-shadow: 0 1px 5px rgba(0,0,0,.4); transition: background .3s;
+  }
+  /* soft pulse around the dot while the fix is fresh */
+  .me-halo { width: 18px; height: 18px; transform: translate(-50%, -50%); border-radius: 50%; background: var(--me); opacity: 0; animation: meHalo 2s ease-out infinite; }
+  @keyframes meHalo { 0% { transform: translate(-50%, -50%) scale(1); opacity: .35; } 100% { transform: translate(-50%, -50%) scale(2.6); opacity: 0; } }
+  /* the beam: a fading wedge pointing the way the phone faces; JS sets --h (degrees from north) */
+  .me-cone { width: 120px; height: 120px; transform: translate(-50%, -50%) rotate(var(--h, 0deg)); transition: opacity .3s; }
+  .me-cone[hidden] { display: block; opacity: 0; }
+  .me-cone svg { width: 100%; height: 100%; display: block; }
+  .me-mk.stale .me-dot { background: #8e8e93; }
+  .me-mk.stale .me-halo, .me-mk.stale .me-cone { display: none; }
+  @media (prefers-reduced-motion: reduce) { .me-halo, .leaflet-control-locate.wait svg { animation: none; } }
+  /* short notes (location errors) */
+  #toast {
+    position: fixed; z-index: 1200; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    max-width: min(420px, calc(100% - 32px)); padding: 10px 14px; border-radius: 12px; zoom: var(--ui);
+    background: #1C1C1E; color: #F2F2F2; box-shadow: 0 8px 28px rgba(0,0,0,.35);
+    font: 500 14px/1.4 Inter, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; text-align: center;
+    transition: opacity .3s;
+  }
+  #toast[hidden] { display: block; opacity: 0; pointer-events: none; }
+

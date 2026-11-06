@@ -1,0 +1,25 @@
+  /* phone: stop details in a bottom sheet instead of a popup */
+  /* header (name + close) stays pinned, the cards scroll underneath */
+  #sheet {
+    position: fixed; z-index: 1100; left: 0; right: 0; bottom: 0;
+    max-height: 50%; display: flex; flex-direction: column; padding-top: 6px;
+    background: #fff; color: #1A1A1A; border-radius: 18px 18px 0 0;
+    box-shadow: 0 -6px 24px rgba(0,0,0,.25);
+  }
+  #sheet[hidden] { display: none; }
+  #sheet .grab { flex: none; width: 40px; height: 5px; border-radius: 3px; background: #E6E6E6; margin: 2px auto 8px; }
+  #sheetBody { flex: 0 1 auto; }
+  #sheet .sp-head { padding: 0 16px 12px; }
+  #sheet .sp-body { -webkit-overflow-scrolling: touch; padding: 4px 16px calc(14px + env(safe-area-inset-bottom)); }
+  /* the vehicle card in the sheet (phones): same content as the popup, full width, scrolls as a whole */
+  #sheet.vsheet #sheetBody { overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 0 16px calc(14px + env(safe-area-inset-bottom)); }
+  @media (max-width: 700px) {
+    /* phone: full width minus 8 px each side, never more than 70 % of the screen height */
+    #panel { top: 8px; left: 8px; right: 8px; width: auto; padding: 12px; max-height: min(70%, calc(100% - 32px)); }
+    /* 32 px buttons and chips keep their look but get a 44 px tall tap area */
+    #types button::before, .chip::before, #stopTrack::before, #diagCopy::before, #qClear::before, #diagClose::before {
+      content: ''; position: absolute; left: 0; right: 0; top: -6px; bottom: -6px;
+    }
+    /* the full-width panel would cover the Follow button: it moves down, above the zoom buttons */
+    #follow { top: auto; bottom: calc(96px + env(safe-area-inset-bottom)); right: 10px; }
+  }

@@ -1,0 +1,173 @@
+<!doctype html>
+<html lang="bg">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sofia Live Transport</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
+<style>
+{{include shared/ui/base.css}}
+{{include features/panel/panel.css}}
+{{include features/stops/progress.css}}
+{{include features/vehicles/tracking.css}}
+{{include shared/ui/status.css}}
+{{include features/diagnostics/diagnostics.css}}
+{{include features/vehicles/markers.css}}
+{{include features/vehicles/popup.css}}
+{{include features/stops/markers.css}}
+{{include features/stops/popup.css}}
+{{include shared/ui/loading.css}}
+{{include shared/ui/sheet.css}}
+{{include shared/ui/scale.css}}
+{{include features/location/location.css}}
+{{include features/places/list.css}}
+{{include features/offline/areas.css}}
+{{include features/places/pins.css}}
+{{include shared/ui/banners.css}}
+{{include shared/ui/connection.css}}
+{{include features/panel/swipe.css}}
+{{include shared/ui/theme.css}}
+{{include features/panel/menu-motion.css}}
+{{include features/panel/menu-layout.css}}
+{{include features/journeys/journeys.css}}
+{{include features/view3d/view.css}}
+{{include features/vehicles/selected-card.css}}
+</style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+</head>
+<body>
+{{include shared/ui/loading.html}}
+<div id="map"></div>
+{{include features/stops/progress.html}}
+{{include features/vehicles/follow.html}}
+{{include features/diagnostics/performance.html}}
+<div id="toast" role="status" aria-live="polite" hidden></div>
+
+{{include features/places/placement.html}}
+<div id="secBar" hidden role="status"><span id="secTxt"></span><button id="secOpen" type="button">Open</button><button id="secClose" type="button" aria-label="Close">×</button></div>
+
+{{include shared/ui/connection.html}}
+{{include shared/ui/name-dialog.html}}
+<div id="sheet" class="stop-pop" hidden><div class="grab"></div><div id="sheetBody" class="sp"></div></div>
+
+<div id="panel">
+  <div class="p-head">
+    <div class="qrow">
+      <div class="sbox">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="2"/><path d="M20 20l-3.6-3.6" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <input id="q" type="search" placeholder="Search line or vehicle" autocomplete="off" aria-label="Search line or vehicle — e.g. 94, X9, A1210" title="e.g. 94, X9, A1210">
+        <button id="qClear" type="button" aria-label="Clear search" title="Clear search" hidden>
+          <svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M3 3l8 8M11 3l-8 8"/></svg>
+        </button>
+      </div>
+      <!-- v78: one chevron, rotated 180° when the menu is open -->
+      <button id="fold" type="button" title="Open menu" aria-label="Open menu" aria-expanded="false" aria-controls="secTypes secMenu">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6"/></svg>
+      </button>
+    </div>
+    <!-- v76: the filter pill sits in the fixed head, so it never scrolls away under the search.
+         v78: it folds with the menu (.fold-sec: its row opens/closes smoothly, the pill fades and slides) -->
+    <div class="fold-sec" id="secTypes">
+    <div id="types" role="group" aria-label="Vehicle types">
+      <button type="button" data-t="3" class="on" aria-pressed="true"><i></i>Bus</button>
+      <button type="button" data-t="0" class="on" aria-pressed="true"><i></i>Tram</button>
+      <button type="button" data-t="11" class="on" aria-pressed="true"><i></i>Trolley</button>
+      <button type="button" data-t="1" class="on" aria-pressed="true"><i></i>Metro</button>
+    </div>
+    </div>
+    <div id="chips"></div>
+  </div>
+  <div id="panelBody">
+    <div id="tracking" hidden>
+      <span class="tb-badge" id="trackBadge"></span>
+      <span class="tb-text"><span class="tb-top" id="trackTop"></span><span class="tb-bot" id="trackBot"></span></span>
+      <button id="stopTrack" type="button">Stop</button>
+    </div>
+    <!-- v93: the route to a place (PC: the whole card; phones: a short bar while the sheet is closed) -->
+    <div id="routeCard" hidden></div>
+    <div class="fold-sec" id="secMenu">
+    <div id="menuCard">
+    <!-- v83: the card is a fixed shell (glass, border, rounded corners, clips); this is what scrolls inside it -->
+    <div id="menuScroll">
+{{include features/places/menu.html}}
+{{include features/offline/menu.html}}
+{{include features/view3d/menu.html}}
+{{include features/diagnostics/menu.html}}
+    </div><!-- /menuScroll -->
+    </div><!-- /menuCard -->
+    </div><!-- /secMenu -->
+  </div>
+</div>
+
+<!-- bottom left: the city and the live feed's state -->
+<div id="cityCard">
+  <div class="cc-name">Sofia</div>
+  <div id="status" class="loading" role="status"><i class="sdot"></i><span id="statusTxt">Loading…</span></div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+<script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.6/dist/protobuf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script>
+(function () {
+{{include config.js}}
+{{include shared/storage/preferences.js}}
+{{include shared/transit/proxy.js}}
+{{include shared/ui/loading.js}}
+{{include shared/storage/cache.js}}
+{{include shared/map/base-map.js}}
+{{include shared/map/preload.js}}
+{{include features/offline/areas.js}}
+{{include shared/transit/realtime-decoder.js}}
+{{include shared/transit/static-feed.js}}
+{{include features/vehicles/lines.js}}
+{{include features/vehicles/markers.js}}
+{{include features/vehicles/popup.js}}
+{{include features/vehicles/route-line.js}}
+{{include features/vehicles/runs.js}}
+{{include features/vehicles/direction-arrows.js}}
+{{include shared/map/focus.js}}
+{{include features/stops/stops.js}}
+{{include features/stops/your-stop.js}}
+{{include features/stops/line-stops.js}}
+{{include shared/transit/timetable.js}}
+{{include features/stops/markers.js}}
+{{include shared/ui/sheet.js}}
+{{include features/panel/panel.js}}
+{{include features/stops/selection.js}}
+{{include shared/transit/arrivals.js}}
+{{include features/stops/popup.js}}
+{{include features/vehicles/focus.js}}
+{{include features/vehicles/follow.js}}
+{{include features/location/location.js}}
+{{include shared/ui/place-icons.js}}
+{{include shared/ui/name-dialog.js}}
+{{include features/places/places.js}}
+{{include features/journeys/planner.js}}
+{{include features/journeys/walking.js}}
+{{include features/journeys/route.js}}
+{{include features/journeys/route-map.js}}
+{{include features/journeys/card.js}}
+{{include features/journeys/guidance.js}}
+{{include features/panel/swipe.js}}
+{{include features/vehicles/hover.js}}
+{{include features/vehicles/motion.js}}
+{{include shared/map/follow-camera.js}}
+{{include shared/transit/live-feed.js}}
+{{include features/search/render.js}}
+{{include features/diagnostics/report.js}}
+{{include features/search/controls.js}}
+{{include shared/map/viewport-cache.js}}
+{{include shared/ui/connection.js}}
+{{include features/diagnostics/performance.js}}
+{{include features/view3d/view.js}}
+{{include shared/ui/format.js}}
+{{include main.js}}
+})();
+</script>
+</body>
+</html>
