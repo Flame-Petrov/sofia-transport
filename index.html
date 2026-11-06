@@ -16,7 +16,8 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; font-family: var(--font); background: var(--bg); color: var(--fg); }
-  #map { position: fixed; inset: 0; }
+  /* Keep pinches on the map while touch handling switches between Leaflet and the 3D canvas. */
+  #map { position: fixed; inset: 0; touch-action: none; }
 
   /* ---------- control panel (top left; always dark) ---------- */
   #panel {
@@ -1169,8 +1170,19 @@
   #map3d.ready { opacity: 1; }
   #map3d.leaving { opacity: 0; pointer-events: none; }
   #map.v3on .leaflet-map-pane { visibility: hidden; }
-  .leaflet-container .leaflet-control-3d, .leaflet-container .leaflet-control-north { border-radius: 50%; }
-  .leaflet-control-3d[hidden], .leaflet-control-north[hidden] { display: none; }
+  .leaflet-container .leaflet-control-3d, .leaflet-control-north .leaflet-bar { border-radius: 50%; }
+  .leaflet-control-3d[hidden] { display: none; }
+  /* Expand the compass slot so the mode toggle moves with it. */
+  .leaflet-bottom .leaflet-control-north {
+    display: flex; align-items: flex-end; max-height: 52px; transform-origin: bottom center;
+    transition: max-height .24s ease, margin-bottom .24s ease, opacity .24s ease, transform .24s ease;
+  }
+  .leaflet-bottom .leaflet-control-north[inert] {
+    max-height: 0; margin-bottom: 0; opacity: 0; transform: scale(.75); pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .leaflet-bottom .leaflet-control-north { transition: none; }
+  }
   .leaflet-container .leaflet-control-3d a { display: flex; align-items: center; justify-content: center; font: 700 15px/48px var(--font); letter-spacing: -.01em; color: #3a3a3c; }
   .leaflet-container .leaflet-control-3d.on a { background: var(--ink); color: #fff; }
   .leaflet-container .leaflet-control-north a { display: flex; align-items: center; justify-content: center; color: #3a3a3c; }
@@ -1771,11 +1783,18 @@
     var C = L.Control.extend({
       options: { position: 'bottomright' },
       onAdd: function () {
-        var box = L.DomUtil.create('div', 'leaflet-bar leaflet-control ' + cls);
-        var a = L.DomUtil.create('a', '', box);
+        var box = L.DomUtil.create('div', 'leaflet-control ' + cls);
+        var bar = box;
+        if (cls === 'leaflet-control-north') {
+          box.inert = true;
+          bar = L.DomUtil.create('div', 'leaflet-bar', box);
+        } else {
+          box.classList.add('leaflet-bar');
+          box.hidden = true;
+        }
+        var a = L.DomUtil.create('a', '', bar);
         a.href = '#'; a.setAttribute('role', 'button'); a.title = title; a.setAttribute('aria-label', title);
         a.innerHTML = html;
-        box.hidden = true;
         L.DomEvent.disableClickPropagation(box);
         L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); onTap(); });
         return box;
@@ -4884,8 +4903,8 @@
   function layoutRightEdge() {
     var f = document.getElementById('follow'), pg = document.getElementById('stopProg'), phone = isPhone();
     // (the location button sits on top of the zoom buttons since v75: the stack starts above it)
-    // v100: the top of the stack is the 3D button (or the compass needle) when shown
-    var h = window.innerHeight, zc = [box3d, northBox, document.querySelector('.leaflet-control-locate')].filter(function (x) { return x && !x.hidden; })[0] || document.querySelector('.leaflet-control-zoom');
+    // The mode toggle sits above the animated compass whenever 3D is available.
+    var h = window.innerHeight, zc = box3d.hidden ? locBox : box3d;
     var zTop = zc ? zc.getBoundingClientRect().top : h - 150 * ui;
     var fBottom = h - zTop + 10;
     f.style.bottom = (fBottom / ui).toFixed(1) + 'px';
@@ -8593,7 +8612,7 @@
     function refresh() {
       var show = view3d.on || available(), a = box3d.querySelector('a'), relayout = false;
       if (box3d.hidden === show) { box3d.hidden = !show; relayout = true; }
-      if (northBox.hidden === view3d.on) { northBox.hidden = !view3d.on; relayout = true; }
+      if (northBox.inert === view3d.on) { northBox.inert = !view3d.on; relayout = true; }
       box3d.classList.toggle('on', view3d.on);
       var t = view3d.on ? 'Back to the flat map' : 'Show the city in 3D';
       setText(a, view3d.on ? '2D' : '3D');

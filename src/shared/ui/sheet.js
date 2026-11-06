@@ -121,8 +121,8 @@
   function layoutRightEdge() {
     var f = document.getElementById('follow'), pg = document.getElementById('stopProg'), phone = isPhone();
     // (the location button sits on top of the zoom buttons since v75: the stack starts above it)
-    // v100: the top of the stack is the 3D button (or the compass needle) when shown
-    var h = window.innerHeight, zc = [box3d, northBox, document.querySelector('.leaflet-control-locate')].filter(function (x) { return x && !x.hidden; })[0] || document.querySelector('.leaflet-control-zoom');
+    // The mode toggle sits above the animated compass whenever 3D is available.
+    var h = window.innerHeight, zc = box3d.hidden ? locBox : box3d;
     var zTop = zc ? zc.getBoundingClientRect().top : h - 150 * ui;
     var fBottom = h - zTop + 10;
     f.style.bottom = (fBottom / ui).toFixed(1) + 'px';

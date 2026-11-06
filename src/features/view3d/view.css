@@ -6,8 +6,19 @@
   #map3d.ready { opacity: 1; }
   #map3d.leaving { opacity: 0; pointer-events: none; }
   #map.v3on .leaflet-map-pane { visibility: hidden; }
-  .leaflet-container .leaflet-control-3d, .leaflet-container .leaflet-control-north { border-radius: 50%; }
-  .leaflet-control-3d[hidden], .leaflet-control-north[hidden] { display: none; }
+  .leaflet-container .leaflet-control-3d, .leaflet-control-north .leaflet-bar { border-radius: 50%; }
+  .leaflet-control-3d[hidden] { display: none; }
+  /* Expand the compass slot so the mode toggle moves with it. */
+  .leaflet-bottom .leaflet-control-north {
+    display: flex; align-items: flex-end; max-height: 52px; transform-origin: bottom center;
+    transition: max-height .24s ease, margin-bottom .24s ease, opacity .24s ease, transform .24s ease;
+  }
+  .leaflet-bottom .leaflet-control-north[inert] {
+    max-height: 0; margin-bottom: 0; opacity: 0; transform: scale(.75); pointer-events: none;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .leaflet-bottom .leaflet-control-north { transition: none; }
+  }
   .leaflet-container .leaflet-control-3d a { display: flex; align-items: center; justify-content: center; font: 700 15px/48px var(--font); letter-spacing: -.01em; color: #3a3a3c; }
   .leaflet-container .leaflet-control-3d.on a { background: var(--ink); color: #fff; }
   .leaflet-container .leaflet-control-north a { display: flex; align-items: center; justify-content: center; color: #3a3a3c; }

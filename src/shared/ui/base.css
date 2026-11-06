@@ -7,5 +7,6 @@
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; font-family: var(--font); background: var(--bg); color: var(--fg); }
-  #map { position: fixed; inset: 0; }
+  /* Keep pinches on the map while touch handling switches between Leaflet and the 3D canvas. */
+  #map { position: fixed; inset: 0; touch-action: none; }
 

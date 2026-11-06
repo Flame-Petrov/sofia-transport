@@ -46,7 +46,7 @@
     function refresh() {
       var show = view3d.on || available(), a = box3d.querySelector('a'), relayout = false;
       if (box3d.hidden === show) { box3d.hidden = !show; relayout = true; }
-      if (northBox.hidden === view3d.on) { northBox.hidden = !view3d.on; relayout = true; }
+      if (northBox.inert === view3d.on) { northBox.inert = !view3d.on; relayout = true; }
       box3d.classList.toggle('on', view3d.on);
       var t = view3d.on ? 'Back to the flat map' : 'Show the city in 3D';
       setText(a, view3d.on ? '2D' : '3D');

@@ -30,11 +30,18 @@
     var C = L.Control.extend({
       options: { position: 'bottomright' },
       onAdd: function () {
-        var box = L.DomUtil.create('div', 'leaflet-bar leaflet-control ' + cls);
-        var a = L.DomUtil.create('a', '', box);
+        var box = L.DomUtil.create('div', 'leaflet-control ' + cls);
+        var bar = box;
+        if (cls === 'leaflet-control-north') {
+          box.inert = true;
+          bar = L.DomUtil.create('div', 'leaflet-bar', box);
+        } else {
+          box.classList.add('leaflet-bar');
+          box.hidden = true;
+        }
+        var a = L.DomUtil.create('a', '', bar);
         a.href = '#'; a.setAttribute('role', 'button'); a.title = title; a.setAttribute('aria-label', title);
         a.innerHTML = html;
-        box.hidden = true;
         L.DomEvent.disableClickPropagation(box);
         L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); onTap(); });
         return box;
