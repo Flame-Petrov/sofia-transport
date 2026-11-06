@@ -72,7 +72,7 @@
       if (loc.acc) loc.acc.setLatLng(sh.ll);
     }
     if (view3d.on) { locCam.off = null; locCam.at = 0; return; }   // v100: the glide above feeds the 3D dot; its camera is the 3D map's
-    if (!loc.follow || following || loc.camHold || map._animatingZoom || (map.dragging && map.dragging.moving())) {
+    if (!loc.follow || following || loc.camHold || zooming || map._animatingZoom || (map.dragging && map.dragging.moving())) {
       locCam.off = null; locCam.at = 0; return;
     }
     var dt = locCam.at ? Math.min(100, now - locCam.at) : 16;

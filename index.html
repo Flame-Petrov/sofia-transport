@@ -1740,7 +1740,10 @@
   }
 
   // ---------- Map ----------
-  var map = L.map('map', { zoomControl: false, preferCanvas: true, maxZoom: 19 }).setView([42.6977, 23.3219], 13);
+  var map = L.map('map', {
+    zoomControl: false, preferCanvas: true, maxZoom: 19,
+    zoomSnap: L.Browser.touch ? 0 : 1   // keep the scale where the rider lifts their fingers
+  }).setView([42.6977, 23.3219], 13);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   // Your location (v75): added after the zoom buttons, so Leaflet stacks it right above them.
   // What the taps do is in the "Your location" section further down (locButton).
@@ -7817,7 +7820,7 @@
       if (loc.acc) loc.acc.setLatLng(sh.ll);
     }
     if (view3d.on) { locCam.off = null; locCam.at = 0; return; }   // v100: the glide above feeds the 3D dot; its camera is the 3D map's
-    if (!loc.follow || following || loc.camHold || map._animatingZoom || (map.dragging && map.dragging.moving())) {
+    if (!loc.follow || following || loc.camHold || zooming || map._animatingZoom || (map.dragging && map.dragging.moving())) {
       locCam.off = null; locCam.at = 0; return;
     }
     var dt = locCam.at ? Math.min(100, now - locCam.at) : 16;
@@ -9273,8 +9276,9 @@
         renderDiag();
       }
       if (instant || reduceMotion || !ready || !m3) { finish(); return; }
-      // flat, north up, and on one of Leaflet's zoom steps (it snaps to whole levels), so the hand-over doesn't jump
-      var snap = map.options.zoomSnap || 1, zs = Math.round((m3.getZoom() + 1) / snap) * snap - 1;
+      // Match the receiving map's zoom precision when handing the camera back to Leaflet.
+      var snap = map.options.zoomSnap, zs = m3.getZoom();
+      if (snap) zs = Math.round((zs + 1) / snap) * snap - 1;
       m3.easeTo({ pitch: 0, bearing: 0, zoom: zs, padding: PAD0, duration: 600 });
       m3.once('moveend', function () { requestAnimationFrame(finish); });
       setTimeout(finish, 1000);

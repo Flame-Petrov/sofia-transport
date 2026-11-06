@@ -729,8 +729,9 @@
         renderDiag();
       }
       if (instant || reduceMotion || !ready || !m3) { finish(); return; }
-      // flat, north up, and on one of Leaflet's zoom steps (it snaps to whole levels), so the hand-over doesn't jump
-      var snap = map.options.zoomSnap || 1, zs = Math.round((m3.getZoom() + 1) / snap) * snap - 1;
+      // Match the receiving map's zoom precision when handing the camera back to Leaflet.
+      var snap = map.options.zoomSnap, zs = m3.getZoom();
+      if (snap) zs = Math.round((zs + 1) / snap) * snap - 1;
       m3.easeTo({ pitch: 0, bearing: 0, zoom: zs, padding: PAD0, duration: 600 });
       m3.once('moveend', function () { requestAnimationFrame(finish); });
       setTimeout(finish, 1000);

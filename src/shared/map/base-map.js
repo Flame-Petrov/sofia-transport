@@ -1,5 +1,8 @@
   // ---------- Map ----------
-  var map = L.map('map', { zoomControl: false, preferCanvas: true, maxZoom: 19 }).setView([42.6977, 23.3219], 13);
+  var map = L.map('map', {
+    zoomControl: false, preferCanvas: true, maxZoom: 19,
+    zoomSnap: L.Browser.touch ? 0 : 1   // keep the scale where the rider lifts their fingers
+  }).setView([42.6977, 23.3219], 13);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   // Your location (v75): added after the zoom buttons, so Leaflet stacks it right above them.
   // What the taps do is in the "Your location" section further down (locButton).
