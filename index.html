@@ -1058,7 +1058,7 @@
 
   /* =====================================================================================================
      v93 — Route to a place: "Start route" on a flag; the main way with its chain, the other ways under it.
-     PC: a glass card in the panel. Phones: the bottom sheet, and a short bar in the panel while it's closed.
+     PC: a glass card in the panel. Phones: the bottom sheet, and a compact bottom bar while it's closed.
      ===================================================================================================== */
   .pp-btns .pp-route { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 42px; border-radius: 21px; background: var(--dest); border-color: var(--dest); color: #fff; font-weight: 600; font-size: 14px; }
   .pp-btns .pp-route svg { width: 16px; height: 16px; }
@@ -1073,6 +1073,12 @@
   #routeCard::-webkit-scrollbar { display: none; }
   #routeCard[hidden] { display: none; }
   #routeCard.compact { flex-direction: row; align-items: center; gap: 4px; padding: 0 8px 0 0; overflow: visible; max-height: none; }
+  #routeDock { position: fixed; z-index: 1099; left: 8px; right: 64px; bottom: calc(16px + env(safe-area-inset-bottom)); zoom: var(--ui); touch-action: none; }
+  #sheet:not([hidden]) + #routeDock, #routeHandle, #sheet.rsheet .grab { display: none; }
+  #sheet.rsheet #routeHandle { display: grid; place-items: center; flex: none; width: 100%; height: 32px; border: 0; background: transparent; cursor: pointer; touch-action: none; }
+  #routeHandle::before { content: ''; width: 40px; height: 5px; border-radius: 3px; background: rgba(60,60,67,.35); }
+  #routeDock .rt-more { transform: rotate(-90deg); }
+  body:has(#routeDock #routeCard:not([hidden])) #cityCard { visibility: hidden; }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { #routeCard { background: rgba(255,255,255,.94); } }
   #sheet.rsheet #sheetBody { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 16px calc(14px + env(safe-area-inset-bottom)); }
   .rt { display: flex; flex-direction: column; gap: 10px; font-family: var(--font); color: var(--ink); }
@@ -1368,7 +1374,8 @@
   </form>
 </div>
 
-<div id="sheet" class="stop-pop" hidden><div class="grab"></div><div id="sheetBody" class="sp"></div></div>
+<div id="sheet" class="stop-pop" hidden><div class="grab"></div><button id="routeHandle" type="button" aria-label="Collapse route details" aria-controls="sheetBody"></button><div id="sheetBody" class="sp"></div></div>
+<div id="routeDock"></div>
 
 <div id="panel">
   <div class="p-head">
@@ -1403,7 +1410,7 @@
       <span class="tb-text"><span class="tb-top" id="trackTop"></span><span class="tb-bot" id="trackBot"></span></span>
       <button id="stopTrack" type="button">Stop</button>
     </div>
-    <!-- v93: the route to a place (PC: the whole card; phones: a short bar while the sheet is closed) -->
+    <!-- The route card moves to the bottom dock on phones. -->
     <div id="routeCard" hidden></div>
     <div class="fold-sec" id="secMenu">
     <div id="menuCard">
@@ -6850,12 +6857,14 @@
     routeSearch();
   }
   function endRoute() {
+    var clearDestination = route && savedPlaces.destinationId === route.placeId;
     if (route && route.go) courseStop();   // v95
     route = null;
     updateRouteVehs();   // v99
     routeLayer.clearLayers();
     showRoute();
-    savedPlaces.refreshDestination();
+    if (clearDestination) savedPlaces.setDestination('');
+    else savedPlaces.refreshDestination();
   }
   var routeBusy = false;
   function routeSearch() {
@@ -6994,10 +7003,12 @@
   }
 
   // ---- the card: the main way with its chain, the others under it ----
-  // Phones: in the bottom sheet (a short bar in the panel brings it back when the sheet is closed). PC: in the panel.
+  // Phones use the bottom sheet and a compact bottom bar. Desktop uses the panel.
   var routeEl = document.createElement('div');
   routeEl.className = 'rt';
   var sheetRoute = false;
+  var routeCard = document.getElementById('routeCard'), routeDock = document.getElementById('routeDock');
+  var panelSlot = routeCard.nextElementSibling, routeHandle = document.getElementById('routeHandle');
   function showRoute() {
     var card = document.getElementById('routeCard');
     if (!route) {
@@ -7005,9 +7016,13 @@
       if (sheetRoute) closeSheet();
       return;
     }
-    if (isPhone()) openRouteSheet();
+    if (isPhone()) {
+      routeDock.appendChild(card);
+      openRouteSheet();
+    }
     else {
       if (sheetRoute) closeSheet();
+      panelSlot.before(card);
       if (routeEl.parentNode !== card) { card.innerHTML = ''; card._h = null; card.appendChild(routeEl); }
       card.classList.remove('compact');
       card.hidden = false;
@@ -7030,9 +7045,32 @@
     sheet.classList.remove('rsheet');
     if (routeEl.parentNode === sheetBody) sheetBody.removeChild(routeEl);
     sheetBody.className = 'sp';
-    setTimeout(renderRoute, 0);   // the short bar in the panel
+    setTimeout(renderRoute, 0);
   }
-  window.addEventListener('resize', function () { if (route) showRoute(); });
+  window.matchMedia('(max-width: 700px)').addEventListener('change', function () { if (route) showRoute(); });
+  routeHandle.addEventListener('click', closeSheet);
+  // A downward pull at the top collapses details. Inside a scrolled itinerary the browser owns the gesture.
+  function routeSwipe(el, direction, enabled, action) {
+    var start;
+    el.addEventListener('touchstart', function (e) {
+      start = e.touches.length === 1 && enabled(e.target) ? e.touches[0] : null;
+    }, { passive: true });
+    el.addEventListener('touchcancel', function () { start = null; });
+    el.addEventListener('touchend', function (e) {
+      if (!start) return;
+      var t = e.changedTouches[0], dy = direction * (t.clientY - start.clientY), dx = t.clientX - start.clientX;
+      start = null;
+      if (dy < 40 || dy < Math.abs(dx) * 1.5) return;
+      if (e.cancelable) e.preventDefault();
+      action();
+    }, { passive: false });
+  }
+  routeSwipe(sheet, 1, function (target) {
+    return sheetRoute && (target === routeHandle || (sheetBody.scrollTop <= 0 && !target.closest('button')));
+  }, closeSheet);
+  routeSwipe(routeDock, -1, function (target) {
+    return route && !target.closest('[data-rt-close]');
+  }, openRouteSheet);
   function minsTo(sec, nowS) { var m = Math.round((sec - nowS) / 60); return m <= 0 ? 'now' : m < 60 ? 'in ' + m + ' min' : 'at ' + relClock(sec); }
   function durTxt(sec) { var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + ('0' + m % 60).slice(-2) + ' min'; }
   var KIND_TXT = { live: 'live', est: '≈ estimate', sched: 'timetable' };
@@ -7141,7 +7179,7 @@
     }
     return out + '<div class="rt-foot">Updated ' + clockOf(route.at) + ' · times live where the feed has them, ≈ estimated, or from the timetable</div>';
   }
-  function routeBarHtml() {   // phones, sheet closed: a short bar in the panel
+  function routeBarHtml() {   // phones with the route sheet collapsed
     if (route.go && route.ways.length) return courseBannerHtml(false);   // v95: the next step
     var p = savedPlaces.find(route.placeId), way = route.ways[0], nowS = tt ? (Date.now() - tt.base) / 1000 : 0, txt;
     if (way) {

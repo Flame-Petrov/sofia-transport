@@ -1,6 +1,6 @@
   /* =====================================================================================================
      v93 — Route to a place: "Start route" on a flag; the main way with its chain, the other ways under it.
-     PC: a glass card in the panel. Phones: the bottom sheet, and a short bar in the panel while it's closed.
+     PC: a glass card in the panel. Phones: the bottom sheet, and a compact bottom bar while it's closed.
      ===================================================================================================== */
   .pp-btns .pp-route { grid-column: 1 / -1; display: flex; align-items: center; justify-content: center; gap: 6px; height: 42px; border-radius: 21px; background: var(--dest); border-color: var(--dest); color: #fff; font-weight: 600; font-size: 14px; }
   .pp-btns .pp-route svg { width: 16px; height: 16px; }
@@ -15,6 +15,12 @@
   #routeCard::-webkit-scrollbar { display: none; }
   #routeCard[hidden] { display: none; }
   #routeCard.compact { flex-direction: row; align-items: center; gap: 4px; padding: 0 8px 0 0; overflow: visible; max-height: none; }
+  #routeDock { position: fixed; z-index: 1099; left: 8px; right: 64px; bottom: calc(16px + env(safe-area-inset-bottom)); zoom: var(--ui); touch-action: none; }
+  #sheet:not([hidden]) + #routeDock, #routeHandle, #sheet.rsheet .grab { display: none; }
+  #sheet.rsheet #routeHandle { display: grid; place-items: center; flex: none; width: 100%; height: 32px; border: 0; background: transparent; cursor: pointer; touch-action: none; }
+  #routeHandle::before { content: ''; width: 40px; height: 5px; border-radius: 3px; background: rgba(60,60,67,.35); }
+  #routeDock .rt-more { transform: rotate(-90deg); }
+  body:has(#routeDock #routeCard:not([hidden])) #cityCard { visibility: hidden; }
   @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) { #routeCard { background: rgba(255,255,255,.94); } }
   #sheet.rsheet #sheetBody { overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; padding: 0 16px calc(14px + env(safe-area-inset-bottom)); }
   .rt { display: flex; flex-direction: column; gap: 10px; font-family: var(--font); color: var(--ink); }

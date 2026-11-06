@@ -1,8 +1,10 @@
   // ---- the card: the main way with its chain, the others under it ----
-  // Phones: in the bottom sheet (a short bar in the panel brings it back when the sheet is closed). PC: in the panel.
+  // Phones use the bottom sheet and a compact bottom bar. Desktop uses the panel.
   var routeEl = document.createElement('div');
   routeEl.className = 'rt';
   var sheetRoute = false;
+  var routeCard = document.getElementById('routeCard'), routeDock = document.getElementById('routeDock');
+  var panelSlot = routeCard.nextElementSibling, routeHandle = document.getElementById('routeHandle');
   function showRoute() {
     var card = document.getElementById('routeCard');
     if (!route) {
@@ -10,9 +12,13 @@
       if (sheetRoute) closeSheet();
       return;
     }
-    if (isPhone()) openRouteSheet();
+    if (isPhone()) {
+      routeDock.appendChild(card);
+      openRouteSheet();
+    }
     else {
       if (sheetRoute) closeSheet();
+      panelSlot.before(card);
       if (routeEl.parentNode !== card) { card.innerHTML = ''; card._h = null; card.appendChild(routeEl); }
       card.classList.remove('compact');
       card.hidden = false;
@@ -35,9 +41,32 @@
     sheet.classList.remove('rsheet');
     if (routeEl.parentNode === sheetBody) sheetBody.removeChild(routeEl);
     sheetBody.className = 'sp';
-    setTimeout(renderRoute, 0);   // the short bar in the panel
+    setTimeout(renderRoute, 0);
   }
-  window.addEventListener('resize', function () { if (route) showRoute(); });
+  window.matchMedia('(max-width: 700px)').addEventListener('change', function () { if (route) showRoute(); });
+  routeHandle.addEventListener('click', closeSheet);
+  // A downward pull at the top collapses details. Inside a scrolled itinerary the browser owns the gesture.
+  function routeSwipe(el, direction, enabled, action) {
+    var start;
+    el.addEventListener('touchstart', function (e) {
+      start = e.touches.length === 1 && enabled(e.target) ? e.touches[0] : null;
+    }, { passive: true });
+    el.addEventListener('touchcancel', function () { start = null; });
+    el.addEventListener('touchend', function (e) {
+      if (!start) return;
+      var t = e.changedTouches[0], dy = direction * (t.clientY - start.clientY), dx = t.clientX - start.clientX;
+      start = null;
+      if (dy < 40 || dy < Math.abs(dx) * 1.5) return;
+      if (e.cancelable) e.preventDefault();
+      action();
+    }, { passive: false });
+  }
+  routeSwipe(sheet, 1, function (target) {
+    return sheetRoute && (target === routeHandle || (sheetBody.scrollTop <= 0 && !target.closest('button')));
+  }, closeSheet);
+  routeSwipe(routeDock, -1, function (target) {
+    return route && !target.closest('[data-rt-close]');
+  }, openRouteSheet);
   function minsTo(sec, nowS) { var m = Math.round((sec - nowS) / 60); return m <= 0 ? 'now' : m < 60 ? 'in ' + m + ' min' : 'at ' + relClock(sec); }
   function durTxt(sec) { var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + ('0' + m % 60).slice(-2) + ' min'; }
   var KIND_TXT = { live: 'live', est: '≈ estimate', sched: 'timetable' };
@@ -146,7 +175,7 @@
     }
     return out + '<div class="rt-foot">Updated ' + clockOf(route.at) + ' · times live where the feed has them, ≈ estimated, or from the timetable</div>';
   }
-  function routeBarHtml() {   // phones, sheet closed: a short bar in the panel
+  function routeBarHtml() {   // phones with the route sheet collapsed
     if (route.go && route.ways.length) return courseBannerHtml(false);   // v95: the next step
     var p = savedPlaces.find(route.placeId), way = route.ways[0], nowS = tt ? (Date.now() - tt.base) / 1000 : 0, txt;
     if (way) {

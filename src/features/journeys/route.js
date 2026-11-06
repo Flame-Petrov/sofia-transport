@@ -56,12 +56,14 @@
     routeSearch();
   }
   function endRoute() {
+    var clearDestination = route && savedPlaces.destinationId === route.placeId;
     if (route && route.go) courseStop();   // v95
     route = null;
     updateRouteVehs();   // v99
     routeLayer.clearLayers();
     showRoute();
-    savedPlaces.refreshDestination();
+    if (clearDestination) savedPlaces.setDestination('');
+    else savedPlaces.refreshDestination();
   }
   var routeBusy = false;
   function routeSearch() {

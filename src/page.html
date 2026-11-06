@@ -50,7 +50,8 @@
 
 {{include shared/ui/connection.html}}
 {{include shared/ui/name-dialog.html}}
-<div id="sheet" class="stop-pop" hidden><div class="grab"></div><div id="sheetBody" class="sp"></div></div>
+<div id="sheet" class="stop-pop" hidden><div class="grab"></div><button id="routeHandle" type="button" aria-label="Collapse route details" aria-controls="sheetBody"></button><div id="sheetBody" class="sp"></div></div>
+<div id="routeDock"></div>
 
 <div id="panel">
   <div class="p-head">
@@ -85,7 +86,7 @@
       <span class="tb-text"><span class="tb-top" id="trackTop"></span><span class="tb-bot" id="trackBot"></span></span>
       <button id="stopTrack" type="button">Stop</button>
     </div>
-    <!-- v93: the route to a place (PC: the whole card; phones: a short bar while the sheet is closed) -->
+    <!-- The route card moves to the bottom dock on phones. -->
     <div id="routeCard" hidden></div>
     <div class="fold-sec" id="secMenu">
     <div id="menuCard">
