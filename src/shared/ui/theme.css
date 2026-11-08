@@ -141,7 +141,8 @@
   .leaflet-container .leaflet-bar a.leaflet-disabled { color: #c7c7cc; background: transparent; }
   .leaflet-right .leaflet-control { margin-right: 26px; }
   .leaflet-bottom .leaflet-control { margin-bottom: 10px; }
-  .leaflet-container .leaflet-control-locate { border-radius: 50%; }
+  .leaflet-control-recenter svg { vertical-align: middle; }
+  .leaflet-container .leaflet-control-recenter, .leaflet-container .leaflet-control-locate { border-radius: 50%; }
   .leaflet-control-locate svg { width: 21px; height: 21px; }
   .leaflet-container .leaflet-control-attribution {
     margin: 0 16px 6px 0 !important; padding: 1px 8px; border-radius: 10px; box-shadow: none; border: 0;

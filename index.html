@@ -823,7 +823,8 @@
   .leaflet-container .leaflet-bar a.leaflet-disabled { color: #c7c7cc; background: transparent; }
   .leaflet-right .leaflet-control { margin-right: 26px; }
   .leaflet-bottom .leaflet-control { margin-bottom: 10px; }
-  .leaflet-container .leaflet-control-locate { border-radius: 50%; }
+  .leaflet-control-recenter svg { vertical-align: middle; }
+  .leaflet-container .leaflet-control-recenter, .leaflet-container .leaflet-control-locate { border-radius: 50%; }
   .leaflet-control-locate svg { width: 21px; height: 21px; }
   .leaflet-container .leaflet-control-attribution {
     margin: 0 16px 6px 0 !important; padding: 1px 8px; border-radius: 10px; box-shadow: none; border: 0;
@@ -1764,10 +1765,11 @@
   }
 
   // ---------- Map ----------
+  var sofiaCenter = [42.6977, 23.3219], overviewZoom = 13;
   var map = L.map('map', {
     zoomControl: false, preferCanvas: true, maxZoom: 19,
     zoomSnap: L.Browser.touch ? 0 : 1   // keep the scale where the rider lifts their fingers
-  }).setView([42.6977, 23.3219], 13);
+  }).setView(sofiaCenter, overviewZoom);
   L.control.zoom({ position: 'bottomright' }).addTo(map);
   // Your location (v75): added after the zoom buttons, so Leaflet stacks it right above them.
   // What the taps do is in the "Your location" section further down (locButton).
@@ -1802,7 +1804,7 @@
           bar = L.DomUtil.create('div', 'leaflet-bar', box);
         } else {
           box.classList.add('leaflet-bar');
-          box.hidden = true;
+          box.hidden = cls === 'leaflet-control-3d';
         }
         var a = L.DomUtil.create('a', '', bar);
         a.href = '#'; a.setAttribute('role', 'button'); a.title = title; a.setAttribute('aria-label', title);
@@ -1814,6 +1816,14 @@
     });
     return new C().addTo(map).getContainer();
   }
+  roundButton('leaflet-control-recenter', 'Recenter map on Sofia',
+    '<svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/><circle cx="12" cy="12" r="2"/></svg>',
+    function () {
+      if (following) setFollow(false);
+      setLocFollow(false);
+      map.stop();
+      map.setView(sofiaCenter, overviewZoom, { animate: false });
+    });
   var northBox = roundButton('leaflet-control-north', 'North up',
     '<svg viewBox="0 0 24 24" aria-hidden="true"><g class="nd"><path d="M12 3l3.6 9h-7.2z" fill="#E5221B"/><path d="M12 21l-3.6-9h7.2z" fill="#8e8e93"/></g></svg>',
     function () { if (view3d.north) view3d.north(); });

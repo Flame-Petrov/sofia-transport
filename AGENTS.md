@@ -68,4 +68,6 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-08 — Static transit startup.** The [startup data guide](docs/startup-transit-data.md) describes the worker paths for static tables, route shapes and the service-day index, including their fallbacks. Built and checked both artifacts. In a 4× CPU comparison with the map ready, the slowest sampled window during archive processing improved from 49.2 to 57.7 FPS. All 24 deterministic timetable fields matched the original. Opened the same live tram in both releases and verified the worker fallback. The workspace report is `reports/Startup fix/Report.md`. A separate unthrottled cold load still had a 167 ms frame.
 
+**2026-11-08 — [Recenter map on Sofia](docs/recenter-map.md).** Built and checked both artifacts. In headless Chrome on release 102, the visible control returned the 2D map from zoom 16 to the startup coordinates at zoom 13. Tilted view and physical phone verification remain open.
+
 <!-- AGENT-HANDOFF:END -->
