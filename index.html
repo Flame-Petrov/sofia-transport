@@ -9669,7 +9669,10 @@
     }
     function modelBearing(v) {
       var motion = v.mo, bearing = v.d.bearing;
-      if (v.d.type === 0) {
+      var roadVehicle = v.d.type === 3 || v.d.type === 11;
+      if (roadVehicle && motion && motion.kind === 'line' && distM(motion.a, motion.b) > 3) {
+        bearing = bearingDeg(motion.a, motion.b);
+      } else {
         // A trip shape is ordered in the direction of service, even at a stop.
         var route = routeMetaFor(v.d);
         if (route && motion && motion.m === route) {
@@ -9808,8 +9811,6 @@
       function add(v) {
         if (!v || !v.pos || seen[v.d.key]) return;
         var model = close && !!vehicleMeshes[v.d.type];
-        var heading = model ? modelBearing(v) : null;
-        if (v.d.type === 0 && !Number.isFinite(heading)) model = false;
         if (v === selected && !model) return;
         seen[v.d.key] = 1;
         var d = v.d, rv = routeVeh[d.key], la = v.pos[0], lo = v.pos[1];
@@ -9820,6 +9821,9 @@
           }
           return;
         }
+        var heading = model ? modelBearing(v) : null;
+        model = model && Number.isFinite(heading);
+        if (v === selected && !model) return;
         if (model && d.type === 0) {
           var rail = railPosition(lo, la, heading);
           if (rail) {
@@ -9873,7 +9877,7 @@
       }
       var k = iconKey(v.d);
       if (k !== trkMk._k) { trkMk._k = k; trkMk.getElement().innerHTML = iconFor(v.d).options.html; }
-      trkMk.getElement().hidden = m3.getZoom() >= vehicleModelZoom && !!vehicleMeshes[v.d.type] && (v.d.type !== 0 || tramPositions.has(v));
+      trkMk.getElement().hidden = m3.getZoom() >= vehicleModelZoom && !!vehicleMeshes[v.d.type] && (v.d.type === 0 ? tramPositions.has(v) : Number.isFinite(modelBearing(v)));
       var atMarker = trkMk.getLngLat();
       if (atMarker.lng === at[0] && atMarker.lat === at[1]) return;
       trkMk.setLngLat(at);

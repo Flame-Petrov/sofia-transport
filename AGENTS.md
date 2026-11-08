@@ -85,4 +85,6 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-08 — [Tram articulation](docs/vehicle-models.md).** Section headings follow forward and rear rail samples; the WebGL layer rotates the front and rear around their bellows. Both releases and JS syntax passed. Controlled left/right and reverse traversal checks confirmed the calculated angles, and desktop Chrome exercised the live 3D layer.
 
+**2026-11-08 — [Bus direction](docs/vehicle-models.md).** Bus and trolleybus models use the motion plan for orientation. Verified both builds, turns, stops and trip changes. In Chrome, bus A1209 moved 5.9 m at 220.79° and its model faced 220.80° with no feed bearing.
+
 <!-- AGENT-HANDOFF:END -->
