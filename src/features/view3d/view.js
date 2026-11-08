@@ -547,7 +547,7 @@
       if (!m3 || !v || !v.pos) return;
       var dur = reduceMotion ? 0 : 900, at = posAt(v, Date.now() + dur) || v.pos, b = headingUp ? vehBearing(v) : 0;
       fc.off = null;
-      cam({ center: [at[1], at[0]], zoom: FOLLOW_STOP_ZOOM - 1, bearing: b === null ? m3.getBearing() : b, padding: padAt(followY()).pad, duration: dur }, true);
+      cam({ center: [at[1], at[0]], bearing: b === null ? m3.getBearing() : b, padding: padAt(followY()).pad, duration: dur }, false);
     };
     // a route to a place: fitted and turned so it runs from you (bottom) up to the place (top); the tilt stays
     view3d.fitRoute = function (pts, me, p, tl, br) {

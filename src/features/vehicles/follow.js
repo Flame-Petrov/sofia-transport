@@ -19,16 +19,14 @@
       }
       map.fire('moveend');   // let the layers settle where the camera stopped
     }
-    // Follow switched on for a vehicle picked from a stop (the camera is zoomed out on its way to the
-    // stop): first its popup closes (tracking and Follow carry on), then the camera flies in to the
-    // vehicle at zoom 15, landing where the follow camera keeps it
+    // Close the card before panning to the vehicle at the current zoom.
     if (on && selected && selected.pos && focusedStop) {
       var v = selected;
       followHold = true;   // the follow camera waits until the popup is gone and the flight has started
       shrinkVehPopup(v, function () {
         followHold = false;
         if (selected !== v || !following) return;
-        flyInToFollow(v);
+        panToFollow(v);
       });
     }
   }
@@ -44,19 +42,19 @@
   // v90: it lands where the vehicle will be when the flight ends, with the look-ahead lean already applied,
   // so the follow camera carries on without a second move (before: it aimed at where the vehicle was at
   // take-off, without the lean, then glided to the vehicle and eased the lean in over ~1.2 s).
-  function flyInToFollow(v) {
+  function panToFollow(v) {
     if (view3d.on && view3d.flyFollow) { view3d.flyFollow(v); return; }   // v102: the same flight on the 3D map
-    var size = map.getSize(), top = freeTop(), bottom = freeBottom(), z = FOLLOW_STOP_ZOOM, room = vpCardRoom();
+    var size = map.getSize(), top = freeTop(), bottom = freeBottom(), z = map.getZoom(), room = vpCardRoom();
     if (room) bottom = vpFreeBottom();   // v100: with its card open, the vehicle goes above the card
     var lean = lookAhead(v, size.x, Math.max(0, bottom - top - room));   // screen px, the same at any zoom
     lookFor = v; lookOff = lean; lookAt = 0;
-    var dur = flyDur(v.pos, z);
+    var dur = reduceMotion ? 0 : flyDur(v.pos, z);
     var at = posAt(v, Date.now() + dur * 1000) || v.pos;
     var target = L.point(size.x / 2, room ? vpTargetY(bottom) : top + (bottom - top) / 2).subtract(lean);
     var center = map.unproject(map.project(at, z).subtract(target.subtract(size.divideBy(2))), z);
-    map.flyTo(center, z, { duration: dur });
+    map.panTo(center, { animate: dur > 0, duration: dur });
   }
-  var FOLLOW_STOP_ZOOM = 15, followHold = false;
+  var followHold = false;
   document.getElementById('follow').onclick = function () { setFollow(!following); };
   // v90: dragging the map takes over from a following camera (vehicle Follow, your location) once the finger
   // has moved it DRAG_TAKEOVER_PX — a tap that wobbles a few pixels no longer ends Follow. Below that the

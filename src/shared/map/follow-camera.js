@@ -42,7 +42,7 @@
   function exactLayerPoint(ll) { return map.project(ll).subtract(map.getPixelOrigin()); }
   function followFrame() {
     if (view3d.on) { followCam.off = null; return; }   // v100: the 3D map has its own camera
-    if (!following || followHold || !selected || !selected.pos || zooming || map._animatingZoom ||
+    if (!following || followHold || (map._panAnim && map._panAnim._inProgress) || !selected || !selected.pos || zooming || map._animatingZoom ||
         (map.dragging && map.dragging.moving())) { followCam.off = null; return; }
     var size = map.getSize(), top = freeTop(), bottom = freeBottom(), room = vpCardRoom();   // phones: between the panel and the sheet
     if (room) bottom = vpFreeBottom();   // v100: the vehicle with its card below it
