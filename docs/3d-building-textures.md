@@ -32,17 +32,17 @@ Evaluate the rows from top to bottom. The first match wins. The bundled classifi
 
 | Priority | Building rule | Proposed material |
 |---|---|---|
-| 1 | A verified monument footprint, including its mapped building parts | Warm gold `#D4A63E` with a subtle stone grain |
-| 2 | Height ≥ 30 m | Blue `#6396C5` with narrow vertical bands |
-| 3 | Ground span ≥ 45 m, measured along the long side of the footprint’s minimum rotated rectangle | Purple `#A084BA` with horizontal courses |
-| 4 | Remaining buildings, including those with only the map’s fallback height | Green `#83AE87` with a fine masonry texture |
+| 1 | A verified monument footprint, including its mapped building parts | Warm gold `#FFBC00` with a subtle stone grain |
+| 2 | Height ≥ 30 m | Blue `#0070FF` with narrow vertical bands |
+| 3 | Ground span ≥ 45 m, measured along the long side of the footprint’s minimum rotated rectangle | Purple `#B82CFF` with horizontal courses |
+| 4 | Remaining buildings, including those with only the map’s fallback height | Green `#0CDE55` with a fine masonry texture |
 
 For example, a 50 m-long, 12 m-high hall is purple even when it runs diagonally across the map. A 32 m tower on an equally wide base is blue. A verified monument of either size is gold. Measure a multipart building once using the parent outline and its tallest roof height, then apply that class to its visible parts so a tower and its podium read as one building.
 
 ## Implementation and verification
 
 - `tools/prepare_buildings.py` assembles OSM areas, associates mapped parts with an explicit building relation or the smallest containing outline, and measures the long side of the minimum rotated rectangle in UTM zone 34N. It assigns one material using the tallest roof in each group, then clips the individual geometries to zoom-14 Web Mercator tiles. The individual roof and base heights are retained.
-- `src/features/view3d/building-materials.js` owns the tile protocol, fallback, deterministic pattern images and layers. It copies the native extrusion styling and filters. The native geometry stays available at zero opacity while textures are on, so switching off can restore the original paint without rebuilding the street layer.
+- `src/features/view3d/building-materials.js` owns the tile protocol, fallback, deterministic pattern images and layers. It copies the native extrusion styling and filters, then raises textured building opacity to 0.92 for stronger color. The native geometry stays available at zero opacity while textures are on, so switching off can restore the original paint without rebuilding the street layer.
 - `src/features/view3d/menu.html`, `view.css` and `view.js` own the checkbox, legend and preference. The style-load callback and switch handler use the same material routine. Each 3D map registers the images and layers on its first use of textures. The standalone build includes the material code and tile bundle through `src/page.html`.
 - For a visual check, open the menu, enable **3D building textures**, enter 3D and zoom to Alexander Nevsky Square. Compare both settings at the same pitch and bearing, then check the tile-edge sample above. Switch while following a vehicle and reload with each setting.
 

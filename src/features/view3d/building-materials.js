@@ -1,6 +1,6 @@
   var buildingMaterials = (function () {
     var scheme = 'sofia-buildings', registered = false;
-    var colors = { green: [131, 174, 135], blue: [99, 150, 197], purple: [160, 132, 186], gold: [212, 166, 62] };
+    var colors = { green: [12, 222, 85], blue: [0, 112, 255], purple: [184, 44, 255], gold: [255, 188, 0] };
 
     function pattern(material) {
       var image = new ImageData(32, 32), color = colors[material];
@@ -56,6 +56,7 @@
         copy.source = sourceId;
         var filter = textured ? ['has', 'material'] : ['!', ['has', 'material']];
         copy.filter = layer.filter ? ['all', layer.filter, filter] : filter;
+        if (textured) copy.paint['fill-extrusion-opacity'] = 0.92;
         if (textured) copy.paint['fill-extrusion-pattern'] = ['image', ['concat', 'v3-material-', ['get', 'material']]];
         map3.addLayer(copy, layer.id);
       });
