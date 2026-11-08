@@ -85,9 +85,7 @@
     else ttInfo.phases.push(name + ' ' + Math.round(now - ttMarkAt));
     ttMarkAt = now;
   }
-  function ttBuild(T, id) {
-    var baseT = noonMinus12(T), Y = ymd(baseT - 12 * 3600e3);
-    var offY = (noonMinus12(Y) - baseT) / 1000;
+  function ttBuild(T, id, baseT, Y, offY) {
     var act = {}; act[Y] = {}; act[T] = {};
     var head = null, rowsRead = 0;
     var wk = [Y, T].map(function (d) { return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8)).getDay()]; });
@@ -298,6 +296,33 @@
   }
   // −1: the trip runs only as yesterday's service (past midnight); 0: today; null: not in the index
   function ttTripDay(tid) { var inst = tt ? ttFirst[tid] : undefined; return inst === undefined ? null : tt.instDay[inst]; }
+  async function buildTimetableInWorker(zip, input) {
+    // The shared compiler reads the same tables and stop grid as its main-thread fallback.
+    self.staticZip = zip;
+    self.trips = input.trips;
+    self.stops = input.stops;
+    self.stopGrid = {};
+    self.STOP_GRID_DEG = input.gridSize;
+    self.TT_VER = input.version;
+    self.ttInfo = {};
+    self.ttMarkAt = 0;
+    Object.values(stops).forEach(indexStop);
+    var index = await ttBuild.apply(null, input.days);
+    index.phases = ttInfo.phases;
+    return index;
+  }
+  function buildTimetable(T, id) {
+    var base = noonMinus12(T), yesterday = ymd(base - 12 * 3600e3);
+    var days = [T, id, base, yesterday, (noonMinus12(yesterday) - base) / 1000];
+    // Stop objects can have Leaflet markers attached by the time a build starts.
+    var locations = {};
+    Object.values(stops).forEach(function (s) { locations[s.id] = { id: s.id, lat: s.lat, lon: s.lon }; });
+    return runArchiveJob([zipEntry, zipLines, inSlices, csvHead, hmsSec, ttMark, ttBuild, ttFootpaths,
+      stopGridKey, indexStop, distM, toRad], buildTimetableInWorker,
+      { days: days, trips: trips, stops: locations, gridSize: STOP_GRID_DEG, version: TT_VER })
+      .then(function (x) { ttInfo.phases = x.phases; delete x.phases; return x; })
+      .catch(function () { return ttBuild.apply(null, days); });
+  }
   function ttEnsure() {
     if (!staticZip || staticState !== 'ok') return Promise.resolve(null);
     var T = ymd(new Date()), id = zipId();
@@ -309,7 +334,7 @@
       if (c && c.v === TT_VER && c.day === T && c.id === id) { ttInfo.from = 'saved'; return c; }
       ttInfo.state = 'building';
       renderDiag();
-      return ttBuild(T, id).then(function (x) { ttInfo.from = 'built'; idb.put('files', 'tt', x); return x; });
+      return buildTimetable(T, id).then(function (x) { ttInfo.from = 'built'; idb.put('files', 'tt', x); return x; });
     }).then(function (x) {
       ttUse(x);
       ttInfo.state = 'ready'; ttInfo.ms = Math.round(performance.now() - t0);

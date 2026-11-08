@@ -41,36 +41,70 @@
   var pathLayer = L.layerGroup().addTo(map);
   var shapes = null, shapesLoading = null, selected = null, switching = false;
 
-  // shapes.txt is big, so it's parsed only the first time someone taps a vehicle
+  // Both the worker and the fallback use the same parser and keep GTFS point order.
+  function parseShapeText(text) {
+    var lines = text.replace(/^\uFEFF/, '').split('\n');
+    var header = lines[0].replace(/["\r]/g, '').split(',').map(function (h) { return h.trim(); });
+    var idCol = header.indexOf('shape_id'), latCol = header.indexOf('shape_pt_lat');
+    var lonCol = header.indexOf('shape_pt_lon'), seqCol = header.indexOf('shape_pt_sequence');
+    var groups = Object.create(null), row = 1;
+    return new Promise(function (resolve) {
+      function readRows() {
+        var until = performance.now() + 5;
+        while (row < lines.length) {
+          var cells = lines[row++].replace('\r', '').split(',');
+          if (cells.length >= 3) {
+            var id = cells[idCol].replace(/"/g, '').trim();
+            (groups[id] || (groups[id] = [])).push([+cells[latCol], +cells[lonCol], +cells[seqCol]]);
+          }
+          if (row % 256 === 0 && performance.now() >= until) { setTimeout(readRows, 0); return; }
+        }
+        Object.keys(groups).forEach(function (id) { groups[id].sort(function (a, b) { return a[2] - b[2]; }); });
+        resolve(groups);
+      }
+      readRows();
+    });
+  }
+
+  async function packShapes(zip) {
+    var groups = await parseShapeText(await zipFile(zip, 'shapes.txt'));
+    var ids = Object.keys(groups), offsets = [0];
+    ids.forEach(function (id) { offsets.push(offsets[offsets.length - 1] + groups[id].length * 3); });
+    var points = new Float64Array(offsets[ids.length]);
+    ids.forEach(function (id, i) {
+      var at = offsets[i];
+      groups[id].forEach(function (p) { points.set(p, at); at += 3; });
+    });
+    return { ids: ids, offsets: offsets, points: points };
+  }
+
+  function unpackShapes(data) {
+    // Existing callers consume arrays. Expand only the routes they actually use.
+    var routesById = Object.create(null);
+    data.ids.forEach(function (id, i) {
+      Object.defineProperty(routesById, id, { enumerable: true, configurable: true, get: function () {
+        var route = [], points = data.points;
+        for (var j = data.offsets[i]; j < data.offsets[i + 1]; j += 3) {
+          route.push([points[j], points[j + 1], points[j + 2]]);
+        }
+        Object.defineProperty(routesById, id, { value: route, enumerable: true });
+        return route;
+      } });
+    });
+    return routesById;
+  }
+
   function loadShapes() {
     if (shapes) return Promise.resolve(shapes);
     if (shapesLoading) return shapesLoading;
     if (!staticZip) return Promise.resolve(null);
-    var t0 = performance.now();
-    shapesLoading = zipFile(staticZip, 'shapes.txt').then(function (text) {
-      // processed in slices of 20,000 lines with a pause between them, so the page never freezes
-      return new Promise(function (resolve) {
-        var out = {}, lines = text.replace(/^﻿/, '').split('\n');
-        text = null;
-        var head = lines[0].replace('\r', '').split(',').map(function (h) { return h.trim().replace(/"/g, ''); });
-        var iId = head.indexOf('shape_id'), iLat = head.indexOf('shape_pt_lat'),
-            iLon = head.indexOf('shape_pt_lon'), iSeq = head.indexOf('shape_pt_sequence'), i = 1;
-        function slice() {
-          for (var end = Math.min(lines.length, i + 20000); i < end; i++) {
-            var c = lines[i].replace('\r', '').split(',');
-            if (c.length < 3) continue;
-            var id = c[iId].replace(/"/g, '').trim();
-            (out[id] || (out[id] = [])).push([+c[iLat], +c[iLon], +c[iSeq]]);
-          }
-          if (i < lines.length) { setTimeout(slice, 0); return; }
-          Object.keys(out).forEach(function (id) { out[id].sort(function (a, b) { return a[2] - b[2]; }); });
-          shapes = out;
-          timings.shapes = Math.round(performance.now() - t0) + ' ms';
-          resolve(out);
-        }
-        slice();
-      });
-    }).catch(function (e) { console.warn('Shapes failed:', e); shapes = {}; return shapes; });
+    var started = performance.now();
+    shapesLoading = runArchiveJob([zipFile, parseShapeText], packShapes).then(unpackShapes).catch(function () {
+      return zipFile(staticZip, 'shapes.txt').then(parseShapeText);
+    }).then(function (result) {
+      timings.shapes = Math.round(performance.now() - started) + ' ms';
+      return shapes = result;
+    }).catch(function (error) { console.warn('Shapes failed:', error); return shapes = {}; });
     return shapesLoading;
   }
 

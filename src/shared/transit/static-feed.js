@@ -103,34 +103,73 @@
         update(true);
       });
   }
+  // Keep jobs self-contained so the generated HTML also works as a standalone release.
+  var staticArchive = null;
+  async function archiveJobMessage(event) {
+    try {
+      importScripts(event.data.library);
+      var zip = await JSZip.loadAsync(event.data.archive);
+      var result = await work(zip, event.data.input);
+      var buffers = Object.values(result).filter(ArrayBuffer.isView).map(function (v) { return v.buffer; });
+      self.postMessage(result, buffers);
+    } catch (error) { self.postMessage({ error: String(error) }); }
+  }
+  function runArchiveJob(helpers, job, input) {
+    return new Promise(function (resolve, reject) {
+      var source = helpers.map(function (fn) { return fn.toString(); }).join('\n') +
+        '\nvar work = ' + job.toString() + ';\nself.onmessage = ' + archiveJobMessage.toString();
+      var url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' })), worker;
+      function close() { if (worker) worker.terminate(); URL.revokeObjectURL(url); }
+      try {
+        worker = new Worker(url);
+        worker.onerror = function (e) { close(); reject(new Error(e.message)); };
+        worker.onmessage = function (e) {
+          close();
+          if (e.data.error) reject(new Error(e.data.error));
+          else resolve(e.data);
+        };
+        worker.postMessage({ archive: staticArchive, input: input, library: document.getElementById('zipLibrary').src });
+      } catch (error) { close(); reject(error); }
+    });
+  }
+
+  async function readStaticTables(zip) {
+    var routes = {}, trips = {}, stops = {};
+    var txt = await Promise.all([zipFile(zip, 'routes.txt'), zipFile(zip, 'trips.txt'), zipFile(zip, 'stops.txt')]);
+    eachRecord(txt[0], function (r) {
+      routes[r.route_id] = {
+        short: r.route_short_name || r.route_long_name || r.route_id,
+        type: parseInt(r.route_type, 10),
+        color: r.route_color ? '#' + r.route_color : null
+      };
+    });
+    eachRecord(txt[1], function (t) {
+      trips[t.trip_id] = { route_id: t.route_id, headsign: t.trip_headsign || '', shape_id: t.shape_id || '', sid: t.service_id || '' };
+    });
+    eachRecord(txt[2], function (st) {
+      if (!st.stop_lat || !st.stop_lon) return;
+      var obj = {
+        id: st.stop_id, name: st.stop_name || '', code: st.stop_code || '',
+        lat: +st.stop_lat, lon: +st.stop_lon, station: st.location_type === '1'
+      };
+      stops[st.stop_id] = obj;
+    });
+    return { routes: routes, trips: trips, stops: stops };
+  }
   function processStatic(buf, onBroken) {
-    try { buf = new Uint8Array(buf).slice().buffer; } catch (e) {}   // plain local copy of the saved bytes
+    staticArchive = buf;
     JSZip.loadAsync(buf)
       .then(function (zip) {
         staticZip = zip;
         staticInfo = 'zip files: ' + Object.keys(zip.files).slice(0, 12).join(', ');
-        return Promise.all([zipFile(zip, 'routes.txt'), zipFile(zip, 'trips.txt'), zipFile(zip, 'stops.txt')]);
+        return runArchiveJob([zipFile, parseCSV, eachRecord], readStaticTables)
+          .catch(function () { return readStaticTables(zip); });
       })
-      .then(function (txt) {
-        eachRecord(txt[0], function (r) {
-          routes[r.route_id] = {
-            short: r.route_short_name || r.route_long_name || r.route_id,
-            type: parseInt(r.route_type, 10),
-            color: r.route_color ? '#' + r.route_color : null
-          };
-        });
-        eachRecord(txt[1], function (t) {
-          trips[t.trip_id] = { route_id: t.route_id, headsign: t.trip_headsign || '', shape_id: t.shape_id || '', sid: t.service_id || '' };
-        });
-        eachRecord(txt[2], function (st) {
-          if (!st.stop_lat || !st.stop_lon) return;
-          var obj = {
-            id: st.stop_id, name: st.stop_name || '', code: st.stop_code || '',
-            lat: +st.stop_lat, lon: +st.stop_lon, station: st.location_type === '1'
-          };
-          stops[st.stop_id] = obj;
-          indexStop(obj);
-        });
+      .then(function (tables) {
+        routes = tables.routes;
+        trips = tables.trips;
+        stops = tables.stops;
+        Object.values(stops).forEach(indexStop);
         buildStopTwins();
         staticState = Object.keys(routes).length ? 'ok' : 'empty';
         setProgress('lines', 1, 'Lines & stops');

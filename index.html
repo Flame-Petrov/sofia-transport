@@ -1494,7 +1494,7 @@
 <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
 <script src="https://unpkg.com/@maplibre/maplibre-gl-leaflet@0.1.4/leaflet-maplibre-gl.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/protobufjs@7.2.6/dist/protobuf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<script id="zipLibrary" src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
 (function () {
   // ---------- Config ----------
@@ -2678,34 +2678,73 @@
         update(true);
       });
   }
+  // Keep jobs self-contained so the generated HTML also works as a standalone release.
+  var staticArchive = null;
+  async function archiveJobMessage(event) {
+    try {
+      importScripts(event.data.library);
+      var zip = await JSZip.loadAsync(event.data.archive);
+      var result = await work(zip, event.data.input);
+      var buffers = Object.values(result).filter(ArrayBuffer.isView).map(function (v) { return v.buffer; });
+      self.postMessage(result, buffers);
+    } catch (error) { self.postMessage({ error: String(error) }); }
+  }
+  function runArchiveJob(helpers, job, input) {
+    return new Promise(function (resolve, reject) {
+      var source = helpers.map(function (fn) { return fn.toString(); }).join('\n') +
+        '\nvar work = ' + job.toString() + ';\nself.onmessage = ' + archiveJobMessage.toString();
+      var url = URL.createObjectURL(new Blob([source], { type: 'text/javascript' })), worker;
+      function close() { if (worker) worker.terminate(); URL.revokeObjectURL(url); }
+      try {
+        worker = new Worker(url);
+        worker.onerror = function (e) { close(); reject(new Error(e.message)); };
+        worker.onmessage = function (e) {
+          close();
+          if (e.data.error) reject(new Error(e.data.error));
+          else resolve(e.data);
+        };
+        worker.postMessage({ archive: staticArchive, input: input, library: document.getElementById('zipLibrary').src });
+      } catch (error) { close(); reject(error); }
+    });
+  }
+
+  async function readStaticTables(zip) {
+    var routes = {}, trips = {}, stops = {};
+    var txt = await Promise.all([zipFile(zip, 'routes.txt'), zipFile(zip, 'trips.txt'), zipFile(zip, 'stops.txt')]);
+    eachRecord(txt[0], function (r) {
+      routes[r.route_id] = {
+        short: r.route_short_name || r.route_long_name || r.route_id,
+        type: parseInt(r.route_type, 10),
+        color: r.route_color ? '#' + r.route_color : null
+      };
+    });
+    eachRecord(txt[1], function (t) {
+      trips[t.trip_id] = { route_id: t.route_id, headsign: t.trip_headsign || '', shape_id: t.shape_id || '', sid: t.service_id || '' };
+    });
+    eachRecord(txt[2], function (st) {
+      if (!st.stop_lat || !st.stop_lon) return;
+      var obj = {
+        id: st.stop_id, name: st.stop_name || '', code: st.stop_code || '',
+        lat: +st.stop_lat, lon: +st.stop_lon, station: st.location_type === '1'
+      };
+      stops[st.stop_id] = obj;
+    });
+    return { routes: routes, trips: trips, stops: stops };
+  }
   function processStatic(buf, onBroken) {
-    try { buf = new Uint8Array(buf).slice().buffer; } catch (e) {}   // plain local copy of the saved bytes
+    staticArchive = buf;
     JSZip.loadAsync(buf)
       .then(function (zip) {
         staticZip = zip;
         staticInfo = 'zip files: ' + Object.keys(zip.files).slice(0, 12).join(', ');
-        return Promise.all([zipFile(zip, 'routes.txt'), zipFile(zip, 'trips.txt'), zipFile(zip, 'stops.txt')]);
+        return runArchiveJob([zipFile, parseCSV, eachRecord], readStaticTables)
+          .catch(function () { return readStaticTables(zip); });
       })
-      .then(function (txt) {
-        eachRecord(txt[0], function (r) {
-          routes[r.route_id] = {
-            short: r.route_short_name || r.route_long_name || r.route_id,
-            type: parseInt(r.route_type, 10),
-            color: r.route_color ? '#' + r.route_color : null
-          };
-        });
-        eachRecord(txt[1], function (t) {
-          trips[t.trip_id] = { route_id: t.route_id, headsign: t.trip_headsign || '', shape_id: t.shape_id || '', sid: t.service_id || '' };
-        });
-        eachRecord(txt[2], function (st) {
-          if (!st.stop_lat || !st.stop_lon) return;
-          var obj = {
-            id: st.stop_id, name: st.stop_name || '', code: st.stop_code || '',
-            lat: +st.stop_lat, lon: +st.stop_lon, station: st.location_type === '1'
-          };
-          stops[st.stop_id] = obj;
-          indexStop(obj);
-        });
+      .then(function (tables) {
+        routes = tables.routes;
+        trips = tables.trips;
+        stops = tables.stops;
+        Object.values(stops).forEach(indexStop);
         buildStopTwins();
         staticState = Object.keys(routes).length ? 'ok' : 'empty';
         setProgress('lines', 1, 'Lines & stops');
@@ -3319,36 +3358,70 @@
   var pathLayer = L.layerGroup().addTo(map);
   var shapes = null, shapesLoading = null, selected = null, switching = false;
 
-  // shapes.txt is big, so it's parsed only the first time someone taps a vehicle
+  // Both the worker and the fallback use the same parser and keep GTFS point order.
+  function parseShapeText(text) {
+    var lines = text.replace(/^\uFEFF/, '').split('\n');
+    var header = lines[0].replace(/["\r]/g, '').split(',').map(function (h) { return h.trim(); });
+    var idCol = header.indexOf('shape_id'), latCol = header.indexOf('shape_pt_lat');
+    var lonCol = header.indexOf('shape_pt_lon'), seqCol = header.indexOf('shape_pt_sequence');
+    var groups = Object.create(null), row = 1;
+    return new Promise(function (resolve) {
+      function readRows() {
+        var until = performance.now() + 5;
+        while (row < lines.length) {
+          var cells = lines[row++].replace('\r', '').split(',');
+          if (cells.length >= 3) {
+            var id = cells[idCol].replace(/"/g, '').trim();
+            (groups[id] || (groups[id] = [])).push([+cells[latCol], +cells[lonCol], +cells[seqCol]]);
+          }
+          if (row % 256 === 0 && performance.now() >= until) { setTimeout(readRows, 0); return; }
+        }
+        Object.keys(groups).forEach(function (id) { groups[id].sort(function (a, b) { return a[2] - b[2]; }); });
+        resolve(groups);
+      }
+      readRows();
+    });
+  }
+
+  async function packShapes(zip) {
+    var groups = await parseShapeText(await zipFile(zip, 'shapes.txt'));
+    var ids = Object.keys(groups), offsets = [0];
+    ids.forEach(function (id) { offsets.push(offsets[offsets.length - 1] + groups[id].length * 3); });
+    var points = new Float64Array(offsets[ids.length]);
+    ids.forEach(function (id, i) {
+      var at = offsets[i];
+      groups[id].forEach(function (p) { points.set(p, at); at += 3; });
+    });
+    return { ids: ids, offsets: offsets, points: points };
+  }
+
+  function unpackShapes(data) {
+    // Existing callers consume arrays. Expand only the routes they actually use.
+    var routesById = Object.create(null);
+    data.ids.forEach(function (id, i) {
+      Object.defineProperty(routesById, id, { enumerable: true, configurable: true, get: function () {
+        var route = [], points = data.points;
+        for (var j = data.offsets[i]; j < data.offsets[i + 1]; j += 3) {
+          route.push([points[j], points[j + 1], points[j + 2]]);
+        }
+        Object.defineProperty(routesById, id, { value: route, enumerable: true });
+        return route;
+      } });
+    });
+    return routesById;
+  }
+
   function loadShapes() {
     if (shapes) return Promise.resolve(shapes);
     if (shapesLoading) return shapesLoading;
     if (!staticZip) return Promise.resolve(null);
-    var t0 = performance.now();
-    shapesLoading = zipFile(staticZip, 'shapes.txt').then(function (text) {
-      // processed in slices of 20,000 lines with a pause between them, so the page never freezes
-      return new Promise(function (resolve) {
-        var out = {}, lines = text.replace(/^﻿/, '').split('\n');
-        text = null;
-        var head = lines[0].replace('\r', '').split(',').map(function (h) { return h.trim().replace(/"/g, ''); });
-        var iId = head.indexOf('shape_id'), iLat = head.indexOf('shape_pt_lat'),
-            iLon = head.indexOf('shape_pt_lon'), iSeq = head.indexOf('shape_pt_sequence'), i = 1;
-        function slice() {
-          for (var end = Math.min(lines.length, i + 20000); i < end; i++) {
-            var c = lines[i].replace('\r', '').split(',');
-            if (c.length < 3) continue;
-            var id = c[iId].replace(/"/g, '').trim();
-            (out[id] || (out[id] = [])).push([+c[iLat], +c[iLon], +c[iSeq]]);
-          }
-          if (i < lines.length) { setTimeout(slice, 0); return; }
-          Object.keys(out).forEach(function (id) { out[id].sort(function (a, b) { return a[2] - b[2]; }); });
-          shapes = out;
-          timings.shapes = Math.round(performance.now() - t0) + ' ms';
-          resolve(out);
-        }
-        slice();
-      });
-    }).catch(function (e) { console.warn('Shapes failed:', e); shapes = {}; return shapes; });
+    var started = performance.now();
+    shapesLoading = runArchiveJob([zipFile, parseShapeText], packShapes).then(unpackShapes).catch(function () {
+      return zipFile(staticZip, 'shapes.txt').then(parseShapeText);
+    }).then(function (result) {
+      timings.shapes = Math.round(performance.now() - started) + ' ms';
+      return shapes = result;
+    }).catch(function (error) { console.warn('Shapes failed:', error); return shapes = {}; });
     return shapesLoading;
   }
 
@@ -4616,9 +4689,7 @@
     else ttInfo.phases.push(name + ' ' + Math.round(now - ttMarkAt));
     ttMarkAt = now;
   }
-  function ttBuild(T, id) {
-    var baseT = noonMinus12(T), Y = ymd(baseT - 12 * 3600e3);
-    var offY = (noonMinus12(Y) - baseT) / 1000;
+  function ttBuild(T, id, baseT, Y, offY) {
     var act = {}; act[Y] = {}; act[T] = {};
     var head = null, rowsRead = 0;
     var wk = [Y, T].map(function (d) { return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8)).getDay()]; });
@@ -4829,6 +4900,33 @@
   }
   // −1: the trip runs only as yesterday's service (past midnight); 0: today; null: not in the index
   function ttTripDay(tid) { var inst = tt ? ttFirst[tid] : undefined; return inst === undefined ? null : tt.instDay[inst]; }
+  async function buildTimetableInWorker(zip, input) {
+    // The shared compiler reads the same tables and stop grid as its main-thread fallback.
+    self.staticZip = zip;
+    self.trips = input.trips;
+    self.stops = input.stops;
+    self.stopGrid = {};
+    self.STOP_GRID_DEG = input.gridSize;
+    self.TT_VER = input.version;
+    self.ttInfo = {};
+    self.ttMarkAt = 0;
+    Object.values(stops).forEach(indexStop);
+    var index = await ttBuild.apply(null, input.days);
+    index.phases = ttInfo.phases;
+    return index;
+  }
+  function buildTimetable(T, id) {
+    var base = noonMinus12(T), yesterday = ymd(base - 12 * 3600e3);
+    var days = [T, id, base, yesterday, (noonMinus12(yesterday) - base) / 1000];
+    // Stop objects can have Leaflet markers attached by the time a build starts.
+    var locations = {};
+    Object.values(stops).forEach(function (s) { locations[s.id] = { id: s.id, lat: s.lat, lon: s.lon }; });
+    return runArchiveJob([zipEntry, zipLines, inSlices, csvHead, hmsSec, ttMark, ttBuild, ttFootpaths,
+      stopGridKey, indexStop, distM, toRad], buildTimetableInWorker,
+      { days: days, trips: trips, stops: locations, gridSize: STOP_GRID_DEG, version: TT_VER })
+      .then(function (x) { ttInfo.phases = x.phases; delete x.phases; return x; })
+      .catch(function () { return ttBuild.apply(null, days); });
+  }
   function ttEnsure() {
     if (!staticZip || staticState !== 'ok') return Promise.resolve(null);
     var T = ymd(new Date()), id = zipId();
@@ -4840,7 +4938,7 @@
       if (c && c.v === TT_VER && c.day === T && c.id === id) { ttInfo.from = 'saved'; return c; }
       ttInfo.state = 'building';
       renderDiag();
-      return ttBuild(T, id).then(function (x) { ttInfo.from = 'built'; idb.put('files', 'tt', x); return x; });
+      return buildTimetable(T, id).then(function (x) { ttInfo.from = 'built'; idb.put('files', 'tt', x); return x; });
     }).then(function (x) {
       ttUse(x);
       ttInfo.state = 'ready'; ttInfo.ms = Math.round(performance.now() - t0);
