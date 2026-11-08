@@ -131,7 +131,7 @@
         full = esc(label + ', timetable, ' + clock + ' Sofia time, ' + wait);
       }
       if (a.kind === 'sched') return '<span class="sp-sched" title="' + full + '" aria-label="' + full + '">' + txt + '</span>';
-      var attrs = ' data-veh="' + esc(a.key) + '" data-stop="' + esc(a.sid || st.id) + '"';   // its own twin (v77)
+      var attrs = ' data-follow-arrival data-veh="' + esc(a.key) + '" data-stop="' + esc(a.sid || st.id) + '"';   // its own twin (v77)
       var ret = a.kind === 'est' && !a.guess.sameWay;   // comes after turning round at the end of its current run
       if (a.kind === 'est') {
         attrs += ' data-eta="' + (a.t || '') + '" data-same="' + (a.guess.sameWay ? 1 : 0) + '" data-onnew="' + (a.guess.stopOnNew || 0) + '"' +

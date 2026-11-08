@@ -70,4 +70,6 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-08 — [Recenter map on Sofia](docs/recenter-map.md).** Built and checked both artifacts. In headless Chrome on release 102, the visible control returned the 2D map from zoom 16 to the startup coordinates at zoom 13. Tilted view and physical phone verification remain open.
 
+**2026-11-08 — [Follow from stop arrivals](docs/marker-camera.md).** Stop arrival buttons now start vehicle follow directly, including for an already selected vehicle. Journey buttons and the explicit stop progress overview keep their previous behavior.
+
 <!-- AGENT-HANDOFF:END -->

@@ -1,4 +1,4 @@
-  function focusVehicle(key, stopId, guessEta) {
+  function focusVehicle(key, stopId, guessEta, followArrival) {
     var v = vehicles[key];
     if (!v) return;
     map.closePopup();
@@ -6,9 +6,10 @@
     var st = pendingFocusStop = (stopId && stops[stopId]) || null;
     pendingGuessEta = guessEta || null;
     // Follow off first: the follow camera would pull straight back to the vehicle (and select() pans to it)
-    if (st && following) setFollow(false);
+    if ((st || followArrival) && following) setFollow(false);
     if (selected === v) { focusedStop = pendingFocusStop; focusGuessEta = pendingGuessEta; pendingFocusStop = null; pendingGuessEta = null; drawFocusStop(); drawRouteStops(); if (shapes) drawPath(v); }
     else select(v);
+    if (followArrival) { setFollow(true); return; }
     var opened = isPhone() && !!st;
     function openIt() {
       if (opened || selected !== v) return;
@@ -140,10 +141,11 @@
     if (!a) return;
     e.preventDefault();
     e.stopPropagation();
-    if (selected && vehicles[a.getAttribute('data-veh')] === selected) { recenter(selected); return; }
+    var followArrival = a.hasAttribute('data-follow-arrival');
+    if (!followArrival && selected && vehicles[a.getAttribute('data-veh')] === selected) { recenter(selected); return; }
     focusVehicle(a.getAttribute('data-veh'), a.getAttribute('data-stop'), a.classList.contains('guess') ? {
       predicted: +a.getAttribute('data-eta') || null,
       g: { sameWay: a.getAttribute('data-same') === '1', stopOnNew: +a.getAttribute('data-onnew') || 0, tripId: a.getAttribute('data-trip') || '' }
-    } : null);
+    } : null, followArrival);
   }, true);
 

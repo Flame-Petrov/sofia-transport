@@ -5496,7 +5496,7 @@
         full = esc(label + ', timetable, ' + clock + ' Sofia time, ' + wait);
       }
       if (a.kind === 'sched') return '<span class="sp-sched" title="' + full + '" aria-label="' + full + '">' + txt + '</span>';
-      var attrs = ' data-veh="' + esc(a.key) + '" data-stop="' + esc(a.sid || st.id) + '"';   // its own twin (v77)
+      var attrs = ' data-follow-arrival data-veh="' + esc(a.key) + '" data-stop="' + esc(a.sid || st.id) + '"';   // its own twin (v77)
       var ret = a.kind === 'est' && !a.guess.sameWay;   // comes after turning round at the end of its current run
       if (a.kind === 'est') {
         attrs += ' data-eta="' + (a.t || '') + '" data-same="' + (a.guess.sameWay ? 1 : 0) + '" data-onnew="' + (a.guess.stopOnNew || 0) + '"' +
@@ -5528,7 +5528,7 @@
   // Tapping a vehicle in a stop's list: track it, zoom out so its route to that stop is in view,
   // and open its popup once the camera has arrived (without the usual zoom-in on the vehicle).
   // Phones: tracking only, no card: the sheet would cover half of that view (tap the vehicle for it).
-  function focusVehicle(key, stopId, guessEta) {
+  function focusVehicle(key, stopId, guessEta, followArrival) {
     var v = vehicles[key];
     if (!v) return;
     map.closePopup();
@@ -5536,9 +5536,10 @@
     var st = pendingFocusStop = (stopId && stops[stopId]) || null;
     pendingGuessEta = guessEta || null;
     // Follow off first: the follow camera would pull straight back to the vehicle (and select() pans to it)
-    if (st && following) setFollow(false);
+    if ((st || followArrival) && following) setFollow(false);
     if (selected === v) { focusedStop = pendingFocusStop; focusGuessEta = pendingGuessEta; pendingFocusStop = null; pendingGuessEta = null; drawFocusStop(); drawRouteStops(); if (shapes) drawPath(v); }
     else select(v);
+    if (followArrival) { setFollow(true); return; }
     var opened = isPhone() && !!st;
     function openIt() {
       if (opened || selected !== v) return;
@@ -5670,11 +5671,12 @@
     if (!a) return;
     e.preventDefault();
     e.stopPropagation();
-    if (selected && vehicles[a.getAttribute('data-veh')] === selected) { recenter(selected); return; }
+    var followArrival = a.hasAttribute('data-follow-arrival');
+    if (!followArrival && selected && vehicles[a.getAttribute('data-veh')] === selected) { recenter(selected); return; }
     focusVehicle(a.getAttribute('data-veh'), a.getAttribute('data-stop'), a.classList.contains('guess') ? {
       predicted: +a.getAttribute('data-eta') || null,
       g: { sameWay: a.getAttribute('data-same') === '1', stopOnNew: +a.getAttribute('data-onnew') || 0, tripId: a.getAttribute('data-trip') || '' }
-    } : null);
+    } : null, followArrival);
   }, true);
 
   // ---------- Follow button ----------
