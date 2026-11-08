@@ -70,6 +70,19 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-08 — [Recenter map on Sofia](docs/recenter-map.md).** Built and checked both artifacts. In headless Chrome on release 102, the visible control returned the 2D map from zoom 16 to the startup coordinates at zoom 13. Tilted view and physical phone verification remain open.
 
+**2026-11-08 — Vehicle models.** The tram now has a low skirt and recessed undercarriage. Restyled the three standalone GLBs as cast-pewter playing pieces. Generated a geometry preview from all three binaries and verified their GLB headers. See the [vehicle model guide](docs/vehicle-models.md).
+
 **2026-11-08 — [Follow from stop arrivals](docs/marker-camera.md).** Stop arrival buttons now pan at the current zoom in both map modes and start vehicle follow directly, including for an already selected vehicle. Journey buttons and the explicit stop progress overview keep their previous behavior.
+
+
+**2026-11-08 — [Live 3D vehicle models](docs/vehicle-models.md).** Both releases embed the three GLBs. Nearby surface vehicles use their marker color and display their line number above the mesh from MapLibre zoom 16. Build, artifact and JavaScript syntax checks passed.
+
+**2026-11-08 — [Surface vehicle geometry and heading](docs/vehicle-models.md).** Rebuilt the three meshes and retained monochrome vehicle tints with material shading. Trams use the directed trip shape where available. Built and checked both releases, checked JavaScript syntax, and exercised all three vehicle types on the live fleet in desktop Chrome.
+
+**2026-11-08 — [Trams on mapped rails](docs/vehicle-models.md).** Close-zoom tram models use the basemap track geometry for position and orientation. Verified both releases and JavaScript syntax. In desktop Chrome, live tram 27 moved 1.6 metres onto a mapped rail. Screenshot in the workspace under `debug images/Tram on rails/`.
+
+**2026-11-08 — [Tram body skirt](docs/vehicle-models.md).** Removed tram wheels and hubs from the mesh generator. Rebuilt the GLB, geometry preview and both checked releases.
+
+**2026-11-08 — [Tram articulation](docs/vehicle-models.md).** Section headings follow forward and rear rail samples; the WebGL layer rotates the front and rear around their bellows. Both releases and JS syntax passed. Controlled left/right and reverse traversal checks confirmed the calculated angles, and desktop Chrome exercised the live 3D layer.
 
 <!-- AGENT-HANDOFF:END -->

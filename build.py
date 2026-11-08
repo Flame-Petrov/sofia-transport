@@ -1,6 +1,7 @@
 """Build the standalone Sofia Live Transport page using Python 3."""
 
 import argparse
+import base64
 from pathlib import Path
 import re
 from tempfile import NamedTemporaryFile
@@ -24,6 +25,9 @@ def render():
         return path.read_text(encoding="utf-8")
 
     page = INCLUDE.sub(include, template.read_text(encoding="utf-8"))
+    for model in ("bus", "tram", "trolleybus"):
+        payload = base64.b64encode((SITE / "models" / (model + ".glb")).read_bytes()).decode("ascii")
+        page = page.replace("{{vehicle-model " + model + "}}", payload)
     if "{{include " in page:
         raise ValueError("Malformed or nested include in source")
     unused = sorted(p for p in SOURCE.rglob("*") if p.suffix in {".js", ".css", ".html"} and p not in used)
