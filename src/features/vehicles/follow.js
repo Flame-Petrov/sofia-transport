@@ -20,7 +20,7 @@
       map.fire('moveend');   // let the layers settle where the camera stopped
     }
     // Close the card before panning to the vehicle at the current zoom.
-    if (on && selected && selected.pos && focusedStop) {
+    if (on && selected && selected.pos) {
       var v = selected;
       followHold = true;   // the follow camera waits until the popup is gone and the flight has started
       shrinkVehPopup(v, function () {

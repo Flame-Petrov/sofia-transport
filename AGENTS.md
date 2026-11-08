@@ -89,4 +89,6 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-08 — [Fixed ground size for 3D vehicles](docs/vehicle-models.md).** All three meshes now use 1.8 ground metres per mesh unit. Tram articulation uses that scale and body hit targets follow the projected vehicle length. Both release artifacts and JavaScript syntax passed verification.
 
+**2026-11-08 — [Dismiss vehicle details on Follow](docs/marker-camera.md).** The follow transition now closes the card when a vehicle is selected directly. Both builds passed verification. Simulated clicks covered dot and pill popups, the phone sheet and the 3D popup. The launcher HTTP check timed out, so live browser verification remains open.
+
 <!-- AGENT-HANDOFF:END -->
