@@ -47,9 +47,7 @@
   function liveOverlay() {
     var key = tt.day + '|' + feedTime + '|' + Object.keys(tuByTrip).length;
     if (ovCache && ovKey === key) return ovCache;
-    var out = {}, base = tt.base / 1000, yd = new Date(tt.base + 12 * 3600e3);
-    yd.setDate(yd.getDate() - 1);
-    var Y = ymd(yd);
+    var out = {}, base = tt.base / 1000, Y = ymd(tt.base - 12 * 3600e3);
     for (var tid in tuByTrip) {
       var list = ttByTrip[tid];
       if (!list) continue;

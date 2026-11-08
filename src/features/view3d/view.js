@@ -22,6 +22,8 @@
     // v102: following cameras, route to a place
     var headingUp = store('sofia_3d_heading') !== 'north', fc = { off: null, at: 0 }, lc = { off: null, at: 0, rest: false };
     var stopsDrawn = [], terrainOn = store('sofia_3d_terrain') === null ? VIEW3D_TERRAIN : store('sofia_3d_terrain') === '1', demAttr = false;   // v103
+    var textureBox = document.getElementById('v3Textures');
+    textureBox.checked = store('sofia_3d_building_textures') === '1';
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
     var VEH_LAYERS = ['v3-veh-dot', 'v3-veh-ring', 'v3-veh-lbl', 'v3-veh-mine', 'v3-veh-tag'];
     var HANDLERS = ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'];
@@ -53,6 +55,8 @@
       if (a.title !== t) { a.title = t; a.setAttribute('aria-label', t); }
       a.setAttribute('aria-pressed', view3d.on ? 'true' : 'false');
       document.getElementById('v3TerRow').hidden = !/^vector/.test(mapMode);   // v103
+      document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream;
+      document.getElementById('v3TextureKey').hidden = !textureBox.checked;
       var m = memo(), bx = document.getElementById('v3Box');
       bx.hidden = !m || !/^vector/.test(mapMode);
       if (m) setText(document.getElementById('v3Note'), '3D was turned off on this device after it ran out of graphics memory (' + clockHM(m.t) + ', ' + m.why + '). It comes back by itself after a day.');
@@ -73,6 +77,7 @@
           l.minzoom = z;
           l.paint = l.paint || {};
           l.paint['fill-extrusion-opacity'] = VIEW3D_BUILDING_OPACITY;
+          if (l['source-layer'] === 'building') l.paint['fill-extrusion-opacity-transition'] = { duration: 0, delay: 0 };
           // a gentle tint by height: most buildings have no height in OpenStreetMap and are drawn 5 m tall
           l.paint['fill-extrusion-color'] = ['interpolate', ['linear'], ['to-number', ['get', 'render_height'], 0], 0, '#E6E0D7', 60, '#F2EEE8'];
         } else if (l.type === 'fill' && l['source-layer'] === 'building' && typeof l.maxzoom === 'number') l.maxzoom = z;
@@ -95,6 +100,7 @@
       });
     }
     function open() {
+      cancelFocusCard();
       if (view3d.on || !available()) return;
       if (savedPlaces && savedPlaces.isPlacing) savedPlaces.cancelPlacement();
       map.closePopup();
@@ -121,6 +127,7 @@
       view3d.on = true; ready = false; closing = false;
       viewBounds01 = null;
       function invalidateBounds() { viewBounds01 = null; }
+      m3.on('move', scheduleViewportPrefetch);
       m3.on('move', invalidateBounds);
       m3.on('resize', invalidateBounds);
       info.opens++; info.tiles0 = tileReq; info.hits0 = tileHits;
@@ -157,7 +164,7 @@
       window.addEventListener('mouseup', pointerOff, true);
       window.addEventListener('touchend', pointerOff, true);
       window.addEventListener('touchcancel', pointerOff, true);
-      m3.on('dragstart', function () { dragFrom = m3.getCenter(); dragAt = Date.now(); });
+      m3.on('dragstart', function () { cancelFocusCard(); dragFrom = m3.getCenter(); dragAt = Date.now(); });
       m3.on('drag', function () {
         if (!dragFrom) return;
         var p = m3.project(dragFrom), c = m3.project(m3.getCenter());
@@ -191,6 +198,7 @@
         paint: { 'fill-color': '#1A73E8', 'fill-opacity': 0.12, 'fill-outline-color': 'rgba(26,115,232,.45)' } }, sym);
       accKey = '';
       addOverlays(sym);
+      applyBuildingTextures();
       syncPins();
       drawMe3();
     }
@@ -215,11 +223,12 @@
     // v103: the 2D stop icon (white rounded square, bus glyph) as a map image; colour 'x' = the plain dark one
     var BUS_D = (/ d="([^"]+)"/.exec(BUS_SVG) || [])[1] || '';
     function addStopImg(id) {
-      var color = id.slice(7) === 'x' ? '#263238' : id.slice(7), S = 20;
+      var metro = id === 'v3stop-metro', color = metro ? TYPES[1].color : id.slice(7) === 'x' ? '#263238' : id.slice(7), S = 20;
       var img = canvas2(S, S, function (g) {
         g.fillStyle = '#fff'; rr(g, 0.5, 0.5, S - 1, S - 1, 6); g.fill();
         g.lineWidth = 2; g.strokeStyle = color; rr(g, 1.5, 1.5, S - 3, S - 3, 5); g.stroke();
-        if (BUS_D && window.Path2D) { g.save(); g.translate(3.5, 3.5); g.scale(13 / 24, 13 / 24); g.fillStyle = color; g.fill(new Path2D(BUS_D)); g.restore(); }
+        if (metro) { g.fillStyle = color; g.font = 'bold 13px sans-serif'; g.textAlign = 'center'; g.fillText('M', S / 2, 14.5); }
+        else if (BUS_D && window.Path2D) { g.save(); g.translate(3.5, 3.5); g.scale(13 / 24, 13 / 24); g.fillStyle = color; g.fill(new Path2D(BUS_D)); g.restore(); }
       });
       m3.addImage(id, img, { pixelRatio: 2 });
     }
@@ -411,9 +420,13 @@
     function openVeh(v, noFocus) {
       if (!m3 || !v) return;
       if (selected !== v) select(v);
-      openPop('veh', v);
+      if (noFocus) { openPop('veh', v); return; }
+      closePop();
+      closeSheet();
       // the vehicle and its card together in the middle of the free map area (as v100's card in 2D)
-      if (!noFocus) focusOn(v.pos || [v.d.lat, v.d.lon], null, vpTargetY(vpFreeBottom(), cardRoom3()));
+      focusOn(v.pos || [v.d.lat, v.d.lon], null, vpTargetY(vpFreeBottom(), vehPopupSize(v).h), function () {
+        if (view3d.on && selected === v) openPop('veh', v);
+      });
     }
     // screen px the open 3D card takes below the vehicle (0 when none): the gap, the pointer and the card
     function cardRoom3() {
@@ -645,7 +658,8 @@
         var st = mk._stop;
         if (!st) return;
         var sel = mk === sheetMarker || (pop && popKind === 'stop' && popRef === mk) ? 1 : 0;
-        feats.push({ type: 'Feature', properties: { img: 'v3stop-' + (mk._color || 'x'), sel: sel }, geometry: { type: 'Point', coordinates: [st.lon, st.lat] } });
+        var img = metroTimetable.serves(st.id) ? 'v3stop-metro' : 'v3stop-' + (mk._color || 'x');
+        feats.push({ type: 'Feature', properties: { img: img, sel: sel }, geometry: { type: 'Point', coordinates: [st.lon, st.lat] } });
         stopsDrawn.push({ mk: mk, c: [st.lon, st.lat] });
       });
       submitPointSource('v3-stops', feats);
@@ -665,9 +679,10 @@
     function stopTap(mk) {
       var st = mk._stop;
       if (!st || !m3) return;
+      closePop();
+      closeSheet();
       if (isPhone() || !mk._spEl) { openSheet(st, mk); return; }
-      openPop('stop', mk);
-      focusOn([st.lat, st.lon]);
+      focusOn([st.lat, st.lon], null, undefined, function () { openPop('stop', mk); });
     }
     function startBearing() {
       if (headingUp && following && selected && selected.pos) { var b = vehBearing(selected); if (b !== null) return b; }
@@ -692,6 +707,7 @@
       refresh();
     }
     function close(reason, instant) {
+      cancelFocusCard();
       if (!view3d.on || closing) return;
       closing = true;
       info.lastClose = reason || 'button';
@@ -706,6 +722,7 @@
         clearTimeout(revealTimer);
         var mm = m3, e3 = el, c = null, z = null;
         try { if (mm) { c = mm.getCenter(); z = mm.getZoom() + 1; } } catch (e) {}
+        scheduleViewportPrefetch();
         view3d.on = false; closing = false; ready = false; camBusy = false;
         m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
@@ -787,12 +804,20 @@
     wrap('fitBounds', function (b, o) { fit(b, o, false); });
     wrap('flyToBounds', function (b, o) { fit(b, o, true); });
     // put a spot at screen height targetY (the 2D focusOn / centreOnMe), at zoom z
-    view3d.focus = function (ll, z, targetY) {
+    view3d.focus = function (ll, z, targetY, arrived) {
       if (!m3) return;
       ll = L.latLng(ll);
       var H = el.clientHeight, pad = { top: 0, bottom: 0, left: 0, right: 0 }, cur = viewZoom();
       if (targetY > H / 2) pad.top = Math.min(H - 40, 2 * targetY - H); else pad.bottom = Math.min(H - 40, H - 2 * targetY);
       var zoomed = Math.abs(z - cur) > 0.01;
+      if (arrived) {
+        m3.stop();
+        m3.once('moveend', function () {
+          if (!m3 || !view3d.on) return;
+          var pos = m3.getCenter();
+          if (Math.abs(pos.lat - ll.lat) < 0.00001 && Math.abs(pos.lng - ll.lng) < 0.00001) arrived();
+        });
+      }
       cam({ center: [ll.lng, ll.lat], zoom: z - 1, padding: pad, duration: zoomed ? 800 : 450 }, zoomed);
     };
     view3d.zoomBy = function (d) {
@@ -985,6 +1010,7 @@
       if (v) { openVeh(v); return; }
       var sm = e && e.point ? stopAtPoint(e.point) : null;   // v103: a stop of the all-stops layer
       if (sm) { stopTap(sm); return; }
+      cancelFocusCard();
       if (pop) { closePop(); return; }                    // this tap only closes the open card
       if (sheetStop || sheetVeh || sheetRoute) { closeSheet(); return; }
       if (Date.now() - popClosedAt < 400) return;
@@ -1055,6 +1081,15 @@
     terBox.checked = terrainOn;
     terBox.onchange = function () { terrainOn = this.checked; store('sofia_3d_terrain', terrainOn ? '1' : '0'); applyTerrain(); };
     view3d.terrain = function () { return { on: terrainOn, set: !!(m3 && m3.getTerrain && m3.getTerrain()) }; };
+
+    function applyBuildingTextures() {
+      if (m3 && m3.getSource('v3-me-acc') && window.DecompressionStream) buildingMaterials.apply(m3, textureBox.checked);
+    }
+    textureBox.onchange = function () {
+      store('sofia_3d_building_textures', this.checked ? '1' : '0');
+      refresh();
+      applyBuildingTextures();
+    };
 
     view3d.open = open;
     view3d.close = close;

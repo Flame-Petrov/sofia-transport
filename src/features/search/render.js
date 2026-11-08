@@ -82,6 +82,12 @@
       if (!groups[g]) groups[g] = { line: line, type: d.type, color: d.color, n: 0 };
       groups[g].n++;
     });
+    Object.keys(routes).forEach(function (id) {
+      var r = routes[id];
+      if (r.type !== 1 || r.short.toLowerCase().indexOf(last) !== 0) return;
+      var key = r.short + '|1';
+      if (!groups[key]) groups[key] = { line: r.short, type: 1, color: TYPES[1].color, n: 0 };
+    });
     Object.keys(groups).map(function (g) { return groups[g]; })
       .sort(function (a, b) { return a.line.length - b.line.length || a.line.localeCompare(b.line, 'bg', { numeric: true }); })
       .slice(0, 14)
@@ -89,7 +95,8 @@
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'chip';
-        b.innerHTML = '<i style="background:' + g.color + '"></i>' + esc(typeInfo(g.type).name) + ' ' + esc(g.line) + ' <small>×' + g.n + '</small>';
+        b.innerHTML = '<i style="background:' + g.color + '"></i>' + esc(typeInfo(g.type).name) + ' ' + esc(g.line) +
+          ' <small>' + (g.n ? '×' + g.n : 'timetable') + '</small>';
         b.onclick = function () {
           q.value = g.line;
           syncClear();

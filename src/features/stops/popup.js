@@ -46,6 +46,7 @@
 
   // Chip text: the first chip of a card carries the unit; ≥ 60 min shows the (24-hour) clock time
   function chipClock(t) { return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); }
+  var metroClock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Sofia', hour: '2-digit', minute: '2-digit' });
   function chipTime(a, first) {
     if (!a.t) return 'on the way';
     var min = Math.round((a.t - Date.now()) / 60000), pre = a.kind === 'est' ? '~' : '';
@@ -80,6 +81,7 @@
       if (a.kind === 'sched' && !a.t) return;   // no vehicle and no time: nothing to show
       var line = (a.kind === 'live' ? (v.d.line || v.d.label) : ((r && r.short) || (v && v.d.line))) || '?';
       var dest = (a.kind === 'live' && v.d.headsign) || info.headsign || '';
+      if (a.terminates) dest = 'Terminates here';
       var gk = (info.route_id || line) + '|' + dest, g = groups[gk];
       if (!g) {
         g = groups[gk] = {
@@ -122,6 +124,12 @@
     var chips = g.items.map(function (a, i) {
       used[a.kind] = true;
       var txt = esc(chipTime(a, i === 0)), full = esc(label + ', ' + KIND_WORD[a.kind] + ', ' + timeWords(a));
+      if (a.metroSchedule) {
+        var clock = metroClock.format(a.t), mins = Math.round((a.t - Date.now()) / 60000);
+        var wait = mins > 0 ? mins + ' min' : 'now';
+        txt = esc(clock + (i === 0 ? ' · ' + wait : ''));
+        full = esc(label + ', timetable, ' + clock + ' Sofia time, ' + wait);
+      }
       if (a.kind === 'sched') return '<span class="sp-sched" title="' + full + '" aria-label="' + full + '">' + txt + '</span>';
       var attrs = ' data-veh="' + esc(a.key) + '" data-stop="' + esc(a.sid || st.id) + '"';   // its own twin (v77)
       var ret = a.kind === 'est' && !a.guess.sameWay;   // comes after turning round at the end of its current run

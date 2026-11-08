@@ -18,12 +18,15 @@
     });
     return src;
   }
+  function sourceZoom(src, zoom) {
+    return Math.min(src.maxzoom ?? 14, Math.max(src.minzoom || 0, Math.floor(zoom) - 1));
+  }
   function preloadMap(style) {
     if (!style || preload.state) return Promise.resolve();
     var src = vectorSource(style);
     if (!src) return Promise.resolve();
     var b = map.getBounds(), urls = [];
-    var zFrom = Math.max(src.minzoom || 0, Math.floor(map.getZoom()) - 1), zTo = src.maxzoom || 14;   // style zoom = Leaflet − 1
+    var zFrom = sourceZoom(src, map.getZoom()), zTo = src.maxzoom ?? 14;   // style zoom = Leaflet − 1
     var tpl = 'https://' + src.tiles[0].replace(/^ofm:\/\//, '');
     for (var z = zFrom; z <= zTo; z++) {
       var n = Math.pow(2, z) - 1;

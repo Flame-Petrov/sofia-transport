@@ -11,11 +11,17 @@
   // sorted by departure and never overtaking each other (else they go to a second pattern), are rows of a
   // times matrix in seconds from today's "noon − 12 h". Yesterday's trips running past midnight are in it
   // too (their times shifted by a day).
-  var TT_VER = 1;
+  var TT_VER = 2;
   var tt = null, ttBusy = null, ttInfo = { state: '', ms: 0, from: '', err: '' };
   var ttFirst = {}, ttInstPat = null, ttStopIx = {}, ttByTrip = {};   // derived when the index is put to use (not saved)
-  function ymd(d) { return '' + d.getFullYear() + ('0' + (d.getMonth() + 1)).slice(-2) + ('0' + d.getDate()).slice(-2); }
-  function noonMinus12(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 12).getTime() - 12 * 3600e3; }
+  var sofiaDay = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Sofia', year: 'numeric', month: '2-digit', day: '2-digit' });
+  var sofiaHour = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Sofia', hour: '2-digit', hourCycle: 'h23' });
+  function ymd(d) { return sofiaDay.format(d).replace(/-/g, ''); }
+  // At UTC noon Sofia is always on the offset that applies at local noon, even on a DST change.
+  function noonMinus12(day) {
+    var utc = Date.UTC(+day.slice(0, 4), +day.slice(4, 6) - 1, +day.slice(6));
+    return utc - (+sofiaHour.format(utc + 12 * 3600e3) - 12) * 3600e3;
+  }
   function zipEntry(name) {
     var h = staticZip ? staticZip.file(new RegExp('(^|/)' + name.replace('.', '\\.') + '$', 'i')) : [];
     return h.length ? h[0] : null;
@@ -80,8 +86,8 @@
     ttMarkAt = now;
   }
   function ttBuild(T, id) {
-    var now = new Date(), yd = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1), Y = ymd(yd);
-    var baseT = noonMinus12(now), offY = Math.round((noonMinus12(yd) - baseT) / 1000);   // ≈ −86,400 (DST-safe)
+    var baseT = noonMinus12(T), Y = ymd(baseT - 12 * 3600e3);
+    var offY = (noonMinus12(Y) - baseT) / 1000;
     var act = {}; act[Y] = {}; act[T] = {};
     var head = null, rowsRead = 0;
     var wk = [Y, T].map(function (d) { return ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][new Date(+d.slice(0, 4), +d.slice(4, 6) - 1, +d.slice(6, 8)).getDay()]; });
@@ -278,6 +284,7 @@
     x.stopIds.forEach(function (s, k) { ix[s] = k; });
     x.nTrips = Object.keys(first).length;
     tt = x; ttInstPat = ip; ttFirst = first; ttStopIx = ix; ttByTrip = byTrip;
+    metroTimetable.index(x);
   }
   // A trip's stops in the old loadTripStops format: [{ stopId, seq, arr (s from its own service day) }]
   function ttTripStops(tid) {
@@ -310,6 +317,8 @@
       // stop lists read before the index was ready may be cut short (split trips): take the complete ones
       Object.keys(tripStopsCache).forEach(function (tid) { var l = ttTripStops(tid); if (l) tripStopsCache[tid] = l; });
       if (selected) drawRouteStops();
+      render(false);
+      refreshStopViews();
       renderDiag();
       return tt;
     }).catch(function (e) {

@@ -32,7 +32,12 @@
         a.t = guessArrival(vehicles[g.key], st, g, a.t) || a.t;
       }
     });
-    return list;
+    if (activeTypes[1]) twinsOf(stopId).forEach(function (sid) {
+      metroTimetable.upcoming(sid, now, searchRoutes).forEach(function (a) {
+        if (!seen[a.tripId]) { seen[a.tripId] = true; list.push(a); }
+      });
+    });
+    return list.sort(function (a, b) { return (a.t || Infinity) - (b.t || Infinity); });
   }
 
   // Best guess for an arrival without a vehicle: a live vehicle of the same line that could

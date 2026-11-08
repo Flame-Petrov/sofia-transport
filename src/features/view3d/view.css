@@ -58,6 +58,7 @@
   /* menu: the note after a 3D crash on this device, with Try again */
   #v3Box { display: flex; flex-direction: column; gap: 8px; padding: 6px 0 10px; }
   #v3Box[hidden], #v3TerRow[hidden] { display: none; }
+  #v3TextureKey { padding-bottom: 8px; }
   #v3Retry {
     height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer;
     border: 1.5px solid var(--border); background: none; color: var(--text); font-size: 14px; font-weight: 500;

@@ -23,8 +23,8 @@
       if (pp && pp.isOpen() && pp._adjustPan) { var was = pp.options.autoPan; pp.options.autoPan = true; pp._adjustPan(); pp.options.autoPan = was; }
     }
     function openAfterMove() { map.once('moveend', function () { setTimeout(openIt, 0); }); }
+    if (!st) { focusOn(v.pos || [v.d.lat, v.d.lon], null, vpTargetY(undefined, vehPopupSize(v).h), openIt); return; }
     setTimeout(openIt, 1500);
-    if (!st) { focusOn(v.pos || [v.d.lat, v.d.lon], null, vpTargetY(undefined, vehPopupSize(v).h)); openAfterMove(); return; }
     // Route not loaded yet: show vehicle and stop now, the road between them once it's drawn
     // (select() asked for the route first, so by the time this runs its path is ready)
     var hadShapes = !!shapes;

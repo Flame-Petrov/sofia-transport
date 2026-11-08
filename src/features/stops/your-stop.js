@@ -43,14 +43,17 @@
   }
   function renderStops2d() {
     var searching = searchStops !== null;
-    var show = viewZoom() >= (searching ? 11 : STOP_ZOOM);
+    var zoom = viewZoom(), show = zoom >= (searching ? 11 : STOP_ZOOM);
+    var metroOnly = activeTypes[1] && !activeTypes[0] && !activeTypes[3] && !activeTypes[11];
+    var showMetro = activeTypes[1] && zoom >= (searching || metroOnly ? 11 : 13);
     var b = viewLBounds(0.2);
     var minLat = b.getSouth(), maxLat = b.getNorth(), minLon = b.getWest(), maxLon = b.getEast();
     var live = Object.keys(tuByTrip).length > 0, now = Date.now();
     function eligible(st) {
       if (!st || st.station) return false;
-      if (searching && !searchStops[st.id]) return false;
-      if (!show || st.lat < minLat || st.lat > maxLat || st.lon < minLon || st.lon > maxLon) return false;
+      if (st.lat < minLat || st.lat > maxLat || st.lon < minLon || st.lon > maxLon) return false;
+      if (metroTimetable.serves(st.id)) return showMetro && metroTimetable.serves(st.id, searchRoutes);
+      if (!show || metroOnly || (searching && !searchStops[st.id])) return false;
       return !live || stopExpecting(st.id, now);   // empty stops aren't drawn
     }
     // twins (v77): one icon per shared stop — the first twin that qualifies; none when one of them is
@@ -64,17 +67,21 @@
       for (var j = 0; j < tw.length && tw[j] !== st.id; j++) if (eligible(stops[tw[j]])) return false;
       return true;
     }
+    function markerColor(id) { return metroTimetable.serves(id) ? TYPES[1].color : searching ? searchStops[id] || null : null; }
     Object.keys(stopMarkers).forEach(function (id) {
-      var mk = stopMarkers[id], color = searching ? (searchStops[id] || null) : null;
+      var mk = stopMarkers[id], color = markerColor(id);
       if (wanted(stops[id]) && mk._color === color) return;
       if (mk.isPopupOpen() || mk === sheetMarker) return;   // don't yank an open popup away
       stopLayer.removeLayer(mk);
       delete stopMarkers[id];
     });
-    if (!show) return;
+    if (!show && !showMetro) return;
     var candidates;
-    if (searching) {
+    if (!show || metroOnly) {
+      candidates = Array.from(metroTimetable.stationIds(), function (id) { return stops[id]; }).filter(Boolean);
+    } else if (searching) {
       candidates = Object.keys(searchStops).map(function (id) { return stops[id]; }).filter(Boolean);
+      for (var sid of metroTimetable.stationIds()) if (!searchStops[sid] && stops[sid]) candidates.push(stops[sid]);
     } else {
       candidates = [];
       var x0 = Math.floor(minLat / STOP_GRID_DEG), x1 = Math.floor(maxLat / STOP_GRID_DEG);
@@ -91,7 +98,7 @@
     for (var i = 0; i < candidates.length; i++) {
       var st = candidates[i], id = st.id;
       if (stopMarkers[id] || !wanted(st)) continue;
-      var color = searching ? searchStops[id] : null;
+      var color = markerColor(id);
       var mk = st._mk;
       if (!mk) {
         mk = st._mk = stopMarker(st, color ? 'route' : '', color, color ? 200 : 0);
@@ -99,7 +106,7 @@
       } else {
         if (mk._color !== color) {
           mk._color = color;
-          mk.setIcon(stopIcon(color ? 'route' : '', color));
+          mk.setIcon(stopIcon(color ? 'route' : '', color, st));
           mk.setZIndexOffset(color ? 200 : 0);
         }
       }

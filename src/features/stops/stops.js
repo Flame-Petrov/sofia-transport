@@ -177,7 +177,7 @@
         mk._color = color;
         routeStopLayer.addLayer(mk);
       } else {
-        if (mk._color !== color) { mk._color = color; mk.setIcon(stopIcon('route', color)); if (mk.isPopupOpen()) markSel(mk, true); }
+        if (mk._color !== color) { mk._color = color; mk.setIcon(stopIcon('route', color, r.stop)); if (mk.isPopupOpen()) markSel(mk, true); }
       }
       if (stopMarkers[id]) { stopLayer.removeLayer(stopMarkers[id]); delete stopMarkers[id]; }
     });

@@ -15,18 +15,18 @@
     map.closePopup();
     leaveVehSheet();
     leaveRouteSheet();   // v93
-    sheetStop = st; sheetMarker = mk;
-    markSel(mk, true);
+    sheetStop = sheetMarker = null;
     expandedStop = null;
-    sheetBody._html = null;
     patchStop(sheetBody, st);
+    // Measure at the real sheet width, then hide it before the browser paints.
     sheet.hidden = false;
-    requestAnimationFrame(function () {
-      // put the stop in the middle of the map area still visible between the panel and the sheet
-      var size = map.getSize();
-      var top = document.getElementById('panel').getBoundingClientRect().bottom;
-      var bottom = size.y - sheetHeight();
-      focusOn([st.lat, st.lon], null, (top + bottom) / 2);
+    var targetY = (freeTop() + map.getSize().y - sheetHeight()) / 2;
+    sheet.hidden = true;
+    focusOn([st.lat, st.lon], null, targetY, function () {
+      sheetStop = st; sheetMarker = mk;
+      markSel(mk, true);
+      patchStop(sheetBody, st);
+      sheet.hidden = false;
     });
   }
   function closeSheet() {
