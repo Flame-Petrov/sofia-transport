@@ -427,7 +427,7 @@
       return best;
     }
     // Sample each end of the carriages on connected rails. Distances follow the
-    // rendered footprint, since the models keep a readable size across zooms.
+    // rendered footprint in metres, independent of the camera zoom.
     function tramHeadings(rail, v, metresPerUnit) {
       var east = 111320 * Math.cos(toRad(rail.at[1])), north = 111320;
       function direction(a, b) {
@@ -502,8 +502,7 @@
           var rail = railPosition(lo, la, heading);
           if (rail) {
             lo = rail.at[0]; la = rail.at[1]; heading = rail.bearing;
-            var metresPerUnit = vehicleMeshScale(m3.getZoom()) / maplibregl.MercatorCoordinate.fromLngLat(rail.at).meterInMercatorCoordinateUnits();
-            var sections = tramHeadings(rail, v, metresPerUnit);
+            var sections = tramHeadings(rail, v, vehicleModelMetresPerUnit);
             heading = sections[1];
             tramPositions.set(v, rail.at);
           } else {
@@ -570,8 +569,17 @@
       for (var i = 0; i < all.length; i++) {
         var f = all[i], q = m3.project(f.c), dx = Math.abs(q.x - p.x), dy = Math.abs(q.y - p.y);
         var rx = f.m ? 26 * ui : lbl ? 18 * ui : 12, ry = f.m ? 16 * ui : lbl ? 12 * ui : 12;
-        if (f.model) { rx = (f.type === 0 ? 40 : 24) * ui; dy = Math.min(dy, Math.abs(q.y - 30 * ui - p.y)); ry = 22 * ui; }
-        if (dx > rx || dy > ry) continue;
+        if (f.model) {
+          var length = (f.type === 0 ? 10.5 : 6) * vehicleModelMetresPerUnit;
+          var h = toRad(f.bearing), lon = length*Math.sin(h)/(111320*Math.cos(toRad(f.c[1]))), lat = length*Math.cos(h)/111320;
+          var front = m3.project([f.c[0]+lon, f.c[1]+lat]), rear = m3.project([f.c[0]-lon, f.c[1]-lat]);
+          var vx = front.x-rear.x, vy = front.y-rear.y;
+          var t = Math.max(0, Math.min(1, ((p.x-rear.x)*vx+(p.y-rear.y)*vy)/(vx*vx+vy*vy || 1)));
+          var bodyDistance = Math.hypot(p.x-rear.x-t*vx, p.y-rear.y-t*vy);
+          var labelHit = dx <= rx && Math.abs(q.y - 30 * ui - p.y) <= ry;
+          if (!labelHit && bodyDistance > 18 * ui) continue;
+          dx = labelHit ? dx : bodyDistance; dy = 0;
+        } else if (dx > rx || dy > ry) continue;
         var d = dx * dx + dy * dy;
         if (d < bd) { bd = d; best = f.k; }
       }

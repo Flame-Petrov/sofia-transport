@@ -87,4 +87,6 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-08 — [Bus direction](docs/vehicle-models.md).** Bus and trolleybus models use the motion plan for orientation. Verified both builds, turns, stops and trip changes. In Chrome, bus A1209 moved 5.9 m at 220.79° and its model faced 220.80° with no feed bearing.
 
+**2026-11-08 — [Fixed ground size for 3D vehicles](docs/vehicle-models.md).** All three meshes now use 1.8 ground metres per mesh unit. Tram articulation uses that scale and body hit targets follow the projected vehicle length. Both release artifacts and JavaScript syntax passed verification.
+
 <!-- AGENT-HANDOFF:END -->

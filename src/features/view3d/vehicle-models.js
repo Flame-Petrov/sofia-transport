@@ -1,7 +1,7 @@
   // The release embeds the three GLBs so the numbered page also works on its own.
   var vehicleMeshes = { 0: '{{vehicle-model tram}}', 3: '{{vehicle-model bus}}', 11: '{{vehicle-model trolleybus}}' };
   var vehicleModelZoom = 16; // MapLibre zoom (17 on the flat map).
-  function vehicleMeshScale(zoom) { return 3.4 * ui / (512 * Math.pow(2, zoom)); }
+  var vehicleModelMetresPerUnit = 1.8;
   function vehicleMeshVertices(encoded) {
     var bytes = Uint8Array.from(atob(encoded), function (c) { return c.charCodeAt(0); });
     var jsonLength = new DataView(bytes.buffer).getUint32(12, true);
@@ -58,10 +58,8 @@
       },
       render: function (gl, matrix) {
         if (map.getZoom() < vehicleModelZoom) return;
-        var scale = vehicleMeshScale(map.getZoom());
         gl.useProgram(program); gl.disable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
         gl.uniformMatrix4fv(loc.matrix,false,matrix);
-        gl.uniform1f(loc.scale,scale);
         gl.enableVertexAttribArray(loc.tone); gl.enableVertexAttribArray(loc.pos); gl.enableVertexAttribArray(loc.normal);
         points().forEach(function (f) {
           var mesh = buffers[f.type];
@@ -69,6 +67,7 @@
           var h = (f.bearing || 0) * Math.PI / 180;
           var altitude = map.getTerrain() ? map.queryTerrainElevation(f.c) || 0 : 0;
           var p = maplibregl.MercatorCoordinate.fromLngLat(f.c,altitude);
+          gl.uniform1f(loc.scale, vehicleModelMetresPerUnit * p.meterInMercatorCoordinateUnits());
           // Translate in double precision before uploading the small clip-space offset.
           var anchor = [0,1,2,3].map(function (i) { return matrix[i]*p.x + matrix[i+4]*p.y + matrix[i+8]*p.z + matrix[i+12]; });
           var rgb = parseInt(f.color.slice(1),16);
