@@ -23,6 +23,7 @@
     var headingUp = store('sofia_3d_heading') !== 'north', fc = { off: null, at: 0 }, lc = { off: null, at: 0, rest: false };
     var stopsDrawn = [], terrainOn = store('sofia_3d_terrain') === null ? VIEW3D_TERRAIN : store('sofia_3d_terrain') === '1', demAttr = false;   // v103
     var textureBox = document.getElementById('v3Textures');
+    var houseBox = document.getElementById('v3HouseDesigns');
     var controlsHelp = document.getElementById('v3Help');
     controlsHelp.querySelector('button').onclick = function () {
       controlsHelp.close();
@@ -40,6 +41,7 @@
       m3.jumpTo(move);
     }
     textureBox.checked = store('sofia_3d_building_textures') === '1';
+    houseBox.checked = store('sofia_3d_house_designs') === '1';
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
     var HANDLERS = ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'];
 
@@ -72,6 +74,7 @@
       document.getElementById('v3TerRow').hidden = !/^vector/.test(mapMode);   // v103
       document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream;
       document.getElementById('v3TextureKey').hidden = !textureBox.checked;
+      document.getElementById('v3HouseHint').hidden = !houseBox.checked;
       var m = memo(), bx = document.getElementById('v3Box');
       bx.hidden = !m || !/^vector/.test(mapMode);
       if (m) setText(document.getElementById('v3Note'), '3D was turned off on this device after it ran out of graphics memory (' + clockHM(m.t) + ', ' + m.why + '). It comes back by itself after a day.');
@@ -1370,10 +1373,15 @@
     view3d.terrain = function () { return { on: terrainOn, set: !!(m3 && m3.getTerrain && m3.getTerrain()) }; };
 
     function applyBuildingTextures() {
-      if (m3 && m3.getSource('v3-me-acc') && window.DecompressionStream) buildingMaterials.apply(m3, textureBox.checked);
+      if (m3 && m3.getSource('v3-me-acc') && window.DecompressionStream) buildingMaterials.apply(m3, textureBox.checked, houseBox.checked);
     }
     textureBox.onchange = function () {
       store('sofia_3d_building_textures', this.checked ? '1' : '0');
+      refresh();
+      applyBuildingTextures();
+    };
+    houseBox.onchange = function () {
+      store('sofia_3d_house_designs', this.checked ? '1' : '0');
       refresh();
       applyBuildingTextures();
     };

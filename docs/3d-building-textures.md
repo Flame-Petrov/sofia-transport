@@ -2,7 +2,7 @@
 
 ## Shipped data and renderer
 
-The menu switch uses the original street-map extrusions when off. When on, the tilted map draws a bundled building-only vector source at the same layer position. The source contains 255 native zoom-14 tiles. Each tile includes a buffer for buildings that cross its edge. The renderer decompresses requested tiles individually. Outside complete extract tiles, or if a tile cannot be decoded, the same source reads the original OpenFreeMap tile through the app’s offline cache and uses the neutral paint.
+With both menu switches off, the tilted map uses the original street-map extrusions. Enabling building textures or house designs draws a bundled building-only vector source at the same layer position. The source contains 255 native zoom-14 tiles. Each tile includes a buffer for buildings that cross its edge. The renderer decompresses requested tiles individually. Outside complete extract tiles, or if a tile cannot be decoded, the same source reads the original OpenFreeMap tile through the app’s offline cache and uses the neutral paint.
 
 The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded building tile is approximately 143 KB. The four 32 × 32 RGBA patterns together contain 16 KiB of pixel data. No geometry measurements take place on the device.
 
@@ -22,7 +22,7 @@ The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded b
 
 ## Rider experience
 
-The **3D building textures** switch sits directly below **3D view: terrain (Vitosha)** in the menu. It starts off. Turning it on gives Sofia’s buildings four original, lightly patterned materials from the existing building zoom (15 in the app). Turning it off restores the current pale, height-shaded buildings immediately. A rider following a tram can try both looks from the same camera position and keep following it.
+The **3D building textures** switch sits directly below **3D view: terrain (Vitosha)** in the menu. It starts off. Turning it on gives Sofia’s buildings four original, lightly patterned materials from the existing building zoom (15 in the app). Turning it off restores the pale, height-shaded extrusions and gives any enabled house designs their natural finish. A rider following a tram can try both looks from the same camera position and keep following it.
 
 Use the existing labelled checkbox with `role="switch"`. Show a compact text key beneath the enabled switch: “Small · green, tall · blue, wide · purple, monuments · gold.” A rider on the flat vector map can set the preference before entering 3D. Hide the control when 3D is unavailable. Remember the choice across mode changes and reloads using `store()` and a dedicated `sofia_3d_building_textures` key.
 
@@ -41,11 +41,24 @@ For example, a 50 m-long, 12 m-high hall is purple even when it runs diagonally 
 
 ## Implementation and verification
 
+**Bulgarian house designs** is a second, independently saved dropdown switch (`sofia_3d_house_designs`, initially off). At app zoom 18 (MapLibre 17), it fits five Bulgarian-inspired designs to small, ground-level, approximately rectangular footprints with walls 3–12 m high and edges 5–26 m long. The footprint ID determines the design, so the same house keeps its appearance after a pan or reload. These are illustrative designs rather than surveyed façades.
+
+| House designs | Building textures | 3D appearance |
+|---|---|---|
+| Off | Off | Original height-shaded extrusions |
+| Off | On | Four building classes in their existing colors and patterns |
+| On | Off | Houses with natural plaster and terracotta roofs; neutral extrusions elsewhere |
+| On | On | Houses with green façades and clay roofs; other buildings retain their class colors |
+
+The [five-design preview](../models/bulgarian-house-designs.png) shows the natural palettes. The reference meshes are [Shuttered gable](../models/house-shuttered-gable.glb), [Timber frame](../models/house-timber-frame.glb), [Brick cornice](../models/house-brick-cornice.glb), [Wooden veranda](../models/house-wooden-veranda.glb), and [Dormer cottage](../models/house-dormer-cottage.glb). The map uses the same procedural geometry in `src/features/view3d/bulgarian-houses.js`, scaled to each eligible footprint and batched for drawing.
+
+To verify, zoom to a residential street at app zoom 18 or higher and try each combination above. With both switches on, turn just the designs off and check that small buildings stay green. Turn designs back on, disable coloring, then reload and check that natural house finishes return. Zoom out a level to check the transition back to extrusions.
+
 The pattern generator in `src/features/view3d/building-materials.js` feathers the green mortar joints, uses low-contrast periodic gradients for the blue and purple bands, and halves the gold grain amplitude. The extrusion follows the mapped footprint. To inspect pattern contrast independently of the building silhouette, toggle textures at a fixed camera position, then rotate past a diagonal roofline.
 
 - `tools/prepare_buildings.py` assembles OSM areas, associates mapped parts with an explicit building relation or the smallest containing outline, and measures the long side of the minimum rotated rectangle in UTM zone 34N. It assigns one material using the tallest roof in each group, then clips the individual geometries to zoom-14 Web Mercator tiles. The individual roof and base heights are retained.
 - `src/features/view3d/building-materials.js` owns the tile protocol, fallback, deterministic pattern images and layers. It copies the native extrusion styling and filters, then raises textured building opacity to 0.92 for stronger color. The native geometry stays available at zero opacity while textures are on, so switching off can restore the original paint without rebuilding the street layer.
-- `src/features/view3d/menu.html`, `view.css` and `view.js` own the checkbox, legend and preference. The style-load callback and switch handler use the same material routine. Each 3D map registers the images and layers on its first use of textures. The standalone build includes the material code and tile bundle through `src/page.html`.
+- `src/features/view3d/menu.html`, `view.css` and `view.js` own the two switches, their hints and their saved preferences. The style-load callback and switch handler use the same material routine. Each 3D map registers the images and layers on its first use of textures. The standalone build includes the material code and tile bundle through `src/page.html`.
 - For a visual check, open the menu, enable **3D building textures**, enter 3D and zoom to Alexander Nevsky Square. Compare both settings at the same pitch and bearing, then check the tile-edge sample above. Switch while following a vehicle and reload with each setting.
 
 The shipped tiles contain 133,769 distinct footprints and parts. All 3,757 IDs repeated across buffered tiles retained the same class. Chrome rendered all four materials on desktop and in a 390 × 844 phone viewport. The tests exercised keyboard and rapid opening toggles, saved on/off states, terrain, a followed vehicle’s open popup, cached rendering and forced tile-decoding failure. A failed decode drew the original neutral buildings. The workspace’s `debug images/3D building textures/` contains the matching camera views. The live-feed connection dialog can cover the menu during a sustained outage. Frame time and memory on a physical phone still need measurement.
