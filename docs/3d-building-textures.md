@@ -41,7 +41,7 @@ For example, a 50 m-long, 12 m-high hall is purple even when it runs diagonally 
 
 ## Implementation and verification
 
-**Bulgarian houses and apartments** is a second, independently saved dropdown switch (`sofia_3d_house_designs`, initially off). At app zoom 18 (MapLibre 17), it fits five Bulgarian-inspired designs to small, ground-level, approximately rectangular footprints with walls 3–12 m high and edges 5–26 m long. Larger rectangular footprints in the green building class use five additional designs when an edge exceeds 26 m or the wall height exceeds 12 m, up to 44 m and 21 m respectively. Look for paired balconies, a brick stairwell block, a corniced residence, continuous balcony galleries, and a low-roof modernist walk-up. The footprint ID determines the design, so the same house keeps its appearance after a pan or reload. These are illustrative designs rather than surveyed façades.
+**Bulgarian houses and apartments** is a second, independently saved dropdown switch (`sofia_3d_house_designs`, initially off). At app zoom 16 (MapLibre 15) and above, it fits five Bulgarian-inspired designs to small, ground-level, approximately rectangular footprints with walls 3–12 m high and edges 5–26 m long. Larger rectangular footprints in the green building class use five additional designs when an edge exceeds 26 m or the wall height exceeds 12 m, up to 44 m and 21 m respectively. Look for paired balconies, a brick stairwell block, a corniced residence, continuous balcony galleries, and a low-roof modernist walk-up. The footprint ID determines the design, so the same house keeps its appearance after a pan or reload. These are illustrative designs rather than surveyed façades.
 
 | House designs | Building textures | 3D appearance |
 |---|---|---|
@@ -52,7 +52,7 @@ For example, a 50 m-long, 12 m-high hall is purple even when it runs diagonally 
 
 The [five-design preview](../models/bulgarian-house-designs.png) shows the natural palettes. The reference meshes are [Shuttered gable](../models/house-shuttered-gable.glb), [Timber frame](../models/house-timber-frame.glb), [Brick cornice](../models/house-brick-cornice.glb), [Wooden veranda](../models/house-wooden-veranda.glb), and [Dormer cottage](../models/house-dormer-cottage.glb). The map uses the same procedural geometry in `src/features/view3d/bulgarian-houses.js`, scaled to each eligible footprint and batched for drawing.
 
-To verify, zoom to a residential street at app zoom 18 or higher and try each combination above. With both switches on, turn just the designs off and check that small buildings stay green. Turn designs back on, disable coloring, then reload and check that natural house finishes persist. Zoom out a level to check the transition back to extrusions.
+To verify, zoom to a residential street at app zoom 16 and try each combination above. With both switches on, turn just the designs off and check that small buildings stay green. Turn designs back on, disable coloring, then reload and check that natural house finishes persist. Zoom out below 16 to check the transition back to extrusions.
 
 The pattern generator in `src/features/view3d/building-materials.js` feathers the green mortar joints, uses low-contrast periodic gradients for the blue and purple bands, and halves the gold grain amplitude. The extrusion follows the mapped footprint. To inspect pattern contrast independently of the building silhouette, toggle textures at a fixed camera position, then rotate past a diagonal roofline.
 

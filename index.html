@@ -9559,7 +9559,7 @@
         map.on('moveend',moved);map.on('sourcedata',sourceChanged);map.on('terrain',moved);
       },
       render:function(gl,matrix){
-        if(map.getZoom()<17 || map.getLayoutProperty(materialLayer,'visibility')==='none'){
+        if(map.getZoom()<15 /* app zoom 16 */ || map.getLayoutProperty(materialLayer,'visibility')==='none'){
           dirty=true;count=0;return;
         }
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
