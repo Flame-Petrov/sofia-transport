@@ -41,7 +41,6 @@
     }
     textureBox.checked = store('sofia_3d_building_textures') === '1';
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
-    var VEH_LAYERS = ['v3-veh-dot', 'v3-veh-ring', 'v3-veh-lbl', 'v3-veh-mine', 'v3-veh-tag'];
     var HANDLERS = ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'];
 
     // ---- after a crash: the button stays hidden for VIEW3D_RETRY_MS ----
@@ -319,12 +318,10 @@
       m3.addLayer({ id: 'v3-veh-dir', type: 'symbol', source: 'v3-veh', minzoom: LZ, filter: ['all', ['>=', ['get', 'b'], 0], ['==', ['get', 'model'], 0]],
         layout: { 'icon-image': 'v3arrow', 'icon-size': U, 'icon-rotate': ['get', 'b'], 'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
           'icon-offset': [0, -17], 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
-      m3.addLayer({ id: 'v3-veh-lbl', type: 'symbol', source: 'v3-veh', filter: ['==', ['get', 'm'], 0], minzoom: LZ, layout: label(11),
-        paint: { 'text-color': ['get', 'ink'], 'icon-opacity': faded(0.6), 'text-opacity': faded(0.6) } });
       // v99's route vehicles ("Board · 4 min"): bigger, ringed in pink, with their tag, at every zoom
       m3.addLayer({ id: 'v3-veh-ring', type: 'circle', source: 'v3-veh', filter: ['==', ['get', 'm'], 1],
         paint: { 'circle-radius': 17 * U, 'circle-color': 'rgba(0,0,0,0)', 'circle-stroke-color': '#D6336C', 'circle-stroke-width': 3, 'circle-pitch-alignment': 'viewport' } });
-      m3.addLayer({ id: 'v3-veh-mine', type: 'symbol', source: 'v3-veh', filter: ['==', ['get', 'm'], 1], layout: label(14), paint: { 'text-color': ['get', 'ink'] } });
+      addNumberOverlay();
       var tag = label(10.5);
       tag['text-field'] = ['get', 'tag']; tag['icon-image'] = 'v3pill-#D6336C'; tag['text-offset'] = [0, 2.1];
       m3.addLayer({ id: 'v3-veh-tag', type: 'symbol', source: 'v3-veh', filter: ['==', ['get', 'm'], 1], layout: tag, paint: { 'text-color': '#fff' } });
@@ -516,14 +513,47 @@
       adjacent(rail.backward, rail.forward);
       return segments;
     }
-    function advanceModels(frameTime) {
+    // Project the number on the frame MapLibre actually paints, including camera-only moves.
+    function addNumberOverlay() {
+      var map3 = m3, base = map3.getCanvas(), canvas = document.createElement('canvas');
+      canvas.className = 'v3-vehicle-numbers';
+      canvas.setAttribute('aria-hidden', 'true');
+      base.after(canvas);
+      var g = canvas.getContext('2d'), painted = false;
+      map3.on('render', function () {
+        if (map3 !== m3 || (!painted && !numberPoses.length)) return;
+        if (canvas.width !== base.width) canvas.width = base.width;
+        if (canvas.height !== base.height) canvas.height = base.height;
+        var width = base.clientWidth, height = base.clientHeight;
+        if (!width || !height) return;
+        g.setTransform(canvas.width / width, 0, 0, canvas.height / height, 0, 0);
+        g.clearRect(0, 0, width, height);
+        painted = numberPoses.length > 0;
+        g.textAlign = 'center'; g.textBaseline = 'middle';
+        numberPoses.forEach(function (pose) {
+          var point = map3.project(pose.c), x = point.x, y = point.y - (pose.model ? 30 * ui : 0);
+          if (x < -60 || y < -30 || x > width + 60 || y > height + 30) return;
+          var size = (pose.m ? 14 : 11) * ui, h = size + 6 * ui;
+          g.font = 'bold ' + size + 'px sans-serif';
+          var w = Math.max(h, g.measureText(pose.number).width + 10 * ui);
+          g.globalAlpha = pose.m ? 1 : pose.opacity;
+          rr(g, x - w / 2, y - h / 2, w, h, 6 * ui);
+          g.fillStyle = pose.color; g.fill();
+          g.lineWidth = 1.5 * ui; g.strokeStyle = '#fff'; g.stroke();
+          g.fillStyle = pose.ink; g.fillText(pose.number, x, y);
+        });
+      });
+    }
+    var numberPoses = [];
+    function advanceVehicles(frameTime) {
       var repaint = false;
-      modelPoses.forEach(function (pose, v) {
+      numberPoses.forEach(function (pose) {
+        var v = pose.vehicle;
         if (!v.mo || !pose.animate) return;
         var pos = posAt(v, frameTime);
         if (pos[0] === pose.lat && pos[1] === pose.lon) return;
         pose.lat = pos[0]; pose.lon = pos[1];
-        var heading = modelBearing(v);
+        var heading = pose.model ? modelBearing(v) : null;
         if (pose.rail) {
           var rail = railPosition(pose.lon, pose.lat, heading, pose.localRails);
           if (!rail) return; // The fleet update will reacquire a track or show the marker.
@@ -545,7 +575,7 @@
       var t0 = performance.now(), nb = view3d.bounds(0.3), b = m3.getBounds(), now = performance.now(), doFar = now >= farDue;
       var s = nb.getSouth(), n = nb.getNorth(), w = nb.getWest(), e = nb.getEast(), feats = [], far = [], seen = {};
       var fs = b.getSouth(), fn = b.getNorth(), fw = b.getWest(), fe = b.getEast();
-      drawn = [];
+      drawn = []; numberPoses = [];
       if (doFar) { farDue = now + 500; farDrawn = []; }
       var close = m3.getZoom() >= vehicleModelZoom;
       var previousPoses = modelPoses, repaint = false;
@@ -564,7 +594,8 @@
           }
           return;
         }
-        var animate = model && (v === selected || (la >= s && la <= n && lo >= w && lo <= e));
+        var numbered = rv || labelsBySearch || m3.getZoom() >= LABEL_ZOOM - 1;
+        var animate = numbered && (v === selected || (la >= s && la <= n && lo >= w && lo <= e));
         if (animate && v.mo) {
           posAt(v, frameTime);
           la = v.pos[0]; lo = v.pos[1];
@@ -586,11 +617,14 @@
         var ink = inkOf[d.color] || (inkOf[d.color] = lineTones(d.color).ink);
         var pose = { k: d.key, c: [lo, la], m: !!rv, type: d.type, color: d.color, bearing: heading, sections: sections, model: model, opacity: (dimNow && !rv && v !== selected ? 0.35 : 1) * (v.parked ? 0.6 : 1) };
         drawn.push(pose);
+        if (numbered) {
+          pose.vehicle = v; pose.number = String(d.shown); pose.ink = ink;
+          pose.animate = animate; pose.lat = v.pos[0]; pose.lon = v.pos[1];
+          numberPoses.push(pose);
+        }
         if (model) {
           var prev = previousPoses.get(v);
           if (!prev || lo !== prev.c[0] || la !== prev.c[1] || heading !== prev.bearing) repaint = true;
-          pose.labelAt = pose.c;
-          pose.animate = animate; pose.lat = v.pos[0]; pose.lon = v.pos[1];
           if (rail && animate) { pose.rail = rail; pose.localRails = localRails(rail); }
           modelPoses.set(v, pose);
         }
@@ -613,7 +647,6 @@
       if (labelsBy !== labelsBySearch) {
         labelsBy = labelsBySearch;
         m3.setLayoutProperty('v3-veh-dot', 'visibility', labelsBy ? 'none' : 'visible');
-        m3.setLayerZoomRange('v3-veh-lbl', labelsBy ? 0 : LABEL_ZOOM - 1, 24);
         m3.setLayerZoomRange('v3-veh-dir', labelsBy ? 0 : LABEL_ZOOM - 1, 24);
       }
     }
@@ -659,7 +692,7 @@
           var vx = front.x-rear.x, vy = front.y-rear.y;
           var t = Math.max(0, Math.min(1, ((p.x-rear.x)*vx+(p.y-rear.y)*vy)/(vx*vx+vy*vy || 1)));
           var bodyDistance = Math.hypot(p.x-rear.x-t*vx, p.y-rear.y-t*vy);
-          var labelPoint = m3.project(f.labelAt);
+          var labelPoint = q;
           var labelHit = Math.abs(labelPoint.x - p.x) <= rx && Math.abs(labelPoint.y - 30 * ui - p.y) <= ry;
           if (!labelHit && bodyDistance > 18 * ui) continue;
           dx = labelHit ? Math.abs(labelPoint.x - p.x) : bodyDistance; dy = 0;
@@ -847,7 +880,6 @@
     function applyDim(dim) {
       var k = dim ? 0.35 : 1, f = function (a) { return ['*', k, ['case', ['==', ['get', 'pk'], 1], a, 1]]; };
       ['v3-veh-dot', 'v3-veh-far'].forEach(function (id) { m3.setPaintProperty(id, 'circle-opacity', f(0.45)); m3.setPaintProperty(id, 'circle-stroke-opacity', f(0.45)); });
-      m3.setPaintProperty('v3-veh-lbl', 'icon-opacity', f(0.6)); m3.setPaintProperty('v3-veh-lbl', 'text-opacity', f(0.6));
       m3.setPaintProperty('v3-veh-dir', 'icon-opacity', k);
     }
     view3d.routeTest = function () { return { lines: m3.getSource('v3-rt')._data.features.length, tags: Object.keys(rtMks).length }; };
@@ -980,7 +1012,7 @@
         view3d.on = false; closing = false; ready = false; camBusy = false;
         m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
-        modelPoses.clear(); railNeighbors.clear(); railSegments = []; trkMk = null; stopMks = {}; stopsDrawn = []; shown = []; drawn = []; farDrawn = []; labelsBy = null; rtMks = {}; rtSig = ''; fc.off = lc.off = null; userMoving = pointerDown = false;
+        numberPoses = []; modelPoses.clear(); railNeighbors.clear(); railSegments = []; trkMk = null; stopMks = {}; stopsDrawn = []; shown = []; drawn = []; farDrawn = []; labelsBy = null; rtMks = {}; rtSig = ''; fc.off = lc.off = null; userMoving = pointerDown = false;
         window.removeEventListener('mouseup', pointerOff, true); window.removeEventListener('touchend', pointerOff, true); window.removeEventListener('touchcancel', pointerOff, true);
         mapEl.classList.remove('v3on');
         handlers(true);
@@ -1120,7 +1152,7 @@
       if (!m3.getSource('v3-veh')) return;
       var now = performance.now();
       if (now >= vehDue) { vehDue = now + 1000 / VIEW3D_VEH_HZ; buildVeh(frameTime); }
-      else advanceModels(frameTime);
+      else advanceVehicles(frameTime);
       trackFrame();
       followCam3();   // v102
       locCam3();
