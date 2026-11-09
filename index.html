@@ -1234,6 +1234,14 @@
     height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer;
     border: 1.5px solid var(--border); background: none; color: var(--text); font-size: 14px; font-weight: 500;
   }
+
+#v3Help { box-sizing: border-box; width: min(320px, calc(100vw - 32px)); padding: 20px 24px; border: 1px solid var(--glass-edge); border-radius: 20px; background: #fafcfb; color: var(--ink); box-shadow: var(--glass-shadow); text-align: center; font: 15px/1.45 system-ui, sans-serif; }
+#v3Help::backdrop { background: rgba(28,38,49,.38); }
+#v3Help svg { display: block; max-width: 100%; margin: auto; }
+#v3Help h2 { margin: 8px 0; font-size: 21px; }
+#v3Help p { margin: 8px 0; }
+#v3Help kbd { padding: 1px 5px; border: 1px solid var(--hair); border-bottom-width: 2px; border-radius: 5px; font: inherit; }
+#v3Help button { margin-top: 10px; width: 100%; min-height: 44px; border: 0; border-radius: 12px; background: #285599; color: white; font: inherit; font-weight: 600; cursor: pointer; }
   /* =====================================================================================================
      v100 — The selected vehicle's card (design images/selected-vehicle-popup-reference.png). A warm ivory
      card hangs below the vehicle, its pointer rising to the round marker: line badge and destination with
@@ -1331,6 +1339,23 @@
   </div>
 </div>
 <div id="map"></div>
+<dialog id="v3Help" aria-labelledby="v3HelpTitle" aria-describedby="v3HelpKeys v3HelpTouch">
+  <svg viewBox="0 0 240 102" width="240" height="102" aria-hidden="true">
+    <path d="m40 65 71-37 85 30-71 38z" fill="#dcebe8"/>
+    <g stroke="#53777a" stroke-linejoin="round">
+      <path d="m79 51 17-8 19 7v17l-17 9-19-8z" fill="#b8d7d1"/><path d="m79 51 19 8 17-9m-17 9v17" fill="none"/>
+      <path d="m115 27 16-8 22 8v31l-16 9-22-9z" fill="#93baba"/><path d="m115 27 22 9 16-9m-16 9v31" fill="none"/>
+    </g>
+    <g fill="none" stroke="#3561ac" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M66 38C28 44 23 68 57 79m-5-10 6 11-13 1"/>
+      <path d="M167 78c40-8 46-30 17-41m4 10-6-11 13-1"/>
+    </g>
+  </svg>
+  <h2 id="v3HelpTitle">Explore the 3D map</h2>
+  <p id="v3HelpKeys">Hold <kbd>Ctrl</kbd> and press <b>← →</b> to rotate or <b>↑ ↓</b> to tilt.</p>
+  <p id="v3HelpTouch">On a touchscreen, twist two fingers to rotate or slide them together up or down to tilt.</p>
+  <button type="button" autofocus>Okay</button>
+</dialog>
 <div id="stopProg" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" title="Show the way to your stop">
   <div class="pg-stop"></div>
   <div class="pg-eta" id="pgEta"></div>
@@ -9353,6 +9378,22 @@
     var headingUp = store('sofia_3d_heading') !== 'north', fc = { off: null, at: 0 }, lc = { off: null, at: 0, rest: false };
     var stopsDrawn = [], terrainOn = store('sofia_3d_terrain') === null ? VIEW3D_TERRAIN : store('sofia_3d_terrain') === '1', demAttr = false;   // v103
     var textureBox = document.getElementById('v3Textures');
+    var controlsHelp = document.getElementById('v3Help');
+    controlsHelp.querySelector('button').onclick = function () {
+      controlsHelp.close();
+      if (m3 && !closing) m3.getCanvas().focus({ preventScroll: true });
+    };
+    controlsHelp.addEventListener('cancel', function (event) { event.preventDefault(); });
+    function keyboardCamera(event) {
+      if (!ready || closing || controlsHelp.open || !event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
+      var key = event.key, move;
+      if (key === 'ArrowLeft' || key === 'ArrowRight') move = { bearing: m3.getBearing() + (key === 'ArrowLeft' ? -10 : 10) };
+      else if (key === 'ArrowUp' || key === 'ArrowDown') move = { pitch: Math.max(0, Math.min(VIEW3D_MAX_PITCH, m3.getPitch() + (key === 'ArrowUp' ? 5 : -5))) };
+      else return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      m3.jumpTo(move);
+    }
     textureBox.checked = store('sofia_3d_building_textures') === '1';
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
     var VEH_LAYERS = ['v3-veh-dot', 'v3-veh-ring', 'v3-veh-lbl', 'v3-veh-mine', 'v3-veh-tag'];
@@ -9456,6 +9497,8 @@
         return;
       }
       view3d.on = true; ready = false; closing = false;
+      m3.getCanvas().addEventListener('keydown', keyboardCamera, true);
+      controlsHelp.showModal();
       viewBounds01 = null;
       function invalidateBounds() { viewBounds01 = null; }
       m3.on('move', scheduleViewportPrefetch);
@@ -10275,6 +10318,7 @@
       cancelFocusCard();
       if (!view3d.on || closing) return;
       closing = true;
+      if (controlsHelp.open) controlsHelp.close();
       info.lastClose = reason || 'button';
       try { if (m3 && ready && m3.getPitch() >= 20) store('sofia_3d_pitch', String(Math.round(m3.getPitch()))); } catch (e) {}   // v103
       terrainAttr(false);

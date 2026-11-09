@@ -95,4 +95,6 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-09 — [3D vehicle motion](docs/vehicle-models.md).** Nearby meshes, body taps and follow anchors share a per-frame pose. Labels follow the fleet cadence. Trams reuse adjacent rails between fleet updates, and GPS-only moving vehicles glide over the measured feed interval. Both releases passed build verification. A controlled 600-frame check covered buses, trolleybuses, GPS-only and route-matched trams on a bend, camera alignment and idle repaints. Physical phone frame timing remains open.
 
+**2026-11-09 — [3D map controls](docs/3d-controls.md).** Added an illustrated guide on each entry to 3D and Ctrl+arrow rotation and tilt on the focused canvas. Both builds and JavaScript syntax passed. Simulated input verified dismissal, focus and all four shortcuts. The launcher HTTP check could not connect, so live browser verification remains open.
+
 <!-- AGENT-HANDOFF:END -->

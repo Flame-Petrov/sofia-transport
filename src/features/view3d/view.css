@@ -63,3 +63,11 @@
     height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer;
     border: 1.5px solid var(--border); background: none; color: var(--text); font-size: 14px; font-weight: 500;
   }
+
+#v3Help { box-sizing: border-box; width: min(320px, calc(100vw - 32px)); padding: 20px 24px; border: 1px solid var(--glass-edge); border-radius: 20px; background: #fafcfb; color: var(--ink); box-shadow: var(--glass-shadow); text-align: center; font: 15px/1.45 system-ui, sans-serif; }
+#v3Help::backdrop { background: rgba(28,38,49,.38); }
+#v3Help svg { display: block; max-width: 100%; margin: auto; }
+#v3Help h2 { margin: 8px 0; font-size: 21px; }
+#v3Help p { margin: 8px 0; }
+#v3Help kbd { padding: 1px 5px; border: 1px solid var(--hair); border-bottom-width: 2px; border-radius: 5px; font: inherit; }
+#v3Help button { margin-top: 10px; width: 100%; min-height: 44px; border: 0; border-radius: 12px; background: #285599; color: white; font: inherit; font-weight: 600; cursor: pointer; }

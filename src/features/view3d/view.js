@@ -23,6 +23,22 @@
     var headingUp = store('sofia_3d_heading') !== 'north', fc = { off: null, at: 0 }, lc = { off: null, at: 0, rest: false };
     var stopsDrawn = [], terrainOn = store('sofia_3d_terrain') === null ? VIEW3D_TERRAIN : store('sofia_3d_terrain') === '1', demAttr = false;   // v103
     var textureBox = document.getElementById('v3Textures');
+    var controlsHelp = document.getElementById('v3Help');
+    controlsHelp.querySelector('button').onclick = function () {
+      controlsHelp.close();
+      if (m3 && !closing) m3.getCanvas().focus({ preventScroll: true });
+    };
+    controlsHelp.addEventListener('cancel', function (event) { event.preventDefault(); });
+    function keyboardCamera(event) {
+      if (!ready || closing || controlsHelp.open || !event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
+      var key = event.key, move;
+      if (key === 'ArrowLeft' || key === 'ArrowRight') move = { bearing: m3.getBearing() + (key === 'ArrowLeft' ? -10 : 10) };
+      else if (key === 'ArrowUp' || key === 'ArrowDown') move = { pitch: Math.max(0, Math.min(VIEW3D_MAX_PITCH, m3.getPitch() + (key === 'ArrowUp' ? 5 : -5))) };
+      else return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      m3.jumpTo(move);
+    }
     textureBox.checked = store('sofia_3d_building_textures') === '1';
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
     var VEH_LAYERS = ['v3-veh-dot', 'v3-veh-ring', 'v3-veh-lbl', 'v3-veh-mine', 'v3-veh-tag'];
@@ -126,6 +142,8 @@
         return;
       }
       view3d.on = true; ready = false; closing = false;
+      m3.getCanvas().addEventListener('keydown', keyboardCamera, true);
+      controlsHelp.showModal();
       viewBounds01 = null;
       function invalidateBounds() { viewBounds01 = null; }
       m3.on('move', scheduleViewportPrefetch);
@@ -945,6 +963,7 @@
       cancelFocusCard();
       if (!view3d.on || closing) return;
       closing = true;
+      if (controlsHelp.open) controlsHelp.close();
       info.lastClose = reason || 'button';
       try { if (m3 && ready && m3.getPitch() >= 20) store('sofia_3d_pitch', String(Math.round(m3.getPitch()))); } catch (e) {}   // v103
       terrainAttr(false);
