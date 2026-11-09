@@ -9338,7 +9338,7 @@
   function bulgarianHouse(f, vertices, origin, map) {
     var geometry = f.geometry, height = Number(f.properties.render_height);
     if (geometry.type !== 'Polygon' || geometry.coordinates.length !== 1 ||
-        geometry.coordinates[0].length !== 5 || height < 3 || height > 21 ||
+        geometry.coordinates[0].length !== 5 || height < 3 || height > 28 ||
         Number(f.properties.render_min_height) !== 0) return false;
     var ring = geometry.coordinates[0];
     var site = maplibregl.MercatorCoordinate.fromLngLat(ring[0]);
@@ -9353,7 +9353,7 @@
     });
     var lengths = edges.map(function (e) { return Math.hypot(e[0],e[1]); });
     var longest = Math.max.apply(null,lengths);
-    if (Math.min.apply(null,lengths) < 5 || longest > 44) return false;
+    if (Math.min.apply(null,lengths) < 4 || longest > 65) return false;
     var designs = height > 12 || longest > 26 ? apartmentDesigns : houseDesigns;
     // Reject skewed, concave and tile-clipped outlines masquerading as houses.
     if (edges.some(function (a,i) {
@@ -9528,7 +9528,7 @@
     function moved(){dirty=true;}
     function sourceChanged(event){if(event.sourceId===sourceId) dirty=true;}
     function rebuild(){
-      var features=map.queryRenderedFeatures({layers:[materialLayer],filter:['==','material','green']});
+      var features=map.queryRenderedFeatures({layers:[materialLayer],filter:['in','material','green','purple']});
       origin=maplibregl.MercatorCoordinate.fromLngLat(map.getCenter());
       origin.unit=origin.meterInMercatorCoordinateUnits();
       var seen=new Set(),vertices=[];

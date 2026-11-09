@@ -29,6 +29,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [Expanded building designs](docs/3d-building-textures.md).** The model layer includes purple-class blocks, accepts edges from 4 to 65 m and fits walls up to 28 m.
+
 **2026-11-09 — [Residential model zoom](docs/3d-building-textures.md).** Houses and apartments start at app zoom 16; check the transition from zoom 15 with the designs switch enabled.
 
 **2026-11-09 — [Tracked metro route](docs/marker-camera.md).** The 3D route sources now initialize from current vehicle progress, including when the hidden flat map is zooming.
