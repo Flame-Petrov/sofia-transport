@@ -29,6 +29,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [Metro carriage turns](docs/vehicle-models.md).** The 3D metro model samples its timetable path at the carriage ends and pivots on every moving frame. A controlled replay of the numbered build covered 801 frames each on left and right bends, including both termini. Live WebGL appearance remains unverified.
+
 **2026-11-09 — [House materials](docs/3d-building-textures.md).** Modeled houses use their design palette with either building texture setting.
 **Editable by future agents.** Keep this section current. After a task, update the affected owner or next step and add a dated handoff with the change, verification performed, and anything still open. Replace superseded entries. Keep durable rules above the marker.
 

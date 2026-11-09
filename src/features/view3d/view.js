@@ -502,6 +502,20 @@
       var pose = modelPoses.get(v);
       return pose ? pose.c : [v.pos[1], v.pos[0]];
     }
+    // Use the same carriage pivots as the tram mesh, measured along the metro trip.
+    function metroHeadings(v) {
+      var plan = v.d.metroPlan, path = plan.m;
+      var center = Number.isFinite(v.along) ? v.along : plan.s0;
+      function sample(offset) {
+        return pointAt(path, Math.max(0, Math.min(path.total, center + offset * vehicleModelMetresPerUnit)));
+      }
+      var tail = sample(-10.8), rearPivot = sample(-3.6), frontPivot = sample(3.6), nose = sample(10.8);
+      function heading(a, b) {
+        if (a.ll[0] === b.ll[0] && a.ll[1] === b.ll[1]) return a.deg;
+        return bearingDeg(a.ll, b.ll);
+      }
+      return [heading(tail, rearPivot), heading(rearPivot, frontPivot), heading(frontPivot, nose)];
+    }
     // Between fleet updates a tram only needs its current rail and the branches
     // touching either end. Refresh that neighborhood when it crosses a vertex.
     function localRails(rail) {
@@ -566,7 +580,8 @@
           pose.bearing = pose.sections[1];
           pose.c = rail.at;
         } else {
-          pose.bearing = heading;
+          if (pose.model && v.d.metroPlan) pose.sections = metroHeadings(v);
+          pose.bearing = pose.sections ? pose.sections[1] : heading;
           pose.c = [pose.lon, pose.lat];
         }
         repaint = true;
@@ -616,6 +631,10 @@
             model = false;
             if (v === selected) return;
           }
+        }
+        if (model && d.metroPlan) {
+          sections = metroHeadings(v);
+          heading = sections[1];
         }
         var ink = inkOf[d.color] || (inkOf[d.color] = lineTones(d.color).ink);
         var pose = { k: d.key, c: [lo, la], m: !!rv, type: d.type, color: d.color, bearing: heading, sections: sections, model: model, opacity: (dimNow && !rv && v !== selected ? 0.35 : 1) * (v.parked ? 0.6 : 1) };
