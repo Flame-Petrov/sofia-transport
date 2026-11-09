@@ -612,6 +612,17 @@
   }
   #placeBar[hidden] { display: none; }
   #placeBar b { color: #F783AC; }
+  .pp-markers { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
+  .pp-markers span { flex: 1; font-size: 12px; }
+  .pp-markers button { background: white; color: var(--pin); border: 1px solid #ddd; border-radius: 8px; width: 32px; height: 34px; cursor: pointer; }
+  .pp-markers button[aria-pressed=true] { border: 2px solid currentColor; background: #f3f0fa; }
+  .pp-markers svg { width: 18px; height: 23px; vertical-align: middle; }
+  .pp-color, .pp-color label { display: flex; align-items: center; gap: 8px; }
+  .pp-color { margin-top: 8px; font-size: 12px; }
+  .pp-color label { flex: 1; justify-content: space-between; }
+  .pp-color input, .pp-color button { height: 32px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; }
+  .pp-color input { width: 44px; padding: 3px; }
+  .pp-color button:disabled { cursor: default; }
   /* v87: "open it through the local server" note — shown when the page isn't secure (opened from a file) */
   #secBar {
     position: fixed; z-index: 1250; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%);
@@ -6355,14 +6366,45 @@
     function distFromMe(p) {
       return loc && loc.fix && loc.state === 'on' ? distM([loc.fix.ll.lat, loc.fix.ll.lng], [p.lat, p.lon]) : null;
     }
+    var markerPaths = {
+      Home: 'M2 10l6-5 6 5v7h-4v-5H6v5H2z',
+      Work: 'M2 8h12v9H2z M5 8V5h6v3 M2 11h12',
+      Star: 'M8 4l2 4 4.5.6-3.2 3.2.8 4.5L8 14.2l-4.1 2.1.8-4.5L1.5 8.6 6 8z'
+    };
+    function markerName(p) {
+      return Object.prototype.hasOwnProperty.call(markerPaths, p.marker) ? p.marker : 'Flag';
+    }
+    function markerColor(p) {
+      return typeof p.color === 'string' && /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : '';
+    }
+    function markerSvg(p) {
+      var svg = markerShape(p), color = markerColor(p);
+      return color ? svg.replace('<svg ', '<svg style="color:' + color + '" ') : svg;
+    }
+    function markerShape(p) {
+      var name = markerName(p);
+      if (name === 'Flag') return FLAG_SVG;
+      return '<svg viewBox="0 0 26 32" aria-hidden="true"><path d="M5 30C5 24 1 19 1 13a12 12 0 1 1 24 0c0 8-12 12-20 17z" fill="currentColor" stroke="white" stroke-width="1.4"/>' +
+        '<path transform="translate(5 1)" d="' + markerPaths[name] + '" fill="none" stroke="white" stroke-width="1.7" stroke-linejoin="round"/></svg>';
+    }
+    function markerChoices(p) {
+      return '<div class="pp-markers" role="group" aria-label="Map marker"><span>Map marker</span>' +
+        ['Flag'].concat(Object.keys(markerPaths)).map(function (name) {
+          return '<button type="button" data-pin-act="marker" data-marker="' + name + '" aria-label="' + name +
+            '" title="' + name + '" aria-pressed="' + (markerName(p) === name) + '">' + markerShape({ marker: name }) + '</button>';
+        }).join('') + '</div>' +
+        '<div class="pp-color"><label>Marker color <input type="color" data-pin-color value="' +
+        (markerColor(p) || (p.id === destId ? '#d6336c' : '#495057')) + '"></label>' +
+        '<button type="button" data-pin-act="reset-color"' + (markerColor(p) ? '' : ' disabled') + '>Reset</button></div>';
+    }
     function pinIcon(p) {
       return L.divIcon({ className: 'pin-mk' + (p.id === destId ? ' dest' : ''), iconSize: null,
-        html: '<div class="pin-ic">' + FLAG_SVG + '</div><div class="pin-lbl">' + esc(p.name) + '</div>' });
+        html: '<div class="pin-ic">' + markerSvg(p) + '</div><div class="pin-lbl">' + esc(p.name) + '</div>' });
     }
     function pinPopupHtml(p) {
       var d = distFromMe(p), isDest = p.id === destId;
       return '<div class="pp" data-pin="' + esc(p.id) + '"><div class="pp-name">' + esc(p.name) + '</div>' +
-        '<div class="pp-sub">' + (d !== null ? fmtM(d) + ' from you' : isDest ? 'Your destination' : 'Saved place') + '</div>' +
+        '<div class="pp-sub">' + (d !== null ? fmtM(d) + ' from you' : isDest ? 'Your destination' : 'Saved place') + '</div>' + markerChoices(p) +
         '<div class="pp-btns"><button type="button" class="pp-route" data-pin-act="route">' + ROUTE_SVG + 'Start route</button>' +
         '<button type="button" class="pp-dest' + (isDest ? ' on' : '') + '" data-pin-act="dest">' +
           (isDest ? 'Clear destination' : 'Set as destination') + '</button>' +
@@ -6373,7 +6415,7 @@
     function redrawPins() {
       var seen = {};
       places.forEach(function (p) {
-        var id = p.id, key = p.name + '|' + (id === destId), mk = pinMarkers[id];
+        var id = p.id, key = markerColor(p) + markerName(p) + '|' + p.name + '|' + (id === destId), mk = pinMarkers[id];
         seen[id] = true;
         if (!mk) {
           mk = pinMarkers[id] = L.marker([p.lat, p.lon], { icon: pinIcon(p), pane: 'pinPane', draggable: true, autoPan: true, keyboard: false });
@@ -6464,7 +6506,7 @@
       var html = places.map(function (p) {
         var d = distFromMe(p), n = esc(p.name), isDest = p.id === destId;
         return '<div class="pl-item' + (isDest ? ' dest' : '') + '" role="listitem" data-pin="' + esc(p.id) + '">' +
-          '<button type="button" class="pl-go" data-pin-act="go" title="Show on the map and go there">' + FLAG_SVG +
+          '<button type="button" class="pl-go" data-pin-act="go" title="Show on the map and go there">' + markerSvg(p) +
             '<span class="pl-n">' + n + '</span>' +
             (d !== null ? '<span class="pl-d">' + fmtM(d) + '</span>' : isDest ? '<span class="pl-d">destination</span>' : '') + '</button>' +
           '<button type="button" class="pl-act pl-route" data-pin-act="route" title="Start route" aria-label="Start route to ' + n + '">' + ROUTE_SVG + '</button>' +
@@ -6483,6 +6525,18 @@
     document.getElementById('plAdd').onclick = function () {
       openPinDlg('New place', '', function (name) { startPlacing({ name: name }); });
     };
+    function setMarkerColor(p, color) {
+      if (color) p.color = color; else delete p.color;
+      savePlaces(); redrawPins(); renderPlaces();
+      var mk = pinMarkers[p.id];
+      if (mk && mk.isPopupOpen()) mk.getPopup().update();
+    }
+    document.addEventListener('change', function (event) {
+      var input = event.target;
+      if (!input.matches('[data-pin-color]')) return;
+      var p = placeById(input.closest('[data-pin]').dataset.pin);
+      if (p) setMarkerColor(p, input.value);
+    }, true);
     // buttons in the list and in a flag's popup (capture: Leaflet stops clicks inside popups from bubbling)
     document.addEventListener('click', function (e) {
       var b = e.target && e.target.closest && e.target.closest('[data-pin-act]');
@@ -6495,7 +6549,15 @@
       else if (act === 'dest') {
         setDest(destId === p.id ? '' : p.id);
         var mk = pinMarkers[p.id];
-        if (mk && mk.isPopupOpen()) mk.getPopup().setContent(pinPopupHtml(p));
+        if (mk && mk.isPopupOpen()) mk.getPopup().update();
+      }
+      else if (act === 'reset-color') setMarkerColor(p, '');
+      else if (act === 'marker') {
+        p.marker = b.dataset.marker;
+        savePlaces(); redrawPins(); renderPlaces();
+        box.querySelectorAll('[data-marker]').forEach(function (button) {
+          button.setAttribute('aria-pressed', String(button.dataset.marker === p.marker));
+        });
       }
       else if (act === 'move') startPlacing({ p: p });
       else if (act === 'rename') openPinDlg('Rename place', p.name, function (name) { p.name = name; savePlaces(); redrawPins(); renderPlaces(); });
@@ -6564,6 +6626,7 @@
       setDestination: setDest,
       refreshDestination: drawDestLine,
       distanceFromMe: distFromMe,
+      markerSvg: markerSvg,
       popupHtml: pinPopupHtml,
       add: addPlace
     };
@@ -11278,7 +11341,7 @@
     // ---- My places: the flags (read only here; placing and moving one is done in 2D) ----
     function pinHtml(p) {
       var d = p.id === savedPlaces.destinationId ? savedPlaces.distanceFromMe(p) : null;
-      return '<div class="pin-ic">' + FLAG_SVG + '</div><div class="pin-lbl">' + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
+      return '<div class="pin-ic">' + savedPlaces.markerSvg(p) + '</div><div class="pin-lbl">' + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
     }
     function syncPins() {
       if (!m3) return;
