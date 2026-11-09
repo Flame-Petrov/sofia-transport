@@ -24,7 +24,7 @@ The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded b
 
 The **3D building textures** switch sits directly below **3D view: terrain (Vitosha)** in the menu. It starts off. Turning it on gives Sofia’s buildings four original, lightly patterned materials from the existing building zoom (15 in the app). Turning it off uses a warm window pattern if house designs are enabled, or pale height-shaded extrusions if both switches are off. A rider following a tram can try both looks from the same camera position and keep following it.
 
-Use the existing labelled checkbox with `role="switch"`. Show a compact text key beneath the enabled switch: “Small · green, tall · blue, wide · purple, monuments · gold.” A rider on the flat vector map can set the preference before entering 3D. Hide the control when 3D is unavailable. Remember the choice across mode changes and reloads using `store()` and a dedicated `sofia_3d_building_textures` key.
+Use the existing labelled checkbox with `role="switch"`. Show a compact text key beneath the enabled switch: “Plaster, brick, glass and limestone façades with muted roofs.” A rider on the flat vector map can set the preference before entering 3D. Hide the control when 3D is unavailable. Remember the choice across mode changes and reloads using `store()` and a dedicated `sofia_3d_building_textures` key.
 
 ## Which material a building gets
 
@@ -32,12 +32,12 @@ Evaluate the rows from top to bottom. The first match wins. The bundled classifi
 
 | Priority | Building rule | Proposed material |
 |---|---|---|
-| 1 | A verified monument footprint, including its mapped building parts | Warm gold `#FFBC00` with a subtle stone grain |
-| 2 | Height ≥ 30 m | Blue `#0070FF` with narrow vertical bands |
-| 3 | Ground span ≥ 45 m, measured along the long side of the footprint’s minimum rotated rectangle | Purple `#B82CFF` with horizontal courses |
-| 4 | Remaining buildings, including those with only the map’s fallback height | Green `#0CDE55` with a fine masonry texture |
+| 1 | A verified monument footprint, including its mapped building parts | Warm limestone with staggered stone courses |
+| 2 | Height ≥ 30 m | Neutral gray glass with a glazed curtain-wall grid |
+| 3 | Ground span ≥ 45 m, measured along the long side of the footprint’s minimum rotated rectangle | Muted brick with horizontal window bands |
+| 4 | Remaining buildings, including those with only the map’s fallback height | Sand plaster with masonry joints and sash windows |
 
-For example, a 50 m-long, 12 m-high hall is purple even when it runs diagonally across the map. A 32 m tower on an equally wide base is blue. A verified monument of either size is gold. Measure a multipart building once using the parent outline and its tallest roof height, then apply that class to its visible parts so a tower and its podium read as one building.
+For example, a 50 m-long, 12 m-high hall uses muted brick even when it runs diagonally across the map. A 32 m tower on an equally wide base uses gray glass. A verified monument of either size uses limestone. Measure a multipart building once using the parent outline and its tallest roof height, then apply that class to its visible parts so a tower and its podium read as one building.
 
 ## Implementation and verification
 
@@ -46,15 +46,15 @@ For example, a 50 m-long, 12 m-high hall is purple even when it runs diagonally 
 | House designs | Building textures | 3D appearance |
 |---|---|---|
 | Off | Off | Original height-shaded extrusions |
-| Off | On | Four building classes in their existing colors and patterns |
+| Off | On | Four building classes in their natural materials |
 | On | Off | Houses with natural plaster and terracotta roofs; window-patterned extrusions elsewhere |
-| On | On | Houses with natural façades and clay roofs; other buildings retain their class colors |
+| On | On | Houses with natural façades and clay roofs; other buildings retain their natural materials |
 
 The [five-design preview](../models/bulgarian-house-designs.png) shows the natural palettes. The reference meshes are [Shuttered gable](../models/house-shuttered-gable.glb), [Timber frame](../models/house-timber-frame.glb), [Brick cornice](../models/house-brick-cornice.glb), [Wooden veranda](../models/house-wooden-veranda.glb), and [Dormer cottage](../models/house-dormer-cottage.glb). The map uses the same procedural geometry in `src/features/view3d/bulgarian-houses.js`, scaled to each eligible footprint and batched for drawing.
 
-To verify, zoom to a residential street at app zoom 16 and try each combination above. With both switches on, turn just the designs off and check that small buildings stay green. Turn designs back on, disable coloring, then reload and check that natural house finishes persist. Zoom out below 16 to check the transition back to extrusions.
+To verify, zoom to a residential street at app zoom 16 and try each combination above. With both switches on, turn just the designs off and check that small buildings show sand plaster. Turn designs back on, disable coloring, then reload and check that natural house finishes persist. Zoom out below 16 to check the transition back to extrusions.
 
-The pattern generator in `src/features/view3d/building-materials.js` feathers the green mortar joints, uses low-contrast periodic gradients for the blue and purple bands, and halves the gold grain amplitude. The extrusion follows the mapped footprint. To inspect pattern contrast independently of the building silhouette, toggle textures at a fixed camera position, then rotate past a diagonal roofline.
+The pattern generator in `src/features/view3d/building-materials.js` supplies four repeating class materials. The patterned extrusion supplies the walls. A flat cap at the mapped roof height gives the roof a muted stone-gray finish whenever either appearance switch is enabled. The extrusion follows the mapped footprint. To inspect pattern contrast independently of the building silhouette, toggle textures at a fixed camera position, then rotate past a diagonal roofline.
 
 - `tools/prepare_buildings.py` assembles OSM areas, associates mapped parts with an explicit building relation or the smallest containing outline, and measures the long side of the minimum rotated rectangle in UTM zone 34N. It assigns one material using the tallest roof in each group, then clips the individual geometries to zoom-14 Web Mercator tiles. The individual roof and base heights are retained.
 - `src/features/view3d/building-materials.js` owns the tile protocol, fallback, deterministic pattern images and layers. It copies the native extrusion styling and filters, then raises textured building opacity to 0.92 for stronger color. The native geometry stays available at zero opacity while textures are on, so switching off can restore the original paint without rebuilding the street layer.
@@ -70,3 +70,9 @@ The shipped tiles contain 133,769 distinct footprints and parts. All 3,757 IDs r
 - Toggle before entering 3D, during opening, after enabling terrain, and after reopening the map. Reload with each preference. Check the switch by keyboard and confirm the flat map and image-map fallback retain their usual presentation.
 - Compare frame time on the same phone and camera path with textures off and on. Check an offline area with cached buildings and confirm the four patterns render without an extra network request. Repeat the toggle several times and check that image and layer counts stay bounded.
 - From the workspace root run `python site/build.py`, `python site/build.py --check`, then `python serve.py --no-open`. Exercise the switch on the numbered release and the hosted artifact before marking the feature complete.
+
+## Building model catalog and test preview
+
+The [21-model test sheet](../models/building-model-tests.png) shows the ten residential designs, four material-class exemplars and seven footprint forms. The latter include a courtyard, L and U wings, a rounded footprint, an irregular polygon, a multi-height complex and a raised deck. The GLBs in `models/` are metre-scale standalone examples. The standalone map builds its residential meshes locally and extrudes the actual mapped rings at their stored base and roof heights. This retains courtyard holes, orientation and the clearance under raised decks.
+
+Run `python site/tools/build_building_models.py` with Node, NumPy and Pillow installed. The exporter samples the residential mesh builder and the images registered by the app, writes the GLBs with embedded materials, then reads and rasterizes each exported GLB for the labeled test sheet. In the map, enable both building switches, enter 3D and zoom into Serdika to compare sand plaster, gray glazed towers, horizontal window bands and pitched roofs.

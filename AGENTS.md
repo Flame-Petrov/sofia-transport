@@ -31,6 +31,10 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [Natural building finishes](docs/3d-building-textures.md).** Updated textured walls and added plain roofs to footprint extrusions. Rebuilt the GLBs and preview. Verified the textured 3D view around Serdika in release 102.
+
+**2026-11-09 — [Building model catalog](docs/3d-building-textures.md#building-model-catalog-and-test-preview).** Exported 21 GLBs and rendered their embedded materials for a labeled test sheet. Verified the numbered release in 3D near Serdika with both building switches enabled.
+
 **2026-11-09 — Reporting preference.** Future handoffs use the three bullets specified above.
 
 **2026-11-09 — [Building texture coverage](docs/3d-building-textures.md).** In the bundled tiles, 64,324 of 133,769 footprint/part IDs miss the residential model criteria. The designs switch now paints the underlying extrusions with a window material; unclassified fallback tiles also get a texture with either switch on. Build and syntax checks passed. Live WebGL appearance remains unverified.

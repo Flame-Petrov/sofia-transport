@@ -1,25 +1,38 @@
   var buildingMaterials = (function () {
     var scheme = 'sofia-buildings', registered = false;
-    var colors = { green: [12, 222, 85], blue: [0, 112, 255], purple: [184, 44, 255], gold: [255, 188, 0] };
+    var colors = { green: [211, 195, 169], blue: [151, 148, 141], purple: [182, 148, 125], gold: [209, 193, 158] };
 
     function pattern(material) {
       var image = new ImageData(32, 32), color = colors[material];
       for (var y = 0; y < 32; y++) {
         for (var x = 0; x < 32; x++) {
           var shade = 0;
+          color = colors[material];
+          var bay = x % 16, level = y % 16;
           if (material === 'green') {
-            var joint = (x + 8 * Math.floor(y / 8)) % 16, row = y % 8;
-            var distance = Math.min(joint, 16 - joint, row, 8 - row);
-            shade = Math.min(1, distance / 2) * 6 - 5;
+            // Rendered masonry, inset sash windows and a stone sill.
+            shade = level === 15 || (x + 8 * Math.floor(y / 8)) % 16 === 0 ? -18 : 0;
+            if (bay >= 4 && bay <= 11 && level >= 3 && level <= 10)
+              color = bay === 8 || level === 7 ? [157,146,128] : [111,106,98];
           }
-          if (material === 'blue') shade = -5 * Math.cos(x * Math.PI / 4);
-          if (material === 'purple') shade = -5 * Math.cos(y * Math.PI / 4);
-          if (material === 'gold') shade = (((x * 19 + y * 31 + x * y * 7) % 13) - 6) / 2;
+          if (material === 'blue') {
+            color = x % 8 === 0 ? [176,173,166] : level >= 13 ? [112,109,103] : colors.blue;
+            shade = (x % 8) * 2;
+          }
+          if (material === 'purple') {
+            color = level === 14 ? [160,142,125] : colors.purple;
+            if (bay >= 2 && bay <= 13 && level >= 4 && level <= 9)
+              color = bay % 4 === 0 ? [153,140,127] : [111,105,98];
+          }
+          if (material === 'gold') {
+            var block = (x + 8 * Math.floor(y / 8)) % 16;
+            shade = y % 8 === 0 || block === 0 ? -34 : ((x * 19 + y * 31) % 9) - 4;
+          }
           if (material === 'facade') {
             var frame = x % 16, floor = y % 16;
             color = floor === 15 ? [165,145,125] :
               frame >= 4 && frame <= 11 && floor >= 3 && floor <= 11 ?
-              (frame === 8 || floor === 7 ? [183,167,145] : [88,107,114]) : [210,191,165];
+              (frame === 8 || floor === 7 ? [183,167,145] : [108,105,100]) : [210,191,165];
           }
           var offset = (y * 32 + x) * 4;
           for (var c = 0; c < 3; c++) image.data[offset + c] = color[c] + shade;
@@ -62,6 +75,17 @@
       copy.id += '-material';
       copy.source = sourceId;
       map3.addLayer(copy, layer.id);
+      // Cap the patterned extrusion with a flat roof at the mapped elevation.
+      var roof = JSON.parse(JSON.stringify(copy));
+      roof.id += '-roof';
+      var height = copy.paint['fill-extrusion-height'] || 0;
+      roof.paint = {
+        'fill-extrusion-base': height,
+        'fill-extrusion-height': height,
+        'fill-extrusion-color': '#a89d8e'
+      };
+      roof.layout = Object.assign({}, roof.layout, {visibility: 'none'});
+      map3.addLayer(roof, layer.id);
     }
 
     function apply(map3, enabled, houses) {
@@ -77,6 +101,7 @@
         var material = layer.id + '-material';
         map3.setPaintProperty(material, 'fill-extrusion-opacity', enabled ? 0.92 : VIEW3D_BUILDING_OPACITY);
         map3.setPaintProperty(material, 'fill-extrusion-pattern', enabled ? ['image', ['concat', 'v3-material-', ['coalesce', ['get', 'material'], 'facade']]] : houses ? ['image', 'v3-material-facade'] : null);
+        map3.setLayoutProperty(material + '-roof', 'visibility', enabled || houses ? 'visible' : 'none');
         if (houses && !map3.getLayer(material + '-houses')) {
 
           map3.addLayer(bulgarianHouseLayer(material, 'v3-material-' + layer.source), layer.id);
