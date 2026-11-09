@@ -28,13 +28,7 @@ for (const [tier, designs] of [context.houseDesigns, context.apartmentDesigns].e
     models.push({name:design.name, tier, vertices});
   }
 }
-// Exercise installation through the public renderer entry point to capture its images.
-context.maplibregl.addProtocol = () => {};
-context.VIEW3D_BUILDING_OPACITY = 1;
-const layer = {id:'sample',type:'fill-extrusion','source-layer':'building',source:'map',paint:{'fill-extrusion-height':12}};
-context.buildingMaterials.apply({
-  getStyle:()=>({layers:[layer],sources:{map:{tiles:['ofm://sample']}}}),
-  getSource:()=>true, hasImage:()=>false, addImage:(id,image)=>{textures[id.slice(12)]=Array.from(image.data);},
-  getLayer:()=>false, addLayer:()=>{}, setPaintProperty:()=>{}, setLayoutProperty:()=>{}
-}, true,false);
+for (const name of ['green','blue','purple','gold','facade','ivory','clay']) {
+  textures[name] = Array.from(context.buildingMaterials.pattern(name).data);
+}
 process.stdout.write(JSON.stringify({models,textures}));

@@ -498,6 +498,28 @@
       var front = ends(true), rear = ends(false);
       return [direction(rear[1], rear[0]), direction(rear[0], front[0]), direction(front[0], front[1])];
     }
+    var coveredMetroRails = [];
+    metroRoofSections.forEach(function (rows) {
+      var previous;
+      rows.forEach(function (row) {
+        var center = [(row[0]+row[2])/2, (row[1]+row[3])/2];
+        if (previous) coveredMetroRails.push([previous, center]);
+        previous = center;
+      });
+    });
+    function coveredMetroPosition(lon, lat, heading) {
+      var rail = railPosition(lon, lat, heading, coveredMetroRails, true);
+      if (!rail || angleDiff(heading, rail.bearing) > 45) return [lon, lat];
+      var direction = toRad(rail.bearing), east = 111320*Math.cos(toRad(lat));
+      var dx = (lon-rail.at[0])*east, dy = (lat-rail.at[1])*111320;
+      // Keep the longitudinal motion through each portal. Blend out onto the timetable path.
+      var along = dx*Math.sin(direction) + dy*Math.cos(direction);
+      var cross = dx*Math.cos(direction) - dy*Math.sin(direction);
+      var blend = Math.min(1, Math.max(0, (40-Math.abs(along))/30),
+        Math.max(0, (32-Math.abs(cross))/10));
+      var shift = (1.65-cross)*blend;
+      return [lon + shift*Math.cos(direction)/east, lat - shift*Math.sin(direction)/111320];
+    }
     function vehicleAnchor(v) {
       var pose = modelPoses.get(v);
       return pose ? pose.c : [v.pos[1], v.pos[0]];
@@ -582,7 +604,7 @@
         } else {
           if (pose.model && v.d.metroPlan) pose.sections = metroHeadings(v);
           pose.bearing = pose.sections ? pose.sections[1] : heading;
-          pose.c = [pose.lon, pose.lat];
+          pose.c = pose.model && v.d.metroPlan ? coveredMetroPosition(pose.lon, pose.lat, pose.bearing) : [pose.lon, pose.lat];
         }
         repaint = true;
       });
@@ -635,6 +657,8 @@
         if (model && d.metroPlan) {
           sections = metroHeadings(v);
           heading = sections[1];
+          var covered = coveredMetroPosition(lo, la, heading);
+          lo = covered[0]; la = covered[1];
         }
         var ink = inkOf[d.color] || (inkOf[d.color] = lineTones(d.color).ink);
         var pose = { k: d.key, c: [lo, la], m: !!rv, type: d.type, color: d.color, bearing: heading, sections: sections, model: model, opacity: (dimNow && !rv && v !== selected ? 0.35 : 1) * (v.parked ? 0.6 : 1) };

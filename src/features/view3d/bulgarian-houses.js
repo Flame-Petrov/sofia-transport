@@ -206,24 +206,24 @@
     return true;
   }
 
-  function bulgarianHouseLayer(materialLayer, sourceId) {
+  function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
     var map, program, buffer, matrixLoc, anchorLoc, position, color, origin;
     var dirty=true, count=0, lastBuild=0, terrain;
     function moved(){dirty=true;}
     function sourceChanged(event){if(event.sourceId===sourceId) dirty=true;}
     function rebuild(){
-      var features=map.queryRenderedFeatures({layers:[materialLayer],filter:['in','material','green','purple']});
       origin=maplibregl.MercatorCoordinate.fromLngLat(map.getCenter());
       origin.unit=origin.meterInMercatorCoordinateUnits();
+      if (canopy) return metroCanopyVertices(map, origin);
+      var features=map.queryRenderedFeatures({layers:[materialLayer],filter:['in','material','green','purple']});
       var seen=new Set(),vertices=[];
       features.forEach(function(f){
         if(!seen.has(f.id) && bulgarianHouse(f,vertices,origin,map)) seen.add(f.id);
       });
-      count=vertices.length/6;
       return new Float32Array(vertices);
     }
     return {
-      id:materialLayer+'-houses',type:'custom',renderingMode:'3d',
+      id:materialLayer+(canopy ? '-metro-roofs' : '-houses'),type:'custom',renderingMode:'3d',
       onAdd:function(owner,gl){
         map=owner;
         program=gl.createProgram();
@@ -243,7 +243,7 @@
         map.on('moveend',moved);map.on('sourcedata',sourceChanged);map.on('terrain',moved);
       },
       render:function(gl,matrix){
-        if(map.getZoom()<15 /* app zoom 16 */ || map.getLayoutProperty(materialLayer,'visibility')==='none'){
+        if(map.getZoom()<(canopy ? 13 : 15) /* app zoom 16 */ || map.getLayoutProperty(materialLayer,'visibility')==='none'){
           dirty=true;count=0;return;
         }
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
@@ -251,7 +251,9 @@
         
         if((dirty && now-lastBuild>200) || terrain!==currentTerrain){
 
-          gl.bufferData(gl.ARRAY_BUFFER,rebuild(),gl.DYNAMIC_DRAW);
+          var data = rebuild();
+          count = data.length / 6;
+          gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
           lastBuild=now;dirty=false;terrain=currentTerrain;
         } else if(dirty) map.triggerRepaint();
         if(!count)return;

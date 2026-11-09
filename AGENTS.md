@@ -31,6 +31,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [Zoom-stable façades](docs/3d-building-textures.md).** Opaque wall textures repeat in metres. Camera updates select and cache visible wall meshes.
+
 **2026-11-09 — [House-mode façades](docs/3d-building-textures.md).** Reduced fallback window size and varied plaster finishes on non-residential-model outlines.
 
 **2026-11-09 — [Natural building finishes](docs/3d-building-textures.md).** Updated textured walls and added plain roofs to footprint extrusions. Rebuilt the GLBs and preview. Verified the textured 3D view around Serdika in release 102.
@@ -132,6 +134,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 **2026-11-09 — [Five Bulgarian house designs](docs/3d-building-textures.md).** The dropdown saves house designs separately from building coloring. Eligible footprints consistently select one of five meshes, with green façades when coloring is enabled. The guide links the five GLBs and their preview. Verified both releases, mesh geometry and JavaScript syntax. At 1280 × 800, headless Chrome opened the numbered release, restored the switch after reload, rendered 47,247 house vertices and exercised all four switch combinations using a controlled basemap style and the bundled Sofia tiles. Live basemap startup fell back to the image map during testing.
 
 **2026-11-09 — [South Bus Station bridge clearance](docs/3d-building-textures.md).** Corrected the prepared deck elevations in the tile and generator and enabled the prepared geometry with neutral paint. Checked the decoded tile and both builds. Visual confirmation remains open.
+
+**Metro corridor roofs.** Replaced five building extrusions with mapped open vaults, a shaded lining, transverse frames and paired supports. See the [building guide](docs/3d-building-textures.md).
 
 <!-- AGENT-HANDOFF:END -->
 

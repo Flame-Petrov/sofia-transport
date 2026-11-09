@@ -3,8 +3,7 @@
     var colors = { green: [211, 195, 169], blue: [151, 148, 141], purple: [182, 148, 125], gold: [209, 193, 158] };
 
     var plaster = { facade: [210,191,165], ivory: [217,210,194], clay: [195,164,143] };
-    var plasterPattern = ['image', ['match', ['%', ['to-number', ['id'], 0], 3],
-      1, 'v3-material-ivory', 2, 'v3-material-clay', 'v3-material-facade']];
+    var facadeLayers = new WeakMap();
 
     function pattern(material) {
       var image = new ImageData(32, 32), color = colors[material];
@@ -71,25 +70,12 @@
         map3.addSource(sourceId, { type: 'vector', minzoom: 14, maxzoom: 14,
           tiles: source.tiles.map(function (url) { return url.replace(/^ofm:/, scheme + ':'); }) });
       }
-      Object.keys(colors).concat(Object.keys(plaster)).forEach(function (name) {
-        var id = 'v3-material-' + name;
-        if (!map3.hasImage(id)) map3.addImage(id, pattern(name), {pixelRatio: plaster[name] ? 2 : 1});
-      });
       var copy = JSON.parse(JSON.stringify(layer));
       copy.id += '-material';
       copy.source = sourceId;
       map3.addLayer(copy, layer.id);
-      // Cap the patterned extrusion with a flat roof at the mapped elevation.
-      var roof = JSON.parse(JSON.stringify(copy));
-      roof.id += '-roof';
-      var height = copy.paint['fill-extrusion-height'] || 0;
-      roof.paint = {
-        'fill-extrusion-base': height,
-        'fill-extrusion-height': height,
-        'fill-extrusion-color': '#a89d8e'
-      };
-      roof.layout = Object.assign({}, roof.layout, {visibility: 'none'});
-      map3.addLayer(roof, layer.id);
+      map3.addLayer(bulgarianHouseLayer(copy.id, sourceId, true), layer.id);
+
     }
 
     function apply(map3, enabled, houses) {
@@ -103,9 +89,21 @@
           install(map3, layer, source);
         }
         var material = layer.id + '-material';
-        map3.setPaintProperty(material, 'fill-extrusion-opacity', enabled || houses ? 0.92 : VIEW3D_BUILDING_OPACITY);
-        map3.setPaintProperty(material, 'fill-extrusion-pattern', enabled ? ['image', ['concat', 'v3-material-', ['coalesce', ['get', 'material'], 'facade']]] : houses ? plasterPattern : null);
-        map3.setLayoutProperty(material + '-roof', 'visibility', enabled || houses ? 'visible' : 'none');
+        var textured = enabled || houses;
+        map3.setPaintProperty(material, 'fill-extrusion-opacity', textured ? 1 : VIEW3D_BUILDING_OPACITY);
+        map3.setPaintProperty(material, 'fill-extrusion-color', textured ? '#a89d8e' : layer.paint['fill-extrusion-color']);
+        var facade = material + '-facades';
+        if (textured && !map3.getLayer(facade)) {
+          var walls = solidFacadeLayer(material, 'v3-material-' + layer.source, enabled, pattern);
+          map3.addLayer(walls, layer.id);
+          if (!facadeLayers.has(map3)) facadeLayers.set(map3, new Map());
+          facadeLayers.get(map3).set(facade, walls);
+        } else if (textured) {
+          facadeLayers.get(map3).get(facade).setClassified(enabled);
+        } else if (map3.getLayer(facade)) {
+          map3.removeLayer(facade);
+          facadeLayers.get(map3).delete(facade);
+        }
         if (houses && !map3.getLayer(material + '-houses')) {
 
           map3.addLayer(bulgarianHouseLayer(material, 'v3-material-' + layer.source), layer.id);
@@ -115,5 +113,5 @@
         map3.setPaintProperty(layer.id, 'fill-extrusion-opacity', 0);
       });
     }
-    return { apply: apply };
+    return { apply: apply, pattern: pattern };
   })();
