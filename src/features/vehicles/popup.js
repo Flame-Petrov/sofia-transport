@@ -25,6 +25,7 @@
   function vpFresh(v) {
     var d = v.d, sec = d.ts ? Math.max(0, Date.now() / 1000 - d.ts) : (v.parkedSince ? (Date.now() - v.parkedSince) / 1000 : null);
     // v100: a dot instead of the icons; a live report just says "Live" (its age is in the tooltip)
+    if (d.metroPlan) return { cls: 'old', html: VP_CLOCK + 'Timetable estimate' };
     if (vehAtEnd(v)) return { cls: 'delayed', html: VP_DOT + (v.parked ? 'Waiting · last seen ' : 'At terminus · ') + (sec === null ? '—' : vpAge(sec)) };
     if (sec === null) return { cls: 'old', html: VP_DOT + 'Update time unknown' };
     if (sec <= 30) return { cls: 'live', html: VP_DOT + 'Live', tip: 'Last report ' + vpAge(sec) };
@@ -424,7 +425,7 @@
       return;
     }
     var oldColor = v.d.color;
-    var moved = d.lat !== v.d.lat || d.lon !== v.d.lon || d.ts !== v.d.ts;
+    var moved = d.metroPlan !== v.d.metroPlan || d.lat !== v.d.lat || d.lon !== v.d.lon || d.ts !== v.d.ts;
     var oldTrip = v.d.tripRef, tripChanged = oldTrip !== d.tripRef;
     // After a long gap — the page sat in the background or the computer slept (staleFeed), or this
     // vehicle was missing from the feed for a while — its last position is old. Animating from there

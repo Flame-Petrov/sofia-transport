@@ -21,6 +21,7 @@
     if (hoverV === v) hoverTip.setLatLng(v.pos);
   }
   function routeMetaFor(d) {
+    if (d.metroPlan) return d.metroPlan.m;
     var info = trips[d.tripRef];
     if (!shapes || !info || !info.shape_id || !shapes[info.shape_id] || shapes[info.shape_id].length < 2) return null;
     return metaFor(info.shape_id);
@@ -67,6 +68,12 @@
 
   function planMotion(v, isNew) {
     var d = v.d, now = Date.now();
+    if (d.metroPlan) {
+      v.mo = d.metroPlan;
+      var pos = posAt(v, now);
+      setPos(v, pos[0], pos[1]);
+      return;
+    }
     if (isNew || !v.pos) setPos(v, d.lat, d.lon);
     var cur = v.pos, dur = feedInterval * 1.15;
     if (distM(cur, [d.lat, d.lon]) > 1500) { setPos(v, d.lat, d.lon); v.mo = null; cur = v.pos; }   // far jump: teleport

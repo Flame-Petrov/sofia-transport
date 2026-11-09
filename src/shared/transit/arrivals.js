@@ -52,7 +52,7 @@
     var newM = info.shape_id && shapes && shapes[info.shape_id] ? metaFor(info.shape_id) : null;
     var stopOnNew = newM ? stopAlong(newM, st, 0) : null;
     for (var k in vehicles) {
-      if (used[k]) continue;
+      if (used[k] || vehicles[k].d.metroPlan) continue;
       var v = vehicles[k], vi = trips[v.d.tripRef];
       if (!vi || vi.route_id !== info.route_id || !v.pos) continue;
       var m = routeMetaFor(v.d);

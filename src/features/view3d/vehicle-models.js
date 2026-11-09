@@ -1,4 +1,6 @@
   // The release embeds the three GLBs so the numbered page also works on its own.
+  // Metro estimates use the rail vehicle silhouette and their own directed timetable path.
+  function vehicleMeshType(type) { return type === 1 ? 0 : type; }
   var vehicleMeshes = { 0: '{{vehicle-model tram}}', 3: '{{vehicle-model bus}}', 11: '{{vehicle-model trolleybus}}' };
   var vehicleModelZoom = 16; // MapLibre zoom (17 on the flat map).
   var vehicleModelMetresPerUnit = 1.8;
@@ -62,7 +64,7 @@
         gl.uniformMatrix4fv(loc.matrix,false,matrix);
         gl.enableVertexAttribArray(loc.tone); gl.enableVertexAttribArray(loc.pos); gl.enableVertexAttribArray(loc.normal);
         points().forEach(function (f) {
-          var mesh = buffers[f.type];
+          var mesh = buffers[vehicleMeshType(f.type)];
           if (!mesh || !f.model) return;
           var h = (f.bearing || 0) * Math.PI / 180;
           var altitude = map.getTerrain() ? map.queryTerrainElevation(f.c) || 0 : 0;

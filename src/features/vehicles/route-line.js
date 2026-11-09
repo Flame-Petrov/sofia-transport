@@ -125,10 +125,13 @@
   function metaFor(id) {
     var key = id + (snapped[id] ? '|snapped' : '');
     if (shapeMeta[key]) return shapeMeta[key];
-    var pts = (snapped[id] || shapes[id]).map(function (p) { return [p[0], p[1]]; }), cum = [0], bear = [], i;
+    return (shapeMeta[key] = pathMeta((snapped[id] || shapes[id]).map(function (p) { return [p[0], p[1]]; })));
+  }
+  function pathMeta(pts) {
+    var cum = [0], bear = [], i;
     for (i = 1; i < pts.length; i++) { cum.push(cum[i - 1] + distM(pts[i - 1], pts[i])); bear.push(bearingDeg(pts[i - 1], pts[i])); }
     bear.push(bear.length ? bear[bear.length - 1] : 0);
-    return (shapeMeta[key] = { pts: pts, cum: cum, bear: bear, total: cum[cum.length - 1] });
+    return { pts: pts, cum: cum, bear: bear, total: cum[cum.length - 1] };
   }
 
   // Sofia's route shapes have few points, so straight lines between them cut corners and drift

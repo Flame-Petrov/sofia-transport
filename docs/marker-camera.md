@@ -7,3 +7,11 @@ Clicking a stop or vehicle frames the marker before revealing its details. The f
 To verify, click an off-center stop and then a vehicle in each view. Watch the marker reach its target before the card appears. Repeat at phone width and tap a second marker during the first move. Only the last marker's details should appear.
 
 Selecting a live or estimated arrival in a stop card closes the card and starts following that vehicle at the current map zoom. The stop stays selected for progress and ETA updates. Stop buttons are rendered in `src/features/stops/popup.js`; `src/features/vehicles/focus.js` hands their selection to `src/features/vehicles/follow.js`. To verify, pick a distant arrival in each map mode, confirm the zoom stays steady throughout the pan, check that Follow is active, and watch the vehicle move. Tap the stop progress indicator for a route overview, then pick the same arrival again to resume follow.
+
+## Metro trains from the station board
+
+During a scheduled run, tap its time on a metro station board to follow that train with the station selected. Later runs become selectable at their first scheduled call. A train card identifies the position as a timetable estimate. The marker leaves the map at the final call.
+
+`src/features/stops/metro.js` matches the service-day trip instance to its station times and projects successive stations onto its directed GTFS shape. If the shape is missing or cannot be matched at every station, it uses the line through the station coordinates. Motion covers the distance between calls in their scheduled interval. The board uses the same instance for its Follow button. In close 3D view the train uses the existing rail vehicle mesh and floating line number.
+
+To check, open a station during service, tap an active time, and compare the selected line, destination and station countdown. Open the train card, then follow across a station call in both map modes. Verify another departure on the same line selects its own train.

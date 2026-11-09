@@ -586,7 +586,7 @@
       if (close) refreshRails(now);
       function add(v) {
         if (!v || !v.pos || seen[v.d.key]) return;
-        var model = close && !!vehicleMeshes[v.d.type];
+        var model = close && !!vehicleMeshes[vehicleMeshType(v.d.type)];
         if (v === selected && !model) return;
         seen[v.d.key] = 1;
         var d = v.d, rv = routeVeh[d.key], la = v.pos[0], lo = v.pos[1];
@@ -689,7 +689,7 @@
         var f = all[i], q = m3.project(f.c), dx = Math.abs(q.x - p.x), dy = Math.abs(q.y - p.y);
         var rx = f.m ? 26 * ui : lbl ? 18 * ui : 12, ry = f.m ? 16 * ui : lbl ? 12 * ui : 12;
         if (f.model) {
-          var length = (f.type === 0 ? 10.5 : 6) * vehicleModelMetresPerUnit;
+          var length = (vehicleMeshType(f.type) === 0 ? 10.5 : 6) * vehicleModelMetresPerUnit;
           var h = toRad(f.bearing), lon = length*Math.sin(h)/(111320*Math.cos(toRad(f.c[1]))), lat = length*Math.cos(h)/111320;
           var front = m3.project([f.c[0]+lon, f.c[1]+lat]), rear = m3.project([f.c[0]-lon, f.c[1]-lat]);
           var vx = front.x-rear.x, vy = front.y-rear.y;

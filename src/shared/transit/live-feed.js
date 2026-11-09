@@ -57,6 +57,7 @@
     });
     Object.keys(vehicles).forEach(function (k) {
       var v = vehicles[k];
+      if (v.d.metroPlan) return;
       if (seen[k]) { if (v.parked) setParked(v, false); return; }
       if (v.parked ? Date.now() - v.parkedSince < PARK_MAX_MS : nearEndOfRun(v)) { setParked(v, true); return; }
       dotLayer.removeLayer(v.dot);

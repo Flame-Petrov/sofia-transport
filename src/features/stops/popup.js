@@ -77,7 +77,7 @@
     var groups = {}, order = [];
     list.forEach(function (a) {
       var v = a.key && vehicles[a.key], info = trips[a.tripId] || {}, r = routes[info.route_id];
-      a.kind = !v ? 'sched' : a.guess ? 'est' : 'live';
+      a.kind = !v || v.d.metroPlan ? 'sched' : a.guess ? 'est' : 'live';
       if (a.kind === 'sched' && !a.t) return;   // no vehicle and no time: nothing to show
       var line = (a.kind === 'live' ? (v.d.line || v.d.label) : ((r && r.short) || (v && v.d.line))) || '?';
       var dest = (a.kind === 'live' && v.d.headsign) || info.headsign || '';
@@ -130,6 +130,8 @@
         txt = esc(clock + (i === 0 ? ' · ' + wait : ''));
         full = esc(label + ', timetable, ' + clock + ' Sofia time, ' + wait);
       }
+      if (a.metroSchedule && a.key) return '<button type="button" class="sp-chip metro-time" data-follow-arrival data-veh="' +
+        esc(a.key) + '" data-stop="' + esc(a.sid) + '" aria-label="Follow train, ' + full + '" title="Follow train, ' + full + '">' + txt + '</button>';
       if (a.kind === 'sched') return '<span class="sp-sched" title="' + full + '" aria-label="' + full + '">' + txt + '</span>';
       var attrs = ' data-follow-arrival data-veh="' + esc(a.key) + '" data-stop="' + esc(a.sid || st.id) + '"';   // its own twin (v77)
       var ret = a.kind === 'est' && !a.guess.sameWay;   // comes after turning round at the end of its current run

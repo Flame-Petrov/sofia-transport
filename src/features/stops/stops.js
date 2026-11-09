@@ -91,6 +91,15 @@
   // otherwise timetable + the latest known delay; otherwise timetable only (marked "scheduled").
   function computeRouteStops(v) {
     var tid = v.d.tripRef, list = tripStopsCache[tid], tu = tuByTrip[tid], now = Date.now(), out = [];
+    if (v.d.metroRun) {
+      var run = v.d.metroRun;
+      for (var i = 0; i < run.length; i++) {
+        var eta = tt.base + tt.times[run.t + i] * 1000;
+        if (eta >= now) out.push({ stop: stops[tt.stopIds[tt.patStops[run.start + i]]],
+                                  eta: eta, seq: tt.patSeqs[run.start + i], realtime: false });
+      }
+      return out;
+    }
     var byStop = {}, bySeq = {};
     if (tu) tu.stus.forEach(function (x) { if (x.stopId) byStop[x.stopId] = x; if (x.seq !== null) bySeq[x.seq] = x; });
     if (list && list.length) {

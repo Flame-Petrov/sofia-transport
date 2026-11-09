@@ -277,7 +277,7 @@
         if (selected !== v) return;
         renderDiag();
         var info = trips[v.d.tripRef];
-        if (info && info.shape_id && shapes && shapes[info.shape_id]) {
+        if (v.d.type !== 1 && info && info.shape_id && shapes && shapes[info.shape_id]) {
           snapShape(info.shape_id).then(function () { if (selected === v) { planMotion(v, false); drawPath(v); drawRouteStops(); } });
         }
         if (v.d.tripRef) {
