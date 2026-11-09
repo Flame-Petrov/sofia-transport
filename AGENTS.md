@@ -31,6 +31,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [Metro Ticket saved places](docs/saved-place-markers.md).** Added the compact routing popup, options menu and draft marker editor. Desktop Chrome screenshots of all three states from release 102 are in the workspace under `debug images/Metro Ticket/`.
+
 **2026-11-09 — [Vehicle follow rotation](docs/3d-controls.md).** Manual rotation holds the chosen bearing during vehicle follow. The compass restores automatic orientation. Live gesture verification remains open.
 
 **2026-11-09 — [Metro path curves](docs/marker-camera.md).** Filtered metro track geometry by distance and excluded metro from road matching on vehicle selection. Tested both directions against the published feed at Konstantin Velichkov and NDK. Visual confirmation remains open.

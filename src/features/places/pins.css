@@ -14,19 +14,6 @@
   .pin-mk.dest .pin-lbl small { color: #FFE3EC; }
   .pin-mk .pin-lbl.custom small { color: inherit; }
   .pin-mk.leaflet-marker-dragging .pin-lbl { opacity: .6; }
-  .pin-pop .leaflet-popup-content { margin: 14px; min-width: 210px; }
-  .pin-pop .leaflet-popup-content-wrapper { border-radius: 14px; }
-  .pp-name { font-size: 16px; font-weight: 700; color: #1A1A1A; overflow-wrap: anywhere; }
-  .pp-sub { margin-top: 2px; font-size: 13px; color: #666; }
-  .pp-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
-  .pp-btns button {
-    height: 36px; border-radius: 10px; border: 1px solid #E0E0E0; background: #fff; color: #1A1A1A; cursor: pointer;
-    font: 500 13px Inter, system-ui, sans-serif;
-  }
-  .pp-btns .pp-dest { grid-column: 1 / -1; background: var(--dest); border-color: var(--dest); color: #fff; font-weight: 600; }
-  .pp-btns .pp-dest.on { background: #fff; color: var(--dest); }
-  .pp-btns .pp-del { color: #c62828; }
-  .pp-btns .pp-del.confirm { background: #c62828; border-color: #c62828; color: #fff; }
   #map.placing, #map.placing .leaflet-interactive { cursor: crosshair; }
   #placeBar {
     position: fixed; z-index: 1250; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%);
@@ -35,14 +22,39 @@
   }
   #placeBar[hidden] { display: none; }
   #placeBar b { color: #F783AC; }
-  .pp-markers { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
-  .pp-markers span { flex: 1; font-size: 12px; }
-  .pp-markers button { background: white; color: var(--pin); border: 1px solid #ddd; border-radius: 8px; width: 32px; height: 34px; cursor: pointer; }
-  .pp-markers button[aria-pressed=true] { border: 2px solid currentColor; background: #f3f0fa; }
-  .pp-markers svg { width: 18px; height: 23px; vertical-align: middle; }
-  .pp-color, .pp-color label { display: flex; align-items: center; gap: 8px; }
-  .pp-color { margin-top: 8px; font-size: 12px; }
-  .pp-color label { flex: 1; justify-content: space-between; }
-  .pp-color input, .pp-color button { height: 32px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; }
-  .pp-color input { width: 44px; padding: 3px; }
-  .pp-color button:disabled { cursor: default; }
+  .pin-pop .leaflet-popup-content { margin: 0; }
+  .pin-pop .leaflet-popup-tip-container { display: none; }
+  .pin-pop.leaflet-popup .leaflet-popup-content-wrapper,
+  .pin-pop.v3-pop .maplibregl-popup-content {
+    padding: 0; min-width: 0; border: 0; border-radius: 0; background: transparent;
+    backdrop-filter: none; box-shadow: none; filter: drop-shadow(0 3px 6px #25243140);
+  }
+  .place-ticket {
+    --blue: #064fe8; position: relative; isolation: isolate; box-sizing: border-box;
+    width: 232px; padding: 12px 14px 9px; color: #132035;
+    font: 600 14px/1.35 Inter, system-ui, sans-serif; text-align: left;
+  }
+  .place-ticket::before { content: ''; position: absolute; inset: 0; z-index: -1; background: #fff9ef;
+    clip-path: polygon(9px 0,calc(100% - 9px) 0,100% 9px,100% calc(100% - 9px),calc(100% - 9px) 100%,9px 100%,0 calc(100% - 9px),0 9px); }
+  .place-ticket header, .ticket-color, .ticket-color label { display: flex; align-items: center; gap: 8px; }
+  .place-ticket header { margin-bottom: 8px; }
+  .place-ticket strong { flex: 1; font-size: 17px; overflow-wrap: anywhere; }
+  .place-ticket button { border: 0; border-radius: 8px; color: inherit; background: transparent; font: inherit; cursor: pointer; min-height: 34px; }
+  .place-ticket button:focus-visible, .place-ticket input:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .place-ticket button:hover, .place-ticket [aria-expanded=true] { background: #e7edff; }
+  .place-ticket svg { width: 17px; height: 17px; }
+  .place-ticket .ticket-primary, .place-ticket .ticket-dest { width: 100%; }
+  .place-ticket .ticket-primary { display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 22px; background: var(--blue); color: white; min-height: 40px; }
+  .place-ticket .ticket-primary:hover { background: #003cc0; }
+  .place-ticket .ticket-dest { color: #084cc9; margin-top: 3px; }
+  .ticket-menu { position: absolute; z-index: 1; top: 45px; right: 8px; padding: 5px; background: #fffbf4; border: 1px solid #ded8cb; border-radius: 12px; box-shadow: 0 4px 15px #18213633; }
+  .ticket-menu button { width: 100%; padding: 5px 10px; display: flex; align-items: center; gap: 10px; text-align: left; }
+  .ticket-menu [data-pin-act=del] { color: #b4262e; border-radius: 0 0 8px 8px; border-top: 1px solid #ded8cb; }
+  .ticket-icons { display: flex; justify-content: space-between; margin: 4px 0 8px; }
+  .ticket-icons button { width: 42px; height: 38px; }
+  .ticket-icons svg { width: 21px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+  .ticket-icons [aria-pressed=true] { box-shadow: inset 0 0 0 2px var(--blue); background: white; }
+  .ticket-color { justify-content: space-between; margin-bottom: 10px; }
+  .ticket-color input { width: 60px; height: 34px; border: 0; padding: 0; background: none; cursor: pointer; }
+  .ticket-color input::-webkit-color-swatch { border: 0; border-radius: 7px; }
+  .ticket-color button:disabled { opacity: .5; cursor: default; }

@@ -1276,11 +1276,11 @@
       var d = p.id === savedPlaces.destinationId ? savedPlaces.distanceFromMe(p) : null;
       return '<div class="pin-ic">' + savedPlaces.markerSvg(p) + '</div>' + savedPlaces.labelOpen(p) + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
     }
-    function syncPins() {
+    function syncPins(refreshEditor) {
       if (!m3) return;
       var seen = {};
       savedPlaces.forEach(function (p) {
-        var id = p.id, m = pinMks[id], html = pinHtml(p), dest = id === savedPlaces.destinationId;
+        var id = p.id, m = pinMks[id], html = pinHtml(savedPlaces.preview(p)), dest = id === savedPlaces.destinationId;
         seen[id] = true;
         if (!m) {
           var e = mkEl('pin-mk', '', 0);
@@ -1297,10 +1297,14 @@
       Object.keys(pinMks).forEach(function (id) { if (!seen[id]) { pinMks[id].remove(); delete pinMks[id]; } });
       if (pop && popKind === 'pin') {
         var q = savedPlaces.find(popRef.id);
-        if (!q) closePop(); else pop.setHTML(savedPlaces.popupHtml(q));
+        if (!q) closePop();
+        else if (refreshEditor || !savedPlaces.editing(q.id)) {
+          var content = savedPlaces.popupHtml(q);
+          if (content !== pop._ticketHtml) { pop._ticketHtml = content; pop.setHTML(content); }
+        }
       }
     }
-    view3d.placesChanged = function () { if (m3) syncPins(); };
+    view3d.placesChanged = function (refreshEditor) { if (m3) syncPins(refreshEditor); };
     // a long-press / right-click: a new place is named and put down on the flat map
     function cancelPress() { if (lp) { clearTimeout(lp.t); lp = null; } }
     function addHere(lngLat) {
@@ -1321,7 +1325,7 @@
       var p = new maplibregl.Popup({ className: 'v3-pop ' + (kind === 'veh' ? 'veh-pop' : kind === 'stop' ? 'stop-pop' : 'pin-pop'), closeButton: false, closeOnClick: false,
         anchor: kind === 'veh' ? 'top' : undefined,   // v100's card: always below the vehicle
         offset: kind === 'pin' ? POP_OFF : kind === 'veh' ? [0, Math.round(VP_GAP * ui) - 8] : popOffset(18), maxWidth: 'none', focusAfterOpen: false });
-      if (kind === 'pin') p.setLngLat([ref.lon, ref.lat]).setHTML(savedPlaces.popupHtml(ref));
+      if (kind === 'pin') { p._ticketHtml = savedPlaces.popupHtml(ref); p.setLngLat([ref.lon, ref.lat]).setHTML(p._ticketHtml); }
       else if (kind === 'veh') { var el = vehPopupEl(ref); patchVeh(el, ref); p.setLngLat(vehicleAnchor(ref)).setDOMContent(el); }
       else {
         var st = ref._stop, se = ref._spEl;
@@ -1340,6 +1344,7 @@
         clearInterval(cardEdgeTimer); cardEdgeTimer = setInterval(vpClearEdge, 250); vpClearEdge();
       }
       p.on('close', function () {
+        if (kind === 'pin') savedPlaces.closeTicket(ref.id);
         if (kind === 'veh') { ref.allStops = false; document.body.classList.remove('vp-card'); clearInterval(cardEdgeTimer); setTimeout(vpClearEdge, 0); }
         if (kind === 'stop') { markSel(ref, false); expandedStop = null; }
         if (pop === p) { pop = null; popKind = ''; popRef = null; popClosedAt = Date.now(); }

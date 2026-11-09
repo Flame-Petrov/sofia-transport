@@ -592,19 +592,6 @@
   .pin-mk.dest .pin-lbl small { color: #FFE3EC; }
   .pin-mk .pin-lbl.custom small { color: inherit; }
   .pin-mk.leaflet-marker-dragging .pin-lbl { opacity: .6; }
-  .pin-pop .leaflet-popup-content { margin: 14px; min-width: 210px; }
-  .pin-pop .leaflet-popup-content-wrapper { border-radius: 14px; }
-  .pp-name { font-size: 16px; font-weight: 700; color: #1A1A1A; overflow-wrap: anywhere; }
-  .pp-sub { margin-top: 2px; font-size: 13px; color: #666; }
-  .pp-btns { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; margin-top: 12px; }
-  .pp-btns button {
-    height: 36px; border-radius: 10px; border: 1px solid #E0E0E0; background: #fff; color: #1A1A1A; cursor: pointer;
-    font: 500 13px Inter, system-ui, sans-serif;
-  }
-  .pp-btns .pp-dest { grid-column: 1 / -1; background: var(--dest); border-color: var(--dest); color: #fff; font-weight: 600; }
-  .pp-btns .pp-dest.on { background: #fff; color: var(--dest); }
-  .pp-btns .pp-del { color: #c62828; }
-  .pp-btns .pp-del.confirm { background: #c62828; border-color: #c62828; color: #fff; }
   #map.placing, #map.placing .leaflet-interactive { cursor: crosshair; }
   #placeBar {
     position: fixed; z-index: 1250; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%);
@@ -613,17 +600,42 @@
   }
   #placeBar[hidden] { display: none; }
   #placeBar b { color: #F783AC; }
-  .pp-markers { display: flex; align-items: center; gap: 4px; margin-top: 10px; }
-  .pp-markers span { flex: 1; font-size: 12px; }
-  .pp-markers button { background: white; color: var(--pin); border: 1px solid #ddd; border-radius: 8px; width: 32px; height: 34px; cursor: pointer; }
-  .pp-markers button[aria-pressed=true] { border: 2px solid currentColor; background: #f3f0fa; }
-  .pp-markers svg { width: 18px; height: 23px; vertical-align: middle; }
-  .pp-color, .pp-color label { display: flex; align-items: center; gap: 8px; }
-  .pp-color { margin-top: 8px; font-size: 12px; }
-  .pp-color label { flex: 1; justify-content: space-between; }
-  .pp-color input, .pp-color button { height: 32px; border: 1px solid #ddd; border-radius: 8px; background: white; cursor: pointer; }
-  .pp-color input { width: 44px; padding: 3px; }
-  .pp-color button:disabled { cursor: default; }
+  .pin-pop .leaflet-popup-content { margin: 0; }
+  .pin-pop .leaflet-popup-tip-container { display: none; }
+  .pin-pop.leaflet-popup .leaflet-popup-content-wrapper,
+  .pin-pop.v3-pop .maplibregl-popup-content {
+    padding: 0; min-width: 0; border: 0; border-radius: 0; background: transparent;
+    backdrop-filter: none; box-shadow: none; filter: drop-shadow(0 3px 6px #25243140);
+  }
+  .place-ticket {
+    --blue: #064fe8; position: relative; isolation: isolate; box-sizing: border-box;
+    width: 232px; padding: 12px 14px 9px; color: #132035;
+    font: 600 14px/1.35 Inter, system-ui, sans-serif; text-align: left;
+  }
+  .place-ticket::before { content: ''; position: absolute; inset: 0; z-index: -1; background: #fff9ef;
+    clip-path: polygon(9px 0,calc(100% - 9px) 0,100% 9px,100% calc(100% - 9px),calc(100% - 9px) 100%,9px 100%,0 calc(100% - 9px),0 9px); }
+  .place-ticket header, .ticket-color, .ticket-color label { display: flex; align-items: center; gap: 8px; }
+  .place-ticket header { margin-bottom: 8px; }
+  .place-ticket strong { flex: 1; font-size: 17px; overflow-wrap: anywhere; }
+  .place-ticket button { border: 0; border-radius: 8px; color: inherit; background: transparent; font: inherit; cursor: pointer; min-height: 34px; }
+  .place-ticket button:focus-visible, .place-ticket input:focus-visible { outline: 2px solid var(--blue); outline-offset: 1px; }
+  .place-ticket button:hover, .place-ticket [aria-expanded=true] { background: #e7edff; }
+  .place-ticket svg { width: 17px; height: 17px; }
+  .place-ticket .ticket-primary, .place-ticket .ticket-dest { width: 100%; }
+  .place-ticket .ticket-primary { display: flex; align-items: center; justify-content: center; gap: 6px; border-radius: 22px; background: var(--blue); color: white; min-height: 40px; }
+  .place-ticket .ticket-primary:hover { background: #003cc0; }
+  .place-ticket .ticket-dest { color: #084cc9; margin-top: 3px; }
+  .ticket-menu { position: absolute; z-index: 1; top: 45px; right: 8px; padding: 5px; background: #fffbf4; border: 1px solid #ded8cb; border-radius: 12px; box-shadow: 0 4px 15px #18213633; }
+  .ticket-menu button { width: 100%; padding: 5px 10px; display: flex; align-items: center; gap: 10px; text-align: left; }
+  .ticket-menu [data-pin-act=del] { color: #b4262e; border-radius: 0 0 8px 8px; border-top: 1px solid #ded8cb; }
+  .ticket-icons { display: flex; justify-content: space-between; margin: 4px 0 8px; }
+  .ticket-icons button { width: 42px; height: 38px; }
+  .ticket-icons svg { width: 21px; height: 24px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; }
+  .ticket-icons [aria-pressed=true] { box-shadow: inset 0 0 0 2px var(--blue); background: white; }
+  .ticket-color { justify-content: space-between; margin-bottom: 10px; }
+  .ticket-color input { width: 60px; height: 34px; border: 0; padding: 0; background: none; cursor: pointer; }
+  .ticket-color input::-webkit-color-swatch { border: 0; border-radius: 7px; }
+  .ticket-color button:disabled { opacity: .5; cursor: default; }
   /* v87: "open it through the local server" note — shown when the page isn't secure (opened from a file) */
   #secBar {
     position: fixed; z-index: 1250; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%);
@@ -6430,40 +6442,69 @@
       return '<svg viewBox="0 0 26 32" aria-hidden="true"><path d="M5 30C5 24 1 19 1 13a12 12 0 1 1 24 0c0 8-12 12-20 17z" fill="currentColor" stroke="white" stroke-width="1.4"/>' +
         '<path transform="translate(5 1)" d="' + markerPaths[name] + '" fill="none" stroke="white" stroke-width="1.7" stroke-linejoin="round"/></svg>';
     }
-    function markerChoices(p) {
-      return '<div class="pp-markers" role="group" aria-label="Map marker"><span>Map marker</span>' +
-        ['Flag'].concat(Object.keys(markerPaths)).map(function (name) {
-          return '<button type="button" data-pin-act="marker" data-marker="' + name + '" aria-label="' + name +
-            '" title="' + name + '" aria-pressed="' + (markerName(p) === name) + '">' + markerShape({ marker: name }) + '</button>';
-        }).join('') + '</div>' +
-        '<div class="pp-color"><label>Marker color <input type="color" data-pin-color value="' +
-        (markerColor(p) || (p.id === destId ? '#d6336c' : '#495057')) + '"></label>' +
-        '<button type="button" data-pin-act="reset-color"' + (markerColor(p) ? '' : ' disabled') + '>Reset</button></div>';
+    var editor = null, menuId = '';
+    function preview(p) {
+      return editor && editor.id === p.id ? Object.assign({}, p, editor) : p;
     }
     function pinIcon(p) {
+      p = preview(p);
       return L.divIcon({ className: 'pin-mk' + (p.id === destId ? ' dest' : ''), iconSize: null,
         html: '<div class="pin-ic">' + markerSvg(p) + '</div>' + labelOpen(p) + esc(p.name) + '</div>' });
     }
+    function markerEditor(p) {
+      var choices = ['Flag', 'Home', 'Work', 'Star'].map(function (name) {
+        var glyph = name === 'Flag' ? '<path d="M3 18V3m0 1c4-3 7 3 12 0v8c-5 3-8-3-12 0"/>' :
+          '<path d="' + markerPaths[name] + '"/>';
+        return '<button type="button" data-pin-act="marker" data-marker="' + name + '" aria-label="' + name +
+          '" aria-pressed="' + (p.marker === name) + '"><svg viewBox="0 0 18 21">' + glyph + '</svg></button>';
+      }).join('');
+      return '<header><button type="button" data-pin-act="back" aria-label="Back">←</button><strong>Edit marker</strong></header>' +
+        '<div class="ticket-label">Icon</div><div class="ticket-icons" role="group" aria-label="Marker icon">' + choices + '</div>' +
+        '<div class="ticket-color"><label>Color <input type="color" data-pin-color value="' +
+        (p.color || (p.id === destId ? '#d6336c' : '#495057')) + '"></label><button type="button" data-pin-act="reset-color"' +
+        (p.color ? '' : ' disabled') + '>Reset</button></div><button type="button" class="ticket-primary" data-pin-act="save">Save changes</button>';
+    }
     function pinPopupHtml(p) {
-      var d = distFromMe(p), isDest = p.id === destId;
-      return '<div class="pp" data-pin="' + esc(p.id) + '"><div class="pp-name">' + esc(p.name) + '</div>' +
-        '<div class="pp-sub">' + (d !== null ? fmtM(d) + ' from you' : isDest ? 'Your destination' : 'Saved place') + '</div>' + markerChoices(p) +
-        '<div class="pp-btns"><button type="button" class="pp-route" data-pin-act="route">' + ROUTE_SVG + 'Start route</button>' +
-        '<button type="button" class="pp-dest' + (isDest ? ' on' : '') + '" data-pin-act="dest">' +
-          (isDest ? 'Clear destination' : 'Set as destination') + '</button>' +
-        '<button type="button" data-pin-act="move">Move</button><button type="button" data-pin-act="rename">Rename</button>' +
-        '<button type="button" class="pp-del" data-pin-act="del">Delete</button></div></div>';
+      var open = menuId === p.id;
+      var main = '<header><strong>' + esc(p.name) + '</strong><button type="button" data-pin-act="more" aria-label="More options" aria-expanded="' +
+        open + '">•••</button></header><button type="button" class="ticket-primary" data-pin-act="route">' + ROUTE_SVG +
+        'Start route</button><button type="button" class="ticket-dest" data-pin-act="dest">' +
+        (p.id === destId ? 'Clear destination' : 'Set as destination') + '</button>';
+      if (open) main += '<div class="ticket-menu" role="group" aria-label="Place options">' +
+        '<button type="button" data-pin-act="edit">' + EDIT_SVG + 'Edit marker</button>' +
+        '<button type="button" data-pin-act="rename">' + EDIT_SVG + 'Rename</button>' +
+        '<button type="button" data-pin-act="move">' + MOVE_SVG + 'Move pin</button>' +
+        '<button type="button" data-pin-act="del">' + DEL_SVG + 'Delete saved place</button></div>';
+      return '<div class="place-ticket" data-pin="' + esc(p.id) + '">' +
+        (editor && editor.id === p.id ? markerEditor(editor) : main) + '</div>';
+    }
+    function refreshTicket(p, focusSelector) {
+      var mk = pinMarkers[p.id];
+      if (mk && mk.isPopupOpen()) mk.getPopup().update();
+      if (view3d.on) view3d.placesChanged(true);
+      if (focusSelector) {
+        var target = document.querySelector('.place-ticket ' + focusSelector);
+        if (target) target.focus({ preventScroll: true });
+      }
+    }
+    function closeTicket(id) {
+      if (menuId === id) menuId = '';
+      if (editor && editor.id === id) {
+        editor = null;
+        redrawPins();
+      }
     }
     // markers follow the library
     function redrawPins() {
       var seen = {};
       places.forEach(function (p) {
-        var id = p.id, key = markerColor(p) + markerName(p) + '|' + p.name + '|' + (id === destId), mk = pinMarkers[id];
+        var id = p.id, key = markerColor(preview(p)) + markerName(preview(p)) + '|' + p.name + '|' + (id === destId), mk = pinMarkers[id];
         seen[id] = true;
         if (!mk) {
           mk = pinMarkers[id] = L.marker([p.lat, p.lon], { icon: pinIcon(p), pane: 'pinPane', draggable: true, autoPan: true, keyboard: false });
           mk._key = key;
-          mk.bindPopup(function () { var q = placeById(id); return q ? pinPopupHtml(q) : ''; }, { className: 'pin-pop', offset: [0, -28], maxWidth: 260 });
+          mk.bindPopup(function () { var q = placeById(id); return q ? pinPopupHtml(q) : ''; }, { className: 'pin-pop', closeButton: false, offset: [0, -28], maxWidth: 260 });
+          mk.on('popupclose', function () { closeTicket(id); });
           mk.on('dragstart', function () { mk.closePopup(); });
           mk.on('dragend', function () {
             var q = placeById(id), ll = mk.getLatLng();
@@ -6568,17 +6609,11 @@
     document.getElementById('plAdd').onclick = function () {
       openPinDlg('New place', '', function (name) { startPlacing({ name: name }); });
     };
-    function setMarkerColor(p, color) {
-      if (color) p.color = color; else delete p.color;
-      savePlaces(); redrawPins(); renderPlaces();
-      var mk = pinMarkers[p.id];
-      if (mk && mk.isPopupOpen()) mk.getPopup().update();
-    }
-    document.addEventListener('change', function (event) {
-      var input = event.target;
-      if (!input.matches('[data-pin-color]')) return;
-      var p = placeById(input.closest('[data-pin]').dataset.pin);
-      if (p) setMarkerColor(p, input.value);
+    document.addEventListener('input', function (event) {
+      if (!editor || !event.target.matches('[data-pin-color]')) return;
+      editor.color = event.target.value;
+      event.target.closest('.ticket-color').querySelector('button').disabled = false;
+      redrawPins();
     }, true);
     // buttons in the list and in a flag's popup (capture: Leaflet stops clicks inside popups from bubbling)
     document.addEventListener('click', function (e) {
@@ -6594,16 +6629,34 @@
         var mk = pinMarkers[p.id];
         if (mk && mk.isPopupOpen()) mk.getPopup().update();
       }
-      else if (act === 'reset-color') setMarkerColor(p, '');
-      else if (act === 'marker') {
-        p.marker = b.dataset.marker;
-        savePlaces(); redrawPins(); renderPlaces();
-        box.querySelectorAll('[data-marker]').forEach(function (button) {
-          button.setAttribute('aria-pressed', String(button.dataset.marker === p.marker));
-        });
+      else if (act === 'more') {
+        menuId = menuId === p.id ? '' : p.id;
+        refreshTicket(p, menuId ? '[data-pin-act="edit"]' : '[data-pin-act="more"]');
+      }
+      else if (act === 'edit') {
+        menuId = '';
+        editor = { id: p.id, marker: markerName(p), color: markerColor(p) };
+        refreshTicket(p, '[aria-pressed="true"]');
+      }
+      else if (editor && editor.id === p.id && (act === 'reset-color' || act === 'marker')) {
+        if (act === 'marker') editor.marker = b.dataset.marker;
+        else editor.color = '';
+        redrawPins();
+        refreshTicket(p, act === 'marker' ? '[aria-pressed="true"]' : '[data-pin-color]');
+      }
+      else if (editor && editor.id === p.id && (act === 'save' || act === 'back')) {
+        if (act === 'save') {
+          p.marker = editor.marker;
+          if (editor.color) p.color = editor.color; else delete p.color;
+          savePlaces();
+          renderPlaces();
+        }
+        editor = null;
+        redrawPins();
+        refreshTicket(p, '[data-pin-act="more"]');
       }
       else if (act === 'move') startPlacing({ p: p });
-      else if (act === 'rename') openPinDlg('Rename place', p.name, function (name) { p.name = name; savePlaces(); redrawPins(); renderPlaces(); });
+      else if (act === 'rename') { menuId = ''; refreshTicket(p); openPinDlg('Rename place', p.name, function (name) { p.name = name; savePlaces(); redrawPins(); renderPlaces(); refreshTicket(p); }); }
       else if (act === 'del') {
         if (!b.classList.contains('confirm')) {   // first tap asks, a second one within 3 s deletes
           var was = b.innerHTML;
@@ -6652,8 +6705,12 @@
 
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
+      if (menuId || editor) {
+        var p = placeById(menuId || editor.id);
+        if (p) { e.stopPropagation(); closeTicket(p.id); refreshTicket(p, '[data-pin-act="more"]'); return; }
+      }
       if (!pinDlg.hidden) closePinDlg(); else if (placing) endPlacing();
-    });
+    }, true);
 
     redrawPins();
     renderPlaces();
@@ -6672,6 +6729,9 @@
       markerSvg: markerSvg,
       labelOpen: labelOpen,
       popupHtml: pinPopupHtml,
+      preview: preview,
+      editing: function (id) { return !!editor && editor.id === id; },
+      closeTicket: closeTicket,
       add: addPlace
     };
   })();
@@ -11399,11 +11459,11 @@
       var d = p.id === savedPlaces.destinationId ? savedPlaces.distanceFromMe(p) : null;
       return '<div class="pin-ic">' + savedPlaces.markerSvg(p) + '</div>' + savedPlaces.labelOpen(p) + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
     }
-    function syncPins() {
+    function syncPins(refreshEditor) {
       if (!m3) return;
       var seen = {};
       savedPlaces.forEach(function (p) {
-        var id = p.id, m = pinMks[id], html = pinHtml(p), dest = id === savedPlaces.destinationId;
+        var id = p.id, m = pinMks[id], html = pinHtml(savedPlaces.preview(p)), dest = id === savedPlaces.destinationId;
         seen[id] = true;
         if (!m) {
           var e = mkEl('pin-mk', '', 0);
@@ -11420,10 +11480,14 @@
       Object.keys(pinMks).forEach(function (id) { if (!seen[id]) { pinMks[id].remove(); delete pinMks[id]; } });
       if (pop && popKind === 'pin') {
         var q = savedPlaces.find(popRef.id);
-        if (!q) closePop(); else pop.setHTML(savedPlaces.popupHtml(q));
+        if (!q) closePop();
+        else if (refreshEditor || !savedPlaces.editing(q.id)) {
+          var content = savedPlaces.popupHtml(q);
+          if (content !== pop._ticketHtml) { pop._ticketHtml = content; pop.setHTML(content); }
+        }
       }
     }
-    view3d.placesChanged = function () { if (m3) syncPins(); };
+    view3d.placesChanged = function (refreshEditor) { if (m3) syncPins(refreshEditor); };
     // a long-press / right-click: a new place is named and put down on the flat map
     function cancelPress() { if (lp) { clearTimeout(lp.t); lp = null; } }
     function addHere(lngLat) {
@@ -11444,7 +11508,7 @@
       var p = new maplibregl.Popup({ className: 'v3-pop ' + (kind === 'veh' ? 'veh-pop' : kind === 'stop' ? 'stop-pop' : 'pin-pop'), closeButton: false, closeOnClick: false,
         anchor: kind === 'veh' ? 'top' : undefined,   // v100's card: always below the vehicle
         offset: kind === 'pin' ? POP_OFF : kind === 'veh' ? [0, Math.round(VP_GAP * ui) - 8] : popOffset(18), maxWidth: 'none', focusAfterOpen: false });
-      if (kind === 'pin') p.setLngLat([ref.lon, ref.lat]).setHTML(savedPlaces.popupHtml(ref));
+      if (kind === 'pin') { p._ticketHtml = savedPlaces.popupHtml(ref); p.setLngLat([ref.lon, ref.lat]).setHTML(p._ticketHtml); }
       else if (kind === 'veh') { var el = vehPopupEl(ref); patchVeh(el, ref); p.setLngLat(vehicleAnchor(ref)).setDOMContent(el); }
       else {
         var st = ref._stop, se = ref._spEl;
@@ -11463,6 +11527,7 @@
         clearInterval(cardEdgeTimer); cardEdgeTimer = setInterval(vpClearEdge, 250); vpClearEdge();
       }
       p.on('close', function () {
+        if (kind === 'pin') savedPlaces.closeTicket(ref.id);
         if (kind === 'veh') { ref.allStops = false; document.body.classList.remove('vp-card'); clearInterval(cardEdgeTimer); setTimeout(vpClearEdge, 0); }
         if (kind === 'stop') { markSel(ref, false); expandedStop = null; }
         if (pop === p) { pop = null; popKind = ''; popRef = null; popClosedAt = Date.now(); }

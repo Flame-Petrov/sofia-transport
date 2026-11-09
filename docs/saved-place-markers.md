@@ -1,9 +1,9 @@
 # Saved place markers
 
-Click or tap a saved marker, then choose Flag, Home, Work, or Star under **Map marker**. The choice applies immediately to that place in the flat map, tilted map and My places list. Existing places start with Flag. The destination keeps its highlight.
+Tap a saved pin to open its Metro Ticket popup. Start route opens journey planning. Set as destination (or Clear destination) changes the active place. The three-dot button opens Edit marker, Rename, Move pin and Delete saved place. Deletion requires a second tap within three seconds.
 
-The picker, icon definitions and local storage update live in `src/features/places/places.js`. Its styles are in `src/features/places/pins.css`. The tilted map reuses the icon renderer in `src/features/view3d/view.js`.
+Edit marker shows Flag, Home, Work and Star, a color picker, and Reset. Changes preview on the pin. Reset selects the automatic color, which follows destination status. Save changes applies the draft to the flat map, tilted map and My places list. Back, Escape or closing the popup discards it. Older places without a marker setting use Flag. A custom color also tints the map label with contrasting text.
 
-To verify, open a flag, choose Home and reopen the popup after a reload. Check the Home button is selected and the marker matches it. Switch map modes and check the same place.
+The popup, saved data and Leaflet marker rendering live in `src/features/places/places.js`. The ticket styles live in `src/features/places/pins.css`. The tilted map reuses the renderer and draft appearance in `src/features/view3d/view.js`.
 
-Open **Marker color** to choose a custom color for this place. The icon uses that color in both map modes and in My places. The map label background matches the custom color, including for the active destination. Its name and distance use contrasting black or white text. Check both a light and a dark color. **Reset** restores the automatic marker color. To verify, choose a color, reload, switch map modes, and use Reset in the popup.
+To verify, open a saved pin, choose More options and Edit marker, select another icon and color, then use Back. Reopen the editor and check the previous settings. Repeat with Save changes, reload, and confirm the new icon and color. Switch map modes and repeat with Reset. Also check the destination toggle and the two-tap delete prompt.

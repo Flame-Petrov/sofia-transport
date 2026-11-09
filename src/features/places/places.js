@@ -49,40 +49,69 @@
       return '<svg viewBox="0 0 26 32" aria-hidden="true"><path d="M5 30C5 24 1 19 1 13a12 12 0 1 1 24 0c0 8-12 12-20 17z" fill="currentColor" stroke="white" stroke-width="1.4"/>' +
         '<path transform="translate(5 1)" d="' + markerPaths[name] + '" fill="none" stroke="white" stroke-width="1.7" stroke-linejoin="round"/></svg>';
     }
-    function markerChoices(p) {
-      return '<div class="pp-markers" role="group" aria-label="Map marker"><span>Map marker</span>' +
-        ['Flag'].concat(Object.keys(markerPaths)).map(function (name) {
-          return '<button type="button" data-pin-act="marker" data-marker="' + name + '" aria-label="' + name +
-            '" title="' + name + '" aria-pressed="' + (markerName(p) === name) + '">' + markerShape({ marker: name }) + '</button>';
-        }).join('') + '</div>' +
-        '<div class="pp-color"><label>Marker color <input type="color" data-pin-color value="' +
-        (markerColor(p) || (p.id === destId ? '#d6336c' : '#495057')) + '"></label>' +
-        '<button type="button" data-pin-act="reset-color"' + (markerColor(p) ? '' : ' disabled') + '>Reset</button></div>';
+    var editor = null, menuId = '';
+    function preview(p) {
+      return editor && editor.id === p.id ? Object.assign({}, p, editor) : p;
     }
     function pinIcon(p) {
+      p = preview(p);
       return L.divIcon({ className: 'pin-mk' + (p.id === destId ? ' dest' : ''), iconSize: null,
         html: '<div class="pin-ic">' + markerSvg(p) + '</div>' + labelOpen(p) + esc(p.name) + '</div>' });
     }
+    function markerEditor(p) {
+      var choices = ['Flag', 'Home', 'Work', 'Star'].map(function (name) {
+        var glyph = name === 'Flag' ? '<path d="M3 18V3m0 1c4-3 7 3 12 0v8c-5 3-8-3-12 0"/>' :
+          '<path d="' + markerPaths[name] + '"/>';
+        return '<button type="button" data-pin-act="marker" data-marker="' + name + '" aria-label="' + name +
+          '" aria-pressed="' + (p.marker === name) + '"><svg viewBox="0 0 18 21">' + glyph + '</svg></button>';
+      }).join('');
+      return '<header><button type="button" data-pin-act="back" aria-label="Back">←</button><strong>Edit marker</strong></header>' +
+        '<div class="ticket-label">Icon</div><div class="ticket-icons" role="group" aria-label="Marker icon">' + choices + '</div>' +
+        '<div class="ticket-color"><label>Color <input type="color" data-pin-color value="' +
+        (p.color || (p.id === destId ? '#d6336c' : '#495057')) + '"></label><button type="button" data-pin-act="reset-color"' +
+        (p.color ? '' : ' disabled') + '>Reset</button></div><button type="button" class="ticket-primary" data-pin-act="save">Save changes</button>';
+    }
     function pinPopupHtml(p) {
-      var d = distFromMe(p), isDest = p.id === destId;
-      return '<div class="pp" data-pin="' + esc(p.id) + '"><div class="pp-name">' + esc(p.name) + '</div>' +
-        '<div class="pp-sub">' + (d !== null ? fmtM(d) + ' from you' : isDest ? 'Your destination' : 'Saved place') + '</div>' + markerChoices(p) +
-        '<div class="pp-btns"><button type="button" class="pp-route" data-pin-act="route">' + ROUTE_SVG + 'Start route</button>' +
-        '<button type="button" class="pp-dest' + (isDest ? ' on' : '') + '" data-pin-act="dest">' +
-          (isDest ? 'Clear destination' : 'Set as destination') + '</button>' +
-        '<button type="button" data-pin-act="move">Move</button><button type="button" data-pin-act="rename">Rename</button>' +
-        '<button type="button" class="pp-del" data-pin-act="del">Delete</button></div></div>';
+      var open = menuId === p.id;
+      var main = '<header><strong>' + esc(p.name) + '</strong><button type="button" data-pin-act="more" aria-label="More options" aria-expanded="' +
+        open + '">•••</button></header><button type="button" class="ticket-primary" data-pin-act="route">' + ROUTE_SVG +
+        'Start route</button><button type="button" class="ticket-dest" data-pin-act="dest">' +
+        (p.id === destId ? 'Clear destination' : 'Set as destination') + '</button>';
+      if (open) main += '<div class="ticket-menu" role="group" aria-label="Place options">' +
+        '<button type="button" data-pin-act="edit">' + EDIT_SVG + 'Edit marker</button>' +
+        '<button type="button" data-pin-act="rename">' + EDIT_SVG + 'Rename</button>' +
+        '<button type="button" data-pin-act="move">' + MOVE_SVG + 'Move pin</button>' +
+        '<button type="button" data-pin-act="del">' + DEL_SVG + 'Delete saved place</button></div>';
+      return '<div class="place-ticket" data-pin="' + esc(p.id) + '">' +
+        (editor && editor.id === p.id ? markerEditor(editor) : main) + '</div>';
+    }
+    function refreshTicket(p, focusSelector) {
+      var mk = pinMarkers[p.id];
+      if (mk && mk.isPopupOpen()) mk.getPopup().update();
+      if (view3d.on) view3d.placesChanged(true);
+      if (focusSelector) {
+        var target = document.querySelector('.place-ticket ' + focusSelector);
+        if (target) target.focus({ preventScroll: true });
+      }
+    }
+    function closeTicket(id) {
+      if (menuId === id) menuId = '';
+      if (editor && editor.id === id) {
+        editor = null;
+        redrawPins();
+      }
     }
     // markers follow the library
     function redrawPins() {
       var seen = {};
       places.forEach(function (p) {
-        var id = p.id, key = markerColor(p) + markerName(p) + '|' + p.name + '|' + (id === destId), mk = pinMarkers[id];
+        var id = p.id, key = markerColor(preview(p)) + markerName(preview(p)) + '|' + p.name + '|' + (id === destId), mk = pinMarkers[id];
         seen[id] = true;
         if (!mk) {
           mk = pinMarkers[id] = L.marker([p.lat, p.lon], { icon: pinIcon(p), pane: 'pinPane', draggable: true, autoPan: true, keyboard: false });
           mk._key = key;
-          mk.bindPopup(function () { var q = placeById(id); return q ? pinPopupHtml(q) : ''; }, { className: 'pin-pop', offset: [0, -28], maxWidth: 260 });
+          mk.bindPopup(function () { var q = placeById(id); return q ? pinPopupHtml(q) : ''; }, { className: 'pin-pop', closeButton: false, offset: [0, -28], maxWidth: 260 });
+          mk.on('popupclose', function () { closeTicket(id); });
           mk.on('dragstart', function () { mk.closePopup(); });
           mk.on('dragend', function () {
             var q = placeById(id), ll = mk.getLatLng();
@@ -187,17 +216,11 @@
     document.getElementById('plAdd').onclick = function () {
       openPinDlg('New place', '', function (name) { startPlacing({ name: name }); });
     };
-    function setMarkerColor(p, color) {
-      if (color) p.color = color; else delete p.color;
-      savePlaces(); redrawPins(); renderPlaces();
-      var mk = pinMarkers[p.id];
-      if (mk && mk.isPopupOpen()) mk.getPopup().update();
-    }
-    document.addEventListener('change', function (event) {
-      var input = event.target;
-      if (!input.matches('[data-pin-color]')) return;
-      var p = placeById(input.closest('[data-pin]').dataset.pin);
-      if (p) setMarkerColor(p, input.value);
+    document.addEventListener('input', function (event) {
+      if (!editor || !event.target.matches('[data-pin-color]')) return;
+      editor.color = event.target.value;
+      event.target.closest('.ticket-color').querySelector('button').disabled = false;
+      redrawPins();
     }, true);
     // buttons in the list and in a flag's popup (capture: Leaflet stops clicks inside popups from bubbling)
     document.addEventListener('click', function (e) {
@@ -213,16 +236,34 @@
         var mk = pinMarkers[p.id];
         if (mk && mk.isPopupOpen()) mk.getPopup().update();
       }
-      else if (act === 'reset-color') setMarkerColor(p, '');
-      else if (act === 'marker') {
-        p.marker = b.dataset.marker;
-        savePlaces(); redrawPins(); renderPlaces();
-        box.querySelectorAll('[data-marker]').forEach(function (button) {
-          button.setAttribute('aria-pressed', String(button.dataset.marker === p.marker));
-        });
+      else if (act === 'more') {
+        menuId = menuId === p.id ? '' : p.id;
+        refreshTicket(p, menuId ? '[data-pin-act="edit"]' : '[data-pin-act="more"]');
+      }
+      else if (act === 'edit') {
+        menuId = '';
+        editor = { id: p.id, marker: markerName(p), color: markerColor(p) };
+        refreshTicket(p, '[aria-pressed="true"]');
+      }
+      else if (editor && editor.id === p.id && (act === 'reset-color' || act === 'marker')) {
+        if (act === 'marker') editor.marker = b.dataset.marker;
+        else editor.color = '';
+        redrawPins();
+        refreshTicket(p, act === 'marker' ? '[aria-pressed="true"]' : '[data-pin-color]');
+      }
+      else if (editor && editor.id === p.id && (act === 'save' || act === 'back')) {
+        if (act === 'save') {
+          p.marker = editor.marker;
+          if (editor.color) p.color = editor.color; else delete p.color;
+          savePlaces();
+          renderPlaces();
+        }
+        editor = null;
+        redrawPins();
+        refreshTicket(p, '[data-pin-act="more"]');
       }
       else if (act === 'move') startPlacing({ p: p });
-      else if (act === 'rename') openPinDlg('Rename place', p.name, function (name) { p.name = name; savePlaces(); redrawPins(); renderPlaces(); });
+      else if (act === 'rename') { menuId = ''; refreshTicket(p); openPinDlg('Rename place', p.name, function (name) { p.name = name; savePlaces(); redrawPins(); renderPlaces(); refreshTicket(p); }); }
       else if (act === 'del') {
         if (!b.classList.contains('confirm')) {   // first tap asks, a second one within 3 s deletes
           var was = b.innerHTML;
@@ -271,8 +312,12 @@
 
     document.addEventListener('keydown', function (e) {
       if (e.key !== 'Escape') return;
+      if (menuId || editor) {
+        var p = placeById(menuId || editor.id);
+        if (p) { e.stopPropagation(); closeTicket(p.id); refreshTicket(p, '[data-pin-act="more"]'); return; }
+      }
       if (!pinDlg.hidden) closePinDlg(); else if (placing) endPlacing();
-    });
+    }, true);
 
     redrawPins();
     renderPlaces();
@@ -291,6 +336,9 @@
       markerSvg: markerSvg,
       labelOpen: labelOpen,
       popupHtml: pinPopupHtml,
+      preview: preview,
+      editing: function (id) { return !!editor && editor.id === id; },
+      closeTicket: closeTicket,
       add: addPlace
     };
   })();
