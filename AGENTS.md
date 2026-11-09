@@ -31,6 +31,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [House-mode façades](docs/3d-building-textures.md).** Reduced fallback window size and varied plaster finishes on non-residential-model outlines.
+
 **2026-11-09 — [Natural building finishes](docs/3d-building-textures.md).** Updated textured walls and added plain roofs to footprint extrusions. Rebuilt the GLBs and preview. Verified the textured 3D view around Serdika in release 102.
 
 **2026-11-09 — [Building model catalog](docs/3d-building-textures.md#building-model-catalog-and-test-preview).** Exported 21 GLBs and rendered their embedded materials for a labeled test sheet. Verified the numbered release in 3D near Serdika with both building switches enabled.

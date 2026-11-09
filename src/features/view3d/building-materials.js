@@ -2,6 +2,10 @@
     var scheme = 'sofia-buildings', registered = false;
     var colors = { green: [211, 195, 169], blue: [151, 148, 141], purple: [182, 148, 125], gold: [209, 193, 158] };
 
+    var plaster = { facade: [210,191,165], ivory: [217,210,194], clay: [195,164,143] };
+    var plasterPattern = ['image', ['match', ['%', ['to-number', ['id'], 0], 3],
+      1, 'v3-material-ivory', 2, 'v3-material-clay', 'v3-material-facade']];
+
     function pattern(material) {
       var image = new ImageData(32, 32), color = colors[material];
       for (var y = 0; y < 32; y++) {
@@ -28,11 +32,11 @@
             var block = (x + 8 * Math.floor(y / 8)) % 16;
             shade = y % 8 === 0 || block === 0 ? -34 : ((x * 19 + y * 31) % 9) - 4;
           }
-          if (material === 'facade') {
+          if (plaster[material]) {
             var frame = x % 16, floor = y % 16;
             color = floor === 15 ? [165,145,125] :
               frame >= 4 && frame <= 11 && floor >= 3 && floor <= 11 ?
-              (frame === 8 || floor === 7 ? [183,167,145] : [108,105,100]) : [210,191,165];
+              (frame === 8 || floor === 7 ? [183,167,145] : [108,105,100]) : plaster[material];
           }
           var offset = (y * 32 + x) * 4;
           for (var c = 0; c < 3; c++) image.data[offset + c] = color[c] + shade;
@@ -67,9 +71,9 @@
         map3.addSource(sourceId, { type: 'vector', minzoom: 14, maxzoom: 14,
           tiles: source.tiles.map(function (url) { return url.replace(/^ofm:/, scheme + ':'); }) });
       }
-      Object.keys(colors).concat('facade').forEach(function (name) {
+      Object.keys(colors).concat(Object.keys(plaster)).forEach(function (name) {
         var id = 'v3-material-' + name;
-        if (!map3.hasImage(id)) map3.addImage(id, pattern(name));
+        if (!map3.hasImage(id)) map3.addImage(id, pattern(name), {pixelRatio: plaster[name] ? 2 : 1});
       });
       var copy = JSON.parse(JSON.stringify(layer));
       copy.id += '-material';
@@ -99,8 +103,8 @@
           install(map3, layer, source);
         }
         var material = layer.id + '-material';
-        map3.setPaintProperty(material, 'fill-extrusion-opacity', enabled ? 0.92 : VIEW3D_BUILDING_OPACITY);
-        map3.setPaintProperty(material, 'fill-extrusion-pattern', enabled ? ['image', ['concat', 'v3-material-', ['coalesce', ['get', 'material'], 'facade']]] : houses ? ['image', 'v3-material-facade'] : null);
+        map3.setPaintProperty(material, 'fill-extrusion-opacity', enabled || houses ? 0.92 : VIEW3D_BUILDING_OPACITY);
+        map3.setPaintProperty(material, 'fill-extrusion-pattern', enabled ? ['image', ['concat', 'v3-material-', ['coalesce', ['get', 'material'], 'facade']]] : houses ? plasterPattern : null);
         map3.setLayoutProperty(material + '-roof', 'visibility', enabled || houses ? 'visible' : 'none');
         if (houses && !map3.getLayer(material + '-houses')) {
 

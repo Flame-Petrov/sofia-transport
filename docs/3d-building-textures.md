@@ -4,7 +4,7 @@
 
 The tilted map uses the bundled building source with either appearance switch on or off. With both off it uses neutral paint. At South Bus Station, the prepared footprint for way 630236462 uses an estimated 12 m underside and 14 m deck top. To check clearance, tilt the map at close zoom and rotate around the station with house designs on and off. The source contains 255 native zoom-14 tiles. Each tile includes a buffer for buildings that cross its edge. The renderer decompresses requested tiles individually. Outside complete extract tiles, or if a tile cannot be decoded, the same source reads the original OpenFreeMap tile through the app’s offline cache and uses a warm window pattern when either appearance switch is on.
 
-The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded building tile is approximately 143 KB. The five 32 × 32 RGBA patterns together contain 20 KiB of pixel data. No geometry measurements take place on the device.
+The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded building tile is approximately 143 KB. The seven 32 × 32 RGBA patterns together contain 28 KiB of pixel data. No geometry measurements take place on the device.
 
 **Source and refresh.** Building geometry and classifications are derived from © OpenStreetMap contributors and distributed under ODbL 1.0. The BBBike Sofia extract used here has replication timestamp `2026-11-07T00:00:00Z`. In a Python environment with `osmium`, `shapely` (2.1+), `pyproj` and `mapbox-vector-tile`, run `python site/tools/prepare_buildings.py Sofia.osm.pbf` from the workspace root to regenerate `building-tiles.js`, then rebuild the HTML. Use the rectangular Sofia extract and recheck the reviewed outlines and tile samples when refreshing. [Extract](https://download.bbbike.org/osm/bbbike/Sofia/) · [OSM attribution and license](https://www.openstreetmap.org/copyright)
 
@@ -47,7 +47,7 @@ For example, a 50 m-long, 12 m-high hall uses muted brick even when it runs diag
 |---|---|---|
 | Off | Off | Original height-shaded extrusions |
 | Off | On | Four building classes in their natural materials |
-| On | Off | Houses with natural plaster and terracotta roofs; window-patterned extrusions elsewhere |
+| On | Off | Houses with natural plaster and terracotta roofs; finer sash windows on sand, ivory or clay plaster elsewhere |
 | On | On | Houses with natural façades and clay roofs; other buildings retain their natural materials |
 
 The [five-design preview](../models/bulgarian-house-designs.png) shows the natural palettes. The reference meshes are [Shuttered gable](../models/house-shuttered-gable.glb), [Timber frame](../models/house-timber-frame.glb), [Brick cornice](../models/house-brick-cornice.glb), [Wooden veranda](../models/house-wooden-veranda.glb), and [Dormer cottage](../models/house-dormer-cottage.glb). The map uses the same procedural geometry in `src/features/view3d/bulgarian-houses.js`, scaled to each eligible footprint and batched for drawing.
@@ -76,3 +76,5 @@ The shipped tiles contain 133,769 distinct footprints and parts. All 3,757 IDs r
 The [21-model test sheet](../models/building-model-tests.png) shows the ten residential designs, four material-class exemplars and seven footprint forms. The latter include a courtyard, L and U wings, a rounded footprint, an irregular polygon, a multi-height complex and a raised deck. The GLBs in `models/` are metre-scale standalone examples. The standalone map builds its residential meshes locally and extrudes the actual mapped rings at their stored base and roof heights. This retains courtyard holes, orientation and the clearance under raised decks.
 
 Run `python site/tools/build_building_models.py` with Node, NumPy and Pillow installed. The exporter samples the residential mesh builder and the images registered by the app, writes the GLBs with embedded materials, then reads and rasterizes each exported GLB for the labeled test sheet. In the map, enable both building switches, enter 3D and zoom into Serdika to compare sand plaster, gray glazed towers, horizontal window bands and pitched roofs.
+
+With only house designs enabled, the footprint ID selects one of three plaster finishes. A pixel ratio of two halves the displayed window spacing. Patterned walls use the same opacity with either switch enabled.
