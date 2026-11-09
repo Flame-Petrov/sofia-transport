@@ -1203,7 +1203,7 @@
   .me-beam svg { position: absolute; left: 0; top: 0; width: 120px; height: 120px; transform: translate(-50%, -50%); zoom: var(--ui); transition: opacity .3s; }
   .me-beam.off svg { opacity: 0; }
   /* popups on the 3D map (PC): the same cards as the 2D popups, in glass */
-  .v3-pop { z-index: 5; }
+  .v3-pop { z-index: 8; } /* above every 3D marker, including the tracked vehicle (7) */
   .v3-pop .maplibregl-popup-content {
     padding: 0; border-radius: 16px; background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); color: var(--ink); zoom: var(--ui); font-size: 13px; line-height: 1.45;
@@ -1490,7 +1490,7 @@
       <label class="dg-switch"><span>3D building textures</span><input type="checkbox" id="v3Textures" role="switch" aria-describedby="v3TextureKey"><span class="sw" aria-hidden="true"></span></label>
       <div id="v3TextureKey" class="pl-hint" hidden>Small · green, tall · blue, wide · purple, monuments · gold.</div>
       <label class="dg-switch"><span>Bulgarian house designs</span><input type="checkbox" id="v3HouseDesigns" role="switch" aria-describedby="v3HouseHint"><span class="sw" aria-hidden="true"></span></label>
-      <div id="v3HouseHint" class="pl-hint" hidden>Five low-rise designs appear at zoom 18. Building textures add the green small-building color.</div>
+      <div id="v3HouseHint" class="pl-hint" hidden>Five low-rise designs appear at zoom 18. Houses keep their natural colors with building textures on or off.</div>
     </div>
     <div class="reveal"><button id="diagBtn" class="dg-row" type="button" aria-expanded="false" aria-controls="diagBody">
       <svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.5" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M8 7.2v4M8 4.8v.1" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>
@@ -9328,7 +9328,7 @@
     var mixed = Math.imul((id >>> 0) ^ Math.floor(id / 4294967296), 0x45d9f3b);
     return ((mixed ^ (mixed >>> 16)) >>> 0) % houseDesigns.length;
   }
-  function bulgarianHouse(f, vertices, origin, map, wallTint) {
+  function bulgarianHouse(f, vertices, origin, map) {
     var geometry = f.geometry, height = Number(f.properties.render_height);
     if (geometry.type !== 'Polygon' || geometry.coordinates.length !== 1 ||
         geometry.coordinates[0].length !== 5 || height < 3 || height > 12 ||
@@ -9362,7 +9362,7 @@
     var center = corners.reduce(function (s,p) {return [s[0]+p[0]/4,s[1]+p[1]/4];},[0,0]);
     var elevation = map.getTerrain() ? map.queryTerrainElevation(ring[0]) || 0 : 0;
     var design = houseDesigns[houseDesignIndex(f.id)];
-    var plaster = wallTint || design.wall;
+    var plaster = design.wall;
     var timber=[0.29,0.18,0.13], glass=[0.23,0.36,0.40], stone=[0.55,0.51,0.44];
     function at(i,z,extra) {
       var p=corners[i], d=Math.hypot(p[0]-center[0],p[1]-center[1]);
@@ -9525,9 +9525,9 @@
         }
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
         var now=performance.now(),currentTerrain=!!map.getTerrain();
-        var useColor=!!map.getPaintProperty(materialLayer,'fill-extrusion-pattern');
-        if((dirty && now-lastBuild>200) || terrain!==currentTerrain || colored!==useColor){
-          colored=useColor;
+        
+        if((dirty && now-lastBuild>200) || terrain!==currentTerrain){
+
           gl.bufferData(gl.ARRAY_BUFFER,rebuild(),gl.DYNAMIC_DRAW);
           lastBuild=now;dirty=false;terrain=currentTerrain;
         } else if(dirty) map.triggerRepaint();
@@ -9632,8 +9632,8 @@
         map3.setPaintProperty(material, 'fill-extrusion-opacity', enabled ? 0.92 : VIEW3D_BUILDING_OPACITY);
         map3.setPaintProperty(material, 'fill-extrusion-pattern', enabled ? ['image', ['concat', 'v3-material-', ['get', 'material']]] : null);
         if (houses && !map3.getLayer(material + '-houses')) {
-          var wallTint = colors.green.map(function (channel) { return channel / 255; });
-          map3.addLayer(bulgarianHouseLayer(material, 'v3-material-' + layer.source, wallTint), layer.id);
+
+          map3.addLayer(bulgarianHouseLayer(material, 'v3-material-' + layer.source), layer.id);
         } else if (!houses && map3.getLayer(material + '-houses')) {
           map3.removeLayer(material + '-houses');
         }

@@ -83,8 +83,8 @@
         map3.setPaintProperty(material, 'fill-extrusion-opacity', enabled ? 0.92 : VIEW3D_BUILDING_OPACITY);
         map3.setPaintProperty(material, 'fill-extrusion-pattern', enabled ? ['image', ['concat', 'v3-material-', ['get', 'material']]] : null);
         if (houses && !map3.getLayer(material + '-houses')) {
-          var wallTint = colors.green.map(function (channel) { return channel / 255; });
-          map3.addLayer(bulgarianHouseLayer(material, 'v3-material-' + layer.source, wallTint), layer.id);
+
+          map3.addLayer(bulgarianHouseLayer(material, 'v3-material-' + layer.source), layer.id);
         } else if (!houses && map3.getLayer(material + '-houses')) {
           map3.removeLayer(material + '-houses');
         }

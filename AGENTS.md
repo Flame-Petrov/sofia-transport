@@ -28,6 +28,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 ## Current roadmap and handoff
 
 <!-- AGENT-HANDOFF:START -->
+
+**2026-11-09 — [House materials](docs/3d-building-textures.md).** Modeled houses use their design palette with either building texture setting.
 **Editable by future agents.** Keep this section current. After a task, update the affected owner or next step and add a dated handoff with the change, verification performed, and anything still open. Replace superseded entries. Keep durable rules above the marker.
 
 | Work area | Start here in src/ | Follow into |
@@ -107,4 +109,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-09 — [Five Bulgarian house designs](docs/3d-building-textures.md).** The dropdown saves house designs separately from building coloring. Eligible footprints consistently select one of five meshes, with green façades when coloring is enabled. The guide links the five GLBs and their preview. Verified both releases, mesh geometry and JavaScript syntax. At 1280 × 800, headless Chrome opened the numbered release, restored the switch after reload, rendered 47,247 house vertices and exercised all four switch combinations using a controlled basemap style and the bundled Sofia tiles. Live basemap startup fell back to the image map during testing.
 
+**2026-11-09 — [South Bus Station bridge clearance](docs/3d-building-textures.md).** Corrected the prepared deck elevations in the tile and generator and enabled the prepared geometry with neutral paint. Checked the decoded tile and both builds. Visual confirmation remains open.
+
 <!-- AGENT-HANDOFF:END -->
+
+**2026-11-09 — 3D popup overlap.** Raised the common popup layer above the tracked vehicle and location marker. See [3D map popups](docs/3d-popups.md) for ownership and the interaction check.

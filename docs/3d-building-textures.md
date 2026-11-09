@@ -22,7 +22,7 @@ The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded b
 
 ## Rider experience
 
-The **3D building textures** switch sits directly below **3D view: terrain (Vitosha)** in the menu. It starts off. Turning it on gives Sofia’s buildings four original, lightly patterned materials from the existing building zoom (15 in the app). Turning it off restores the pale, height-shaded extrusions and gives any enabled house designs their natural finish. A rider following a tram can try both looks from the same camera position and keep following it.
+The **3D building textures** switch sits directly below **3D view: terrain (Vitosha)** in the menu. It starts off. Turning it on gives Sofia’s buildings four original, lightly patterned materials from the existing building zoom (15 in the app). Turning it off restores the pale, height-shaded extrusions. A rider following a tram can try both looks from the same camera position and keep following it.
 
 Use the existing labelled checkbox with `role="switch"`. Show a compact text key beneath the enabled switch: “Small · green, tall · blue, wide · purple, monuments · gold.” A rider on the flat vector map can set the preference before entering 3D. Hide the control when 3D is unavailable. Remember the choice across mode changes and reloads using `store()` and a dedicated `sofia_3d_building_textures` key.
 
@@ -48,11 +48,11 @@ For example, a 50 m-long, 12 m-high hall is purple even when it runs diagonally 
 | Off | Off | Original height-shaded extrusions |
 | Off | On | Four building classes in their existing colors and patterns |
 | On | Off | Houses with natural plaster and terracotta roofs; neutral extrusions elsewhere |
-| On | On | Houses with green façades and clay roofs; other buildings retain their class colors |
+| On | On | Houses with natural façades and clay roofs; other buildings retain their class colors |
 
 The [five-design preview](../models/bulgarian-house-designs.png) shows the natural palettes. The reference meshes are [Shuttered gable](../models/house-shuttered-gable.glb), [Timber frame](../models/house-timber-frame.glb), [Brick cornice](../models/house-brick-cornice.glb), [Wooden veranda](../models/house-wooden-veranda.glb), and [Dormer cottage](../models/house-dormer-cottage.glb). The map uses the same procedural geometry in `src/features/view3d/bulgarian-houses.js`, scaled to each eligible footprint and batched for drawing.
 
-To verify, zoom to a residential street at app zoom 18 or higher and try each combination above. With both switches on, turn just the designs off and check that small buildings stay green. Turn designs back on, disable coloring, then reload and check that natural house finishes return. Zoom out a level to check the transition back to extrusions.
+To verify, zoom to a residential street at app zoom 18 or higher and try each combination above. With both switches on, turn just the designs off and check that small buildings stay green. Turn designs back on, disable coloring, then reload and check that natural house finishes persist. Zoom out a level to check the transition back to extrusions.
 
 The pattern generator in `src/features/view3d/building-materials.js` feathers the green mortar joints, uses low-contrast periodic gradients for the blue and purple bands, and halves the gold grain amplitude. The extrusion follows the mapped footprint. To inspect pattern contrast independently of the building silhouette, toggle textures at a fixed camera position, then rotate past a diagonal roofline.
 
