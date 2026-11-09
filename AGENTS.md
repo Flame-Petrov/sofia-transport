@@ -31,6 +31,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [Vehicle follow rotation](docs/3d-controls.md).** Manual rotation holds the chosen bearing during vehicle follow. The compass restores automatic orientation. Live gesture verification remains open.
+
 **2026-11-09 — [Saved place markers](docs/saved-place-markers.md).** Custom colors also tint the name label in both map modes with contrasting text. Added per-place marker shape and custom color pickers. Desktop Chrome verified color persistence, list rendering, and changing and resetting colors in 3D. Desktop Chrome verified all four choices on a legacy pin in release 102, persistence after reload, and changing the marker in 3D. Both build artifacts passed verification.
 
 **2026-11-09 — [Yug metro entrance](docs/3d-building-textures.md).** Extended the western vault along eight adjoining prepared footprints and removed their residential extrusions.

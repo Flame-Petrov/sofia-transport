@@ -10112,6 +10112,10 @@
     var trk = { color: '#888', tailRef: null }, fontB = ['Noto Sans Bold'];
     // v102: following cameras, route to a place
     var headingUp = store('sofia_3d_heading') !== 'north', fc = { off: null, at: 0 }, lc = { off: null, at: 0, rest: false };
+    var manualVehicleBearing = false;
+    function rotateVehicleCamera() {
+      if (following && !manualVehicleBearing) { manualVehicleBearing = true; refreshNorth(); }
+    }
     var stopsDrawn = [], terrainOn = store('sofia_3d_terrain') === null ? VIEW3D_TERRAIN : store('sofia_3d_terrain') === '1', demAttr = false;   // v103
     var textureBox = document.getElementById('v3Textures');
     var houseBox = document.getElementById('v3HouseDesigns');
@@ -10129,6 +10133,7 @@
       else return;
       event.preventDefault();
       event.stopImmediatePropagation();
+      if (move.bearing !== undefined) rotateVehicleCamera();
       m3.jumpTo(move);
     }
     textureBox.checked = store('sofia_3d_building_textures') === '1';
@@ -10277,7 +10282,8 @@
       window.addEventListener('touchend', pointerOff, true);
       window.addEventListener('touchcancel', pointerOff, true);
       m3.on('dragstart', function () { cancelFocusCard(); dragFrom = m3.getCenter(); dragAt = Date.now(); });
-      m3.on('drag', function () {
+      m3.on('drag', function (event) {
+        if (following && event.originalEvent && event.originalEvent.touches && event.originalEvent.touches.length > 1) { dragFrom = null; return; }
         if (!dragFrom) return;
         var p = m3.project(dragFrom), c = m3.project(m3.getCenter());
         if (Math.sqrt((p.x - c.x) * (p.x - c.x) + (p.y - c.y) * (p.y - c.y)) < DRAG_TAKEOVER_PX) return;
@@ -10286,7 +10292,10 @@
         setLocFollow(false);
       });
       m3.on('dragend', function () { dragFrom = null; dragAt = Date.now(); });
-      m3.on('rotate', needle);
+      m3.on('rotate', function (event) {
+        if (event.originalEvent) rotateVehicleCamera();
+        needle();
+      });
       m3.on('click', onClick);
       m3.on('contextmenu', function (e) { cancelPress(); addHere(e.lngLat); });
       // a long press: Android and PC send their own (contextmenu, above); iPhones don't, so there it is timed here
@@ -10929,7 +10938,7 @@
       var now = performance.now(), dt = fc.at ? Math.min(250, now - fc.at) : 16;   // (250: slow phones still ease at the right speed)
       fc.at = now;
       var b = m3.getBearing(), tb = headingUp ? vehBearing(v) : 0;
-      if (tb !== null) b = turnToward(b, tb, dt, LOOK_EASE_MS);
+      if (!manualVehicleBearing && tb !== null) b = turnToward(b, tb, dt, LOOK_EASE_MS);
       lockOn(fc, vehicleAnchor(v), followY(), b, dt, FOLLOW_TAU);
     }
     // your location: heading-up while you walk (compass, or the GPS direction); standing, it rests while the dot stays
@@ -10953,12 +10962,14 @@
     }
     function refreshNorth() {
       var sub = following || (loc && loc.follow), a = northBox.querySelector('a');
-      northBox.classList.toggle('hu', !!(sub && headingUp));
+      northBox.classList.toggle('hu', !!(sub && headingUp && !manualVehicleBearing));
       var t = sub ? (headingUp ? 'Heading up (tap for north up)' : 'North up (tap for heading up)') : 'North up';
+      if (following && manualVehicleBearing) t = 'Free rotation (tap to resume ' + (headingUp ? 'heading up)' : 'north up)');
       if (a.title !== t) { a.title = t; a.setAttribute('aria-label', t); }
     }
     view3d.refreshNorth = refreshNorth;
     view3d.followChanged = function (on) {
+      manualVehicleBearing = false;
       fc.off = null; fc.at = 0;
       if (m3) {   // pinch and wheel zoom around the followed vehicle (the camera's centre is it)
         try { m3.scrollZoom.enable(on ? { around: 'center' } : undefined); m3.touchZoomRotate.enable(on ? { around: 'center' } : undefined); } catch (e) {}
@@ -11254,7 +11265,8 @@
     view3d.north = function () {
       if (!m3) return;
       if (following || loc.follow) {
-        headingUp = !headingUp;
+        if (manualVehicleBearing) manualVehicleBearing = false;
+        else headingUp = !headingUp;
         store('sofia_3d_heading', headingUp ? 'heading' : 'north');
         refreshNorth();
         toast(headingUp ? 'Heading up: the map turns with the way ahead.' : 'North up while following.', 2200);
