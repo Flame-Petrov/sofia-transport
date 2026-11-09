@@ -15,6 +15,12 @@
           if (material === 'blue') shade = -5 * Math.cos(x * Math.PI / 4);
           if (material === 'purple') shade = -5 * Math.cos(y * Math.PI / 4);
           if (material === 'gold') shade = (((x * 19 + y * 31 + x * y * 7) % 13) - 6) / 2;
+          if (material === 'facade') {
+            var frame = x % 16, floor = y % 16;
+            color = floor === 15 ? [165,145,125] :
+              frame >= 4 && frame <= 11 && floor >= 3 && floor <= 11 ?
+              (frame === 8 || floor === 7 ? [183,167,145] : [88,107,114]) : [210,191,165];
+          }
           var offset = (y * 32 + x) * 4;
           for (var c = 0; c < 3; c++) image.data[offset + c] = color[c] + shade;
           image.data[offset + 3] = 255;
@@ -48,22 +54,14 @@
         map3.addSource(sourceId, { type: 'vector', minzoom: 14, maxzoom: 14,
           tiles: source.tiles.map(function (url) { return url.replace(/^ofm:/, scheme + ':'); }) });
       }
-      Object.keys(colors).forEach(function (name) {
+      Object.keys(colors).concat('facade').forEach(function (name) {
         var id = 'v3-material-' + name;
         if (!map3.hasImage(id)) map3.addImage(id, pattern(name));
       });
-      // Outside the extract, the same source returns normal OpenFreeMap features.
-      // The two filters are exclusive. Both layers occupy the original draw order.
-      [false, true].forEach(function (textured) {
-        var copy = JSON.parse(JSON.stringify(layer));
-        copy.id += textured ? '-material' : '-neutral';
-        copy.source = sourceId;
-        var filter = textured ? ['has', 'material'] : ['!', ['has', 'material']];
-        copy.filter = layer.filter ? ['all', layer.filter, filter] : filter;
-        if (textured) copy.paint['fill-extrusion-opacity'] = 0.92;
-        if (textured) copy.paint['fill-extrusion-pattern'] = ['image', ['concat', 'v3-material-', ['get', 'material']]];
-        map3.addLayer(copy, layer.id);
-      });
+      var copy = JSON.parse(JSON.stringify(layer));
+      copy.id += '-material';
+      copy.source = sourceId;
+      map3.addLayer(copy, layer.id);
     }
 
     function apply(map3, enabled, houses) {
@@ -78,7 +76,7 @@
         }
         var material = layer.id + '-material';
         map3.setPaintProperty(material, 'fill-extrusion-opacity', enabled ? 0.92 : VIEW3D_BUILDING_OPACITY);
-        map3.setPaintProperty(material, 'fill-extrusion-pattern', enabled ? ['image', ['concat', 'v3-material-', ['get', 'material']]] : null);
+        map3.setPaintProperty(material, 'fill-extrusion-pattern', enabled ? ['image', ['concat', 'v3-material-', ['coalesce', ['get', 'material'], 'facade']]] : houses ? ['image', 'v3-material-facade'] : null);
         if (houses && !map3.getLayer(material + '-houses')) {
 
           map3.addLayer(bulgarianHouseLayer(material, 'v3-material-' + layer.source), layer.id);

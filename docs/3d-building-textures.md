@@ -2,9 +2,9 @@
 
 ## Shipped data and renderer
 
-The tilted map uses the bundled building source with either appearance switch on or off. With both off it uses neutral paint. At South Bus Station, the prepared footprint for way 630236462 uses an estimated 12 m underside and 14 m deck top. To check clearance, tilt the map at close zoom and rotate around the station with house designs on and off. The source contains 255 native zoom-14 tiles. Each tile includes a buffer for buildings that cross its edge. The renderer decompresses requested tiles individually. Outside complete extract tiles, or if a tile cannot be decoded, the same source reads the original OpenFreeMap tile through the app’s offline cache and uses the neutral paint.
+The tilted map uses the bundled building source with either appearance switch on or off. With both off it uses neutral paint. At South Bus Station, the prepared footprint for way 630236462 uses an estimated 12 m underside and 14 m deck top. To check clearance, tilt the map at close zoom and rotate around the station with house designs on and off. The source contains 255 native zoom-14 tiles. Each tile includes a buffer for buildings that cross its edge. The renderer decompresses requested tiles individually. Outside complete extract tiles, or if a tile cannot be decoded, the same source reads the original OpenFreeMap tile through the app’s offline cache and uses a warm window pattern when either appearance switch is on.
 
-The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded building tile is approximately 143 KB. The four 32 × 32 RGBA patterns together contain 16 KiB of pixel data. No geometry measurements take place on the device.
+The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded building tile is approximately 143 KB. The five 32 × 32 RGBA patterns together contain 20 KiB of pixel data. No geometry measurements take place on the device.
 
 **Source and refresh.** Building geometry and classifications are derived from © OpenStreetMap contributors and distributed under ODbL 1.0. The BBBike Sofia extract used here has replication timestamp `2026-11-07T00:00:00Z`. In a Python environment with `osmium`, `shapely` (2.1+), `pyproj` and `mapbox-vector-tile`, run `python site/tools/prepare_buildings.py Sofia.osm.pbf` from the workspace root to regenerate `building-tiles.js`, then rebuild the HTML. Use the rectangular Sofia extract and recheck the reviewed outlines and tile samples when refreshing. [Extract](https://download.bbbike.org/osm/bbbike/Sofia/) · [OSM attribution and license](https://www.openstreetmap.org/copyright)
 
@@ -22,7 +22,7 @@ The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded b
 
 ## Rider experience
 
-The **3D building textures** switch sits directly below **3D view: terrain (Vitosha)** in the menu. It starts off. Turning it on gives Sofia’s buildings four original, lightly patterned materials from the existing building zoom (15 in the app). Turning it off restores the pale, height-shaded extrusions. A rider following a tram can try both looks from the same camera position and keep following it.
+The **3D building textures** switch sits directly below **3D view: terrain (Vitosha)** in the menu. It starts off. Turning it on gives Sofia’s buildings four original, lightly patterned materials from the existing building zoom (15 in the app). Turning it off uses a warm window pattern if house designs are enabled, or pale height-shaded extrusions if both switches are off. A rider following a tram can try both looks from the same camera position and keep following it.
 
 Use the existing labelled checkbox with `role="switch"`. Show a compact text key beneath the enabled switch: “Small · green, tall · blue, wide · purple, monuments · gold.” A rider on the flat vector map can set the preference before entering 3D. Hide the control when 3D is unavailable. Remember the choice across mode changes and reloads using `store()` and a dedicated `sofia_3d_building_textures` key.
 
@@ -47,7 +47,7 @@ For example, a 50 m-long, 12 m-high hall is purple even when it runs diagonally 
 |---|---|---|
 | Off | Off | Original height-shaded extrusions |
 | Off | On | Four building classes in their existing colors and patterns |
-| On | Off | Houses with natural plaster and terracotta roofs; neutral extrusions elsewhere |
+| On | Off | Houses with natural plaster and terracotta roofs; window-patterned extrusions elsewhere |
 | On | On | Houses with natural façades and clay roofs; other buildings retain their class colors |
 
 The [five-design preview](../models/bulgarian-house-designs.png) shows the natural palettes. The reference meshes are [Shuttered gable](../models/house-shuttered-gable.glb), [Timber frame](../models/house-timber-frame.glb), [Brick cornice](../models/house-brick-cornice.glb), [Wooden veranda](../models/house-wooden-veranda.glb), and [Dormer cottage](../models/house-dormer-cottage.glb). The map uses the same procedural geometry in `src/features/view3d/bulgarian-houses.js`, scaled to each eligible footprint and batched for drawing.
@@ -61,7 +61,7 @@ The pattern generator in `src/features/view3d/building-materials.js` feathers th
 - `src/features/view3d/menu.html`, `view.css` and `view.js` own the two switches, their hints and their saved preferences. The style-load callback and switch handler use the same material routine. Each 3D map registers the images and layers on its first use of textures. The standalone build includes the material code and tile bundle through `src/page.html`.
 - For a visual check, open the menu, enable **3D building textures**, enter 3D and zoom to Alexander Nevsky Square. Compare both settings at the same pitch and bearing, then check the tile-edge sample above. Switch while following a vehicle and reload with each setting.
 
-The shipped tiles contain 133,769 distinct footprints and parts. All 3,757 IDs repeated across buffered tiles retained the same class. Chrome rendered all four materials on desktop and in a 390 × 844 phone viewport. The tests exercised keyboard and rapid opening toggles, saved on/off states, terrain, a followed vehicle’s open popup, cached rendering and forced tile-decoding failure. A failed decode drew the original neutral buildings. The workspace’s `debug images/3D building textures/` contains the matching camera views. The live-feed connection dialog can cover the menu during a sustained outage. Frame time and memory on a physical phone still need measurement.
+The shipped tiles contain 133,769 distinct footprints and parts. All 3,757 IDs repeated across buffered tiles retained the same class. Chrome rendered all four materials on desktop and in a 390 × 844 phone viewport. The tests exercised keyboard and rapid opening toggles, saved on/off states, terrain, a followed vehicle’s open popup, cached rendering and forced tile-decoding failure. That earlier failed-decode test predates the window-pattern fallback. The workspace’s `debug images/3D building textures/` contains the matching camera views. The live-feed connection dialog can cover the menu during a sustained outage. Frame time and memory on a physical phone still need measurement.
 
 ## Acceptance checks
 

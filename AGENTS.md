@@ -4,6 +4,8 @@ Read the standing rules and the current handoff before editing. Paths in this gu
 
 ## Standing navigation rules
 
+Always end task reports with three bullets: **Completed** for what was accomplished, **Repository** for the branch, commit and push status relative to main (or why the status is unknown or inapplicable), and **Warning** for blockers, risks or unverified work. Use “None” when there is no warning.
+
 1. Start from a rider action and an entry point. Reproduce the symptom on the local launcher or the hosted page and record the viewport, map mode, and live or timetable data involved when relevant.
 2. Edit the owning feature under `src/features/`. Keep its interactions, feature-specific markup, and styling together. Put behavior used by multiple features under `src/shared/`. A feature decides when to follow a vehicle. The shared camera moves the map.
 3. Trace both directions before changing a cross-feature operation. Search the source for its definition and callers, including open popups, phone sheets, live refresh, and the 3D view where applicable. For example, run `rg -n "arrivalsAt|guessArrival|stopPopupHtml" src` from this directory.
@@ -29,15 +31,19 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — Reporting preference.** Future handoffs use the three bullets specified above.
+
+**2026-11-09 — [Building texture coverage](docs/3d-building-textures.md).** In the bundled tiles, 64,324 of 133,769 footprint/part IDs miss the residential model criteria. The designs switch now paints the underlying extrusions with a window material; unclassified fallback tiles also get a texture with either switch on. Build and syntax checks passed. Live WebGL appearance remains unverified.
+
 **2026-11-09 — [Expanded building designs](docs/3d-building-textures.md).** The model layer includes purple-class blocks, accepts edges from 4 to 65 m and fits walls up to 28 m.
 
 **2026-11-09 — [Residential model zoom](docs/3d-building-textures.md).** Houses and apartments start at app zoom 16; check the transition from zoom 15 with the designs switch enabled.
 
 **2026-11-09 — [Tracked metro route](docs/marker-camera.md).** The 3D route sources now initialize from current vehicle progress, including when the hidden flat map is zooming.
 
-**2026-11-09 — [Larger residential buildings](docs/3d-building-textures.md).** Added five size-selected designs under the Bulgarian houses and apartments switch. Check the next size tier on rectangular residential blocks at zoom 18.
-
 **2026-11-09 — [Metro carriage turns](docs/vehicle-models.md).** The 3D metro model samples its timetable path at the carriage ends and pivots on every moving frame. A controlled replay of the numbered build covered 801 frames each on left and right bends, including both termini. Live WebGL appearance remains unverified.
+
+**2026-11-09 — [Larger residential buildings](docs/3d-building-textures.md).** Added five size-selected designs under the Bulgarian houses and apartments switch. Check the next size tier on rectangular residential blocks at zoom 18.
 
 **2026-11-09 — [House materials](docs/3d-building-textures.md).** Modeled houses use their design palette with either building texture setting.
 **Editable by future agents.** Keep this section current. After a task, update the affected owner or next step and add a dated handoff with the change, verification performed, and anything still open. Replace superseded entries. Keep durable rules above the marker.
