@@ -7,15 +7,22 @@
     { name: 'Wooden veranda', hip: 1, pitch: 0.27, wall: [0.95,0.85,0.72], roof: [0.72,0.33,0.20] },
     { name: 'Dormer cottage', hip: 0.55, pitch: 0.46, wall: [0.89,0.82,0.63], roof: [0.62,0.25,0.14] }
   ];
-  function houseDesignIndex(id) {
+  var apartmentDesigns = [
+    { name: 'Ochre balcony flats', hip: 1, pitch: 0.24, wall: [0.89,0.72,0.49], roof: [0.62,0.29,0.17] },
+    { name: 'Brick stairwell block', hip: 0.3, pitch: 0.21, wall: [0.77,0.48,0.35], roof: [0.49,0.27,0.21] },
+    { name: 'Corniced city residence', hip: 0.8, pitch: 0.36, wall: [0.92,0.85,0.71], roof: [0.59,0.26,0.18] },
+    { name: 'Gallery apartments', hip: 0, pitch: 0.22, wall: [0.82,0.76,0.65], roof: [0.51,0.28,0.22] },
+    { name: 'Modernist walk-up', hip: 1, pitch: 0.035, wall: [0.91,0.89,0.83], roof: [0.43,0.43,0.41] }
+  ];
+  function houseDesignIndex(id, designs) {
     // Prepared way IDs usually end in 2. Mix the upper digits before choosing.
     var mixed = Math.imul((id >>> 0) ^ Math.floor(id / 4294967296), 0x45d9f3b);
-    return ((mixed ^ (mixed >>> 16)) >>> 0) % houseDesigns.length;
+    return ((mixed ^ (mixed >>> 16)) >>> 0) % designs.length;
   }
   function bulgarianHouse(f, vertices, origin, map) {
     var geometry = f.geometry, height = Number(f.properties.render_height);
     if (geometry.type !== 'Polygon' || geometry.coordinates.length !== 1 ||
-        geometry.coordinates[0].length !== 5 || height < 3 || height > 12 ||
+        geometry.coordinates[0].length !== 5 || height < 3 || height > 21 ||
         Number(f.properties.render_min_height) !== 0) return false;
     var ring = geometry.coordinates[0];
     var site = maplibregl.MercatorCoordinate.fromLngLat(ring[0]);
@@ -29,7 +36,9 @@
       return [q[0]-p[0],q[1]-p[1]];
     });
     var lengths = edges.map(function (e) { return Math.hypot(e[0],e[1]); });
-    if (Math.min.apply(null,lengths) < 5 || Math.max.apply(null,lengths) > 26) return false;
+    var longest = Math.max.apply(null,lengths);
+    if (Math.min.apply(null,lengths) < 5 || longest > 44) return false;
+    var designs = height > 12 || longest > 26 ? apartmentDesigns : houseDesigns;
     // Reject skewed, concave and tile-clipped outlines masquerading as houses.
     if (edges.some(function (a,i) {
       var j=(i+1)%4,b=edges[j];
@@ -45,7 +54,7 @@
     if (lengths[1]>lengths[0]) corners.push(corners.shift());
     var center = corners.reduce(function (s,p) {return [s[0]+p[0]/4,s[1]+p[1]/4];},[0,0]);
     var elevation = map.getTerrain() ? map.queryTerrainElevation(ring[0]) || 0 : 0;
-    var design = houseDesigns[houseDesignIndex(f.id)];
+    var design = designs[houseDesignIndex(f.id, designs)];
     var plaster = design.wall;
     var timber=[0.29,0.18,0.13], glass=[0.23,0.36,0.40], stone=[0.55,0.51,0.44];
     function at(i,z,extra) {
@@ -78,6 +87,20 @@
       panel(0,1,0,height,plaster,0.08);
       panel(0,1,0,0.55,stone,0.11);
       var floors=Math.max(1,Math.round(height/3.4)), bays=Math.max(2,Math.floor(len/3.2));
+      var limestone=[0.84,0.80,0.71];
+      if(design.name==='Brick stairwell block' && i%2===0){
+        panel(0.41,0.59,0,height,limestone,0.13);
+      }
+      if(design.name==='Modernist walk-up'){
+        for(var band=0;band<floors;band++){
+          panel(0.04,0.96,(band+0.26)*height/floors,(band+0.82)*height/floors,[0.46,0.51,0.52],0.13);
+        }
+      }
+      if(design.name==='Corniced city residence'){
+        for(var course=1;course<=floors;course++){
+          panel(0,1,course*height/floors-0.35,course*height/floors,limestone,0.48);
+        }
+      }
       if(design.name==='Timber frame'){
         for(var post=0;post<=bays;post++){
           var axis=post/bays;
@@ -135,6 +158,22 @@
         function front(along,depth,z){
           return [midpoint[0]+along*dx/len+depth*(inward[0]-midpoint[0])/reach,
             midpoint[1]+along*dy/len+depth*(inward[1]-midpoint[1])/reach,z];
+        }
+        if(design.name==='Ochre balcony flats' || design.name==='Gallery apartments'){
+          var gallery=design.name==='Gallery apartments';
+          var centers=gallery?[0]:[-len*0.25,len*0.25];
+          var halfSpan=gallery?len*0.43:Math.min(2.4,len*0.17);
+          for(var storey=1;storey<floors;storey++){
+            var slab=storey*height/floors;
+            centers.forEach(function(x){
+              var left=x-halfSpan,right=x+halfSpan;
+              quad(front(left,-1,slab),front(right,-1,slab),front(right,0.6,slab),front(left,0.6,slab),stone,1);
+              quad(front(left,-1,slab-0.14),front(right,-1,slab-0.14),front(right,-1,slab+0.85),front(left,-1,slab+0.85),limestone,0.94);
+              [left,right].forEach(function(end){
+                quad(front(end,-1,slab),front(end,0.6,slab),front(end,0.6,slab+0.85),front(end,-1,slab+0.85),limestone,0.8);
+              });
+            });
+          }
         }
         if(design.name==='Dormer cottage'){
           var start=reach*0.20,back=reach*0.72,base=height+rise*0.19,top=height+rise*0.58;
