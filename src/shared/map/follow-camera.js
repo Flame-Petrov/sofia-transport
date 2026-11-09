@@ -63,13 +63,15 @@
   // between GPS readings (glideMe). Before, each reading (~1 per second) started a 0.8 s pan to it and the dot
   // jumped: stop-and-go (the camera stood still in ~36 % of frames, measured) with a jump each second.
   function locFrame() {
-    if ((loc.state !== 'on' && loc.state !== 'wait') || !loc.show || !loc.marker) return;
+    if ((loc.state !== 'on' && loc.state !== 'wait') || !loc.show || (!view3d.on && !loc.marker)) return;
     var sh = loc.show, now = performance.now();
     if (sh.dur && sh.ll !== sh.to) {
       var k = Math.min(1, (now - sh.t0) / sh.dur);
       sh.ll = k >= 1 ? sh.to : L.latLng(sh.from.lat + (sh.to.lat - sh.from.lat) * k, sh.from.lng + (sh.to.lng - sh.from.lng) * k);
-      loc.marker.setLatLng(sh.ll);
-      if (loc.acc) loc.acc.setLatLng(sh.ll);
+      if (!view3d.on) {
+        loc.marker.setLatLng(sh.ll);
+        if (loc.acc) loc.acc.setLatLng(sh.ll);
+      }
     }
     if (view3d.on) { locCam.off = null; locCam.at = 0; return; }   // v100: the glide above feeds the 3D dot; its camera is the 3D map's
     if (!loc.follow || following || loc.camHold || zooming || map._animatingZoom || (map.dragging && map.dragging.moving())) {

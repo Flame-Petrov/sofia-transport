@@ -31,6 +31,10 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [Rendering performance measurements and regressions](docs/rendering-performance.md).** Hosted 3D assets load on demand. The numbered release embeds them. Buildings retain their meshes across camera changes, and settled vehicles leave the animation set. Added Chrome camera replay and regression coverage for viewport re-entry, GPS projection, live trip ordering, journey delays and overtaking, asset retry and offline transaction failure. All 32 Node tests passed. The guide records the measured workloads and remaining device checks.
+
+**2026-11-09 — [Feature tests and transit fixes](docs/feature-tests.md).** Added 20 Node tests for rider actions, map behavior and transit data. Fixed tracked-stop ETAs outside the Sofia time zone and stopped the planner from adding a walking link when the feed prohibited the transfer. All 20 tests passed. The guide links the saved test log and gives the rerun command. Rebuilt both artifacts and verified the launcher served release 102.
+
 **2026-11-09 — [Metro Ticket saved places](docs/saved-place-markers.md).** Added the compact routing popup, options menu and draft marker editor. Desktop Chrome screenshots of all three states from release 102 are in the workspace under `debug images/Metro Ticket/`.
 
 **2026-11-09 — [Vehicle follow rotation](docs/3d-controls.md).** Manual rotation holds the chosen bearing during vehicle follow. The compass restores automatic orientation. Live gesture verification remains open.

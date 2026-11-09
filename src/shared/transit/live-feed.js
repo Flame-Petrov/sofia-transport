@@ -6,16 +6,16 @@
     if (!buf) return;
     try {
       var tum = decode(buf);
-      tuByVehicle = {}; tuCount = 0; tuByTrip = {}; stopIndex = {};
+      var byVehicle = {}, count = 0, byTrip = {}, byStop = {};
       var nStu = 0, withTime = 0, withDelay = 0, withStop = 0;
       (tum.entity || []).forEach(function (e) {
         var tu = e.trip_update;
         if (!tu || !tu.trip) return;
         var vehId = tu.vehicle ? (tu.vehicle.id || tu.vehicle.label || '') : '';
         if (tu.vehicle) {
-          tuCount++;
-          if (tu.vehicle.id) tuByVehicle[tu.vehicle.id] = tu.trip;
-          if (tu.vehicle.label) tuByVehicle[tu.vehicle.label] = tu.trip;
+          count++;
+          if (tu.vehicle.id) byVehicle[tu.vehicle.id] = tu.trip;
+          if (tu.vehicle.label) byVehicle[tu.vehicle.label] = tu.trip;
         }
         var tid = tu.trip.trip_id || '';
         var stus = (tu.stop_time_update || []).map(function (u) {
@@ -31,19 +31,23 @@
           };
         });
         if (!tid) return;
-        tuByTrip[tid] = { stus: stus, vehId: vehId, startDate: tu.trip.start_date || '',
+        byTrip[tid] = { stus: stus, vehId: vehId, startDate: tu.trip.start_date || '',
                           delay: typeof tu.delay === 'number' ? tu.delay : null };
         stus.forEach(function (x) {
           if (!x.stopId || x.skipped) return;
-          (stopIndex[x.stopId] || (stopIndex[x.stopId] = [])).push({ tripId: tid, vehId: vehId, t: x.t });
+          (byStop[x.stopId] || (byStop[x.stopId] = [])).push({ tripId: tid, vehId: vehId, t: x.t });
         });
       });
+      tuByVehicle = byVehicle; tuCount = count; tuByTrip = byTrip; stopIndex = byStop;
       tuSample = nStu + ' stop updates (time ' + withTime + ', delay ' + withDelay + ', stop_id ' + withStop + ')';
       tuStats = { n: nStu, time: withTime, delay: withDelay, stop: withStop };
-    } catch (e) { console.warn('Trip updates decode failed:', e); }
+      return true;
+    } catch (e) { console.warn('Trip updates decode failed:', e); return false; }
   }
 
+  var unresolvedPositions = [];
   function applyPositions(msg) {
+    unresolvedPositions = [];
     var seen = {};
     tripToVeh = {}; vehByLabel = {};
     (msg.entity || []).forEach(function (ent) {
@@ -53,6 +57,7 @@
       seen[d.key] = true;
       if (d.tripRef) tripToVeh[d.tripRef] = d.key;
       if (d.label) vehByLabel[d.label] = d.key;
+      if (d.via !== 'position') unresolvedPositions.push(ent);
       upsert(d);
     });
     Object.keys(vehicles).forEach(function (k) {
@@ -63,6 +68,7 @@
       dotLayer.removeLayer(v.dot);
       v.dotInMap = false;
       if (v.pill) { pillLayer.removeLayer(v.pill); v.pillInMap = false; }
+      forgetMotion(v);
       delete vehicles[k];
     });
   }
@@ -80,11 +86,50 @@
       });
   }
 
+  var updateSequence = 0, lastTripSequence = 0;
+  function enrichPositions() {
+    var changed = false;
+    unresolvedPositions.forEach(function (ent) {
+      var d = describe(ent), v = vehicles[d.key];
+      if (!v || (v.d.tripRef === d.tripRef && v.d.line === d.line && v.d.via === d.via && v.d.type === d.type && v.d.color === d.color && v.d.headsign === d.headsign)) return;
+      if (tripToVeh[v.d.tripRef] === d.key) delete tripToVeh[v.d.tripRef];
+      if (d.tripRef) tripToVeh[d.tripRef] = d.key;
+      upsert(d);
+      changed = true;
+    });
+    return changed;
+  }
+  function refreshFeedViews(fleetChanged) {
+    if (selected) {
+      if (vehicles[selected.d.key] === selected) {
+        if (shapes && (!flow || flow.m !== routeMetaFor(selected.d) || atEndOfRun(selected))) {
+          drawPath(selected); refreshPopup(selected);
+        }
+        drawRouteStops(true); // The shared refresh below updates stops after the fleet filter.
+      } else deselect();
+    }
+    if (fleetChanged) render(false);
+    else renderStops();
+    refreshStopViews();
+    renderDiag();
+    if (route) renderRoute();
+  }
+  function refreshTripUpdates(sequence) {
+    return fetchFeed(TU_URL, TU_TIMEOUT_MS).then(function (buf) {
+      if (sequence <= lastTripSequence || !applyTripUpdates(buf)) return;
+      lastTripSequence = sequence;
+      ovCache = null;
+      // Resolve missing trip IDs against the most recent positions, even when
+      // requests complete out of order. Never replay an older GPS snapshot.
+      refreshFeedViews(enrichPositions());
+    }).catch(function (e) { console.warn('Trip updates unavailable:', e); });
+  }
+
   // force = reprocess even if the feed hasn't changed (e.g. once line names have loaded)
   function update(force) {
     if (document.hidden || busy) return;
     busy = true;
-    fetchFeed(FEED_URL, FEED_TIMEOUT_MS)
+    return fetchFeed(FEED_URL, FEED_TIMEOUT_MS)
       .then(function (buf) {
         var msg = decode(buf);
         var ts = (msg.header && msg.header.timestamp) || 0;
@@ -92,7 +137,7 @@
         feedFailed = false;
         showReload(false);
         setProgress('vehicles', 1, 'Vehicles');
-        if (!force && ts && ts === lastHeaderTs) { render(false); return; }  // nothing new: skip the work
+        if (!force && ts && ts === lastHeaderTs) { renderFeedStatus(); return; }
         lastHeaderTs = ts;
         feedTime = ts ? ts * 1000 : Date.now();
         var arrived = Date.now();
@@ -105,28 +150,10 @@
           if (gap > 2000 && gap < 60000) feedInterval = Math.max(4000, Math.min(25000, feedInterval * 0.7 + gap * 0.3));
         }
         lastNewDataAt = arrived;
-        return fetchFeed(TU_URL, TU_TIMEOUT_MS)
-          .catch(function () { return null; })
-          .then(function (tuBuf) {
-            applyTripUpdates(tuBuf);
-            // decoding the trip updates takes ~20 ms and the rest ~10 ms: two short tasks instead of one
-            // long one, so the map can draw a frame in between
-            return new Promise(function (res) { setTimeout(res, 0); });
-          })
-          .then(function () {
-            applyPositions(msg);
-            staleFeed = false;
-            if (selected) {
-              if (vehicles[selected.d.key] === selected) {
-                if (shapes && (!flow || flow.m !== routeMetaFor(selected.d) || atEndOfRun(selected))) { drawPath(selected); refreshPopup(selected); }
-                drawRouteStops();
-              } else deselect();
-            }
-            render(false);
-            refreshStopViews();
-            renderDiag();
-            if (route) renderRoute();   // v93: live times of the ways shown
-          });
+        applyPositions(msg);
+        staleFeed = false;
+        refreshFeedViews(true);
+        refreshTripUpdates(++updateSequence);
       })
       .catch(function (e) {
         console.warn('Feed failed:', e);

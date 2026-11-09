@@ -1,2 +1,3 @@
 # The builder verifies the exact UTF-8 bytes of the standalone page.
 /index.html text eol=lf
+/tiles/buildings/**/*.pbf binary

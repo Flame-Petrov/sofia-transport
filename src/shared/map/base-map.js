@@ -199,17 +199,26 @@
   // tiles of an offline area (and the map fonts, which never change) are saved as kept
   var keepUrls = {};
   function keepTileT(url) { return keepUrls[url] || /\/fonts\//.test(url) ? KEEP_T + Date.now() : Date.now(); }
-  function fetchTile(url, signal) {
+  function fetchTile(url, signal, requireSaved) {
     if (!tileInflight[url]) {
       tileInflight[url] = fetch(url, signal ? { signal: signal } : undefined)
         .then(function (r) {
           if (!r.ok) { var e = new Error('HTTP ' + r.status); e.status = r.status; throw e; }
           return r.arrayBuffer();
         })
-        .then(function (buf) { idb.put('tiles', null, { url: url, d: buf, t: keepTileT(url) }); return buf; })
+        .then(function (buf) {
+          var saved = idb.put('tiles', null, { url: url, d: buf, t: keepTileT(url) });
+          return { buf: buf, saved: saved };
+        })
         .then(function (buf) { delete tileInflight[url]; return buf; }, function (e) { delete tileInflight[url]; throw e; });
     }
-    return tileInflight[url];
+    return tileInflight[url].then(function (tile) {
+      if (!requireSaved) return tile.buf;
+      return tile.saved.then(function (key) {
+        if (key !== url) throw new Error('Offline tile was not saved');
+        return tile.buf;
+      });
+    });
   }
   // A month-old build can be taken off OpenFreeMap's servers. A tile that is missing there (404) asks
   // for the current tile list once; if the build changed, every address of the old one is read from

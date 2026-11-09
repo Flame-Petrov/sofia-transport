@@ -1,0 +1,130 @@
+TAP version 13
+# Subtest: a vehicle moves along its route and holds at the terminus after the segment ends
+ok 1 - a vehicle moves along its route and holds at the terminus after the segment ends
+  ---
+  duration_ms: 147.7771
+  type: 'test'
+  ...
+# Subtest: following a vehicle hands the camera to 3D and releases it when toggled off
+ok 2 - following a vehicle hands the camera to 3D and releases it when toggled off
+  ---
+  duration_ms: 6.5566
+  type: 'test'
+  ...
+# Subtest: 3D vehicle model decoder produces finite triangle data for each shipped model
+ok 3 - 3D vehicle model decoder produces finite triangle data for each shipped model
+  ---
+  duration_ms: 797.7239
+  type: 'test'
+  ...
+# Subtest: offline sync retries a failed tile, records the ready area, and reuses it on the next sync
+ok 4 - offline sync retries a failed tile, records the ready area, and reuses it on the next sync
+  ---
+  duration_ms: 107.068
+  type: 'test'
+  ...
+# Subtest: performance overlay reports frame gaps and visible 3D markers on the phone layout
+ok 5 - performance overlay reports frame gaps and visible 3D markers on the phone layout
+  ---
+  duration_ms: 17.4999
+  type: 'test'
+  ...
+# Subtest: search matches exact line, fleet label or plate and respects the type buttons
+ok 6 - search matches exact line, fleet label or plate and respects the type buttons
+  ---
+  duration_ms: 61.0776
+  type: 'test'
+  ...
+# Subtest: adding a place persists its coordinates and active destination through reload
+ok 7 - adding a place persists its coordinates and active destination through reload
+  ---
+  duration_ms: 140.7827
+  type: 'test'
+  ...
+# Subtest: legacy pins keep their default flag and a missing destination is cleared
+ok 8 - legacy pins keep their default flag and a missing destination is cleared
+  ---
+  duration_ms: 11.5154
+  type: 'test'
+  ...
+# Subtest: location button starts a watch, accepts a GPS fix and releases the watch on stop
+ok 9 - location button starts a watch, accepts a GPS fix and releases the watch on stop
+  ---
+  duration_ms: 153.6436
+  type: 'test'
+  ...
+# Subtest: walking guidance detects arrival at the saved destination
+ok 10 - walking guidance detects arrival at the saved destination
+  ---
+  duration_ms: 14.7165
+  type: 'test'
+  ...
+# Subtest: service-day index restores split rows in order and excludes a cancelled service
+ok 11 - service-day index restores split rows in order and excludes a cancelled service
+  ---
+  duration_ms: 363.0217
+  type: 'test'
+  ...
+# Subtest: journey includes both rides, the published transfer, and the final walk
+ok 12 - journey includes both rides, the published transfer, and the final walk
+  ---
+  duration_ms: 287.4057
+  type: 'test'
+  ...
+# Subtest: a prohibited transfer between nearby stops cannot make a journey possible
+ok 13 - a prohibited transfer between nearby stops cannot make a journey possible
+  ---
+  duration_ms: 181.9944
+  type: 'test'
+  ...
+# Subtest: without a transfers table the planner can walk to a nearby connection
+ok 14 - without a transfers table the planner can walk to a nearby connection
+  ---
+  duration_ms: 49.6455
+  type: 'test'
+  ...
+# Subtest: planning to a saved place offers two rides and switches to walking after a missed connection
+ok 15 - planning to a saved place offers two rides and switches to walking after a missed connection
+  ---
+  duration_ms: 482.2894
+  type: 'test'
+  ...
+# Subtest: a cached timetable with old transfer rules is rebuilt once and reused on reload
+ok 16 - a cached timetable with old transfer rules is rebuilt once and reused on reload
+  ---
+  duration_ms: 48.4742
+  type: 'test'
+  ...
+# Subtest: tracked night bus shows the Sofia service-day ETA on a UTC device
+ok 17 - tracked night bus shows the Sofia service-day ETA on a UTC device
+  ---
+  duration_ms: 151.4659
+  type: 'test'
+  ...
+# Subtest: explicit service dates use Sofia noon on both daylight-saving transitions
+ok 18 - explicit service dates use Sofia noon on both daylight-saving transitions
+  ---
+  duration_ms: 28.8799
+  type: 'test'
+  ...
+# Subtest: live arrivals resolve a vehicle, omit skipped stops, and merge with metro times
+ok 19 - live arrivals resolve a vehicle, omit skipped stops, and merge with metro times
+  ---
+  duration_ms: 38.6294
+  type: 'test'
+  ...
+# Subtest: metro station board includes the hour boundary, marks the terminus and drops departed trains
+ok 20 - metro station board includes the hour boundary, marks the terminus and drops departed trains
+  ---
+  duration_ms: 19.0001
+  type: 'test'
+  ...
+1..20
+# tests 20
+# suites 0
+# pass 20
+# fail 0
+# cancelled 0
+# skipped 0
+# todo 0
+# duration_ms 3638.7302

@@ -6,8 +6,23 @@
     [[23.3638352,42.6587999,23.363959,42.6589135],[23.3648815,42.6581889,23.3650094,42.6583069]],
     [[23.3649049,42.6582105,23.3649854,42.6582848],[23.3659319,42.6576241,23.3660074,42.6576898],[23.3659371,42.6576211,23.3660126,42.6576869],[23.3686424,42.656129,23.3687267,42.6561932],[23.3686543,42.6561225,23.3687382,42.6561863],[23.3694374,42.6556543,23.3695199,42.6557139],[23.3694467,42.6556487,23.3695287,42.6557079],[23.3699237,42.6553224,23.370007,42.6553808],[23.3699311,42.6553173,23.3700143,42.6553756],[23.3705828,42.6548515,23.3706731,42.6549129]]
   ];
-  function metroCanopyVertices(map, origin) {
-    var vertices = [], bounds = map.getBounds(), facets = 16;
+  function visibleMetroRoofSegments(bounds) {
+    var visible = new Set();
+    metroRoofSections.forEach(function(rows, section) {
+      for (var j=1;j<rows.length;j++) {
+        var a=rows[j-1], b=rows[j];
+        if (Math.max(a[0],a[2],b[0],b[2]) >= bounds.getWest() &&
+            Math.min(a[0],a[2],b[0],b[2]) <= bounds.getEast() &&
+            Math.max(a[1],a[3],b[1],b[3]) >= bounds.getSouth() &&
+            Math.min(a[1],a[3],b[1],b[3]) <= bounds.getNorth()) visible.add(section+'/'+j);
+      }
+    });
+    return visible;
+  }
+
+  function metroCanopyVertices(map, origin, visible) {
+    if (!visible) visible=visibleMetroRoofSegments(map.getBounds());
+    var vertices = [], facets = 16;
     var concrete = [.62,.59,.54], frame = [.35,.34,.32], underside = [.45,.43,.40];
     function quad(a,b,c,d,color) {
       for (var point of [a,b,c,a,c,d]) vertices.push(...point,...color);
@@ -51,17 +66,14 @@
         }
       }
     }
-    metroRoofSections.forEach(function(rows) {
+    metroRoofSections.forEach(function(rows, section) {
       var distance=0, spacing=8, ribWidth=.48;
       for(var j=1;j<rows.length;j++) {
         var a=rows[j-1], b=rows[j];
         var dx=(b[0]+b[2]-a[0]-a[2])*40935, dy=(b[1]+b[3]-a[1]-a[3])*55660;
         var length=Math.hypot(dx,dy), start=distance;
         distance+=length;
-        if (Math.max(a[0],a[2],b[0],b[2])<bounds.getWest() ||
-            Math.min(a[0],a[2],b[0],b[2])>bounds.getEast() ||
-            Math.max(a[1],a[3],b[1],b[3])<bounds.getSouth() ||
-            Math.min(a[1],a[3],b[1],b[3])>bounds.getNorth()) continue;
+        if (!visible.has(section+'/'+j)) continue;
         var left=ground(a.slice(0,2)), right=ground(a.slice(2));
         var endLeft=ground(b.slice(0,2)), endRight=ground(b.slice(2));
         var cuts=[0,length];

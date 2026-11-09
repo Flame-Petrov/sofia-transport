@@ -78,8 +78,11 @@
           if (areas.indexOf(a) < 0 || mapVer !== ver) return Promise.resolve();   // removed, or the build changed
           // a tile that is already saved (seen on the map before) is re-saved as kept, not downloaded again
           return idb.get('tiles', u).then(function (hit) {
-            if (hit && hit.d) return idb.put('tiles', null, { url: u, d: hit.d, t: KEEP_T + Date.now() }).then(function () { return hit.d; });
-            return fetchTile(u);
+            if (hit && hit.d) return idb.put('tiles', null, { url: u, d: hit.d, t: KEEP_T + Date.now() }).then(function (key) {
+              if (key !== u) throw new Error('Offline tile was not retained');
+              return hit.d;
+            });
+            return fetchTile(u, undefined, true);
           }).then(function (buf) { bytes += buf.byteLength; keptKeys[u] = 1; }, function (e) {
             now.failed++;
             // the build was taken off the server: switch to the current one and start this run over
@@ -90,7 +93,7 @@
       }), 4).then(function () {
         if (areas.indexOf(a) < 0 || mapVer !== ver) return;
         // (size unknown when the record was lost but the tiles were all there: the estimate)
-        rec[a.id] = { ver: ver, n: urls.length, bytes: bytes || urls.length * KB_PER_TILE * 1024, failed: now.failed, t: Date.now() };
+        rec[a.id] = { ver: ver, n: urls.length, bytes: bytes || (now.failed ? 0 : urls.length * KB_PER_TILE * 1024), failed: now.failed, t: Date.now() };
         save();
       });
     }

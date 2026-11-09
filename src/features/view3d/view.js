@@ -152,7 +152,7 @@
       m3.getCanvas().addEventListener('keydown', keyboardCamera, true);
       controlsHelp.showModal();
       viewBounds01 = null;
-      function invalidateBounds() { viewBounds01 = null; }
+      function invalidateBounds() { viewBounds01 = null; fleetDirty=true; farPending=true; }
       m3.on('move', scheduleViewportPrefetch);
       m3.on('move', invalidateBounds);
       m3.on('resize', invalidateBounds);
@@ -313,8 +313,8 @@
       var transport = m3.getStyle().layers.find(function (l) { return l['source-layer'] === 'transportation'; });
       railSource = transport && transport.source;
       railsDirty = true; railRefreshAt = 0; railSegments = [];
-      m3.on('sourcedata', function (e) { if (e.sourceId === railSource) railsDirty = true; });
-      m3.on('moveend', function () { railsDirty = true; });
+      m3.on('sourcedata', function (e) { if (e.sourceId === railSource) { railsDirty = true; fleetDirty=true; } });
+      m3.on('moveend', function () { if (!selfMove) railsDirty = true; });
       m3.addLayer(vehicleModelLayer(function () { return drawn; }));
       var LZ = LABEL_ZOOM - 1, faded = function (a) { return ['case', ['==', ['get', 'pk'], 1], a, 1]; };
       var label = function (size) {
@@ -350,7 +350,7 @@
     var labelsBy = null;
     // Near vehicles (inside the clipped view, + 30 %) go to 'v3-veh' 15 times a second; the far ones, toward the
     // horizon, only as dots and twice a second ('v3-veh-far'), so a tilted view doesn't update the whole city 15×/s.
-    var farDue = 0, farDrawn = [];
+    var farDue = 0, farPending = false, farDrawn = [];
     // Keep snapshots per map instance. Compare geometry, styling and order so a
     // colour change or a disappearing vehicle still reaches the worker.
     var pointSnapshots = {};
@@ -562,12 +562,33 @@
       return segments;
     }
     // Project the number on the frame MapLibre actually paints, including camera-only moves.
+    function numberBadge(pose, ratio, cache) {
+      var key = [pose.number,pose.color,pose.ink,pose.m,ui,ratio].join('|');
+      if (cache.has(key)) return cache.get(key);
+      var size=(pose.m ? 14 : 11)*ui, h=size+6*ui, pad=2*ui;
+      var canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
+      var font='bold '+size+'px sans-serif';
+      ctx.font=font;
+      var w=Math.max(h,ctx.measureText(pose.number).width+10*ui);
+      canvas.width=Math.ceil((w+2*pad)*ratio);
+      canvas.height=Math.ceil((h+2*pad)*ratio);
+      ctx.scale(ratio,ratio);
+      ctx.font=font; ctx.textAlign='center'; ctx.textBaseline='middle';
+      rr(ctx,pad,pad,w,h,6*ui);
+      ctx.fillStyle=pose.color; ctx.fill();
+      ctx.lineWidth=1.5*ui; ctx.strokeStyle='#fff'; ctx.stroke();
+      ctx.fillStyle=pose.ink; ctx.fillText(pose.number,pad+w/2,pad+h/2);
+      var badge={canvas:canvas,width:canvas.width/ratio,height:canvas.height/ratio};
+      if (cache.size >= 256) cache.delete(cache.keys().next().value);
+      cache.set(key,badge);
+      return badge;
+    }
     function addNumberOverlay() {
       var map3 = m3, base = map3.getCanvas(), canvas = document.createElement('canvas');
       canvas.className = 'v3-vehicle-numbers';
       canvas.setAttribute('aria-hidden', 'true');
       base.after(canvas);
-      var g = canvas.getContext('2d'), painted = false;
+      var g = canvas.getContext('2d'), painted = false, badges = new Map();
       map3.on('render', function () {
         if (map3 !== m3 || (!painted && !numberPoses.length)) return;
         if (canvas.width !== base.width) canvas.width = base.width;
@@ -581,23 +602,19 @@
         numberPoses.forEach(function (pose) {
           var point = map3.project(pose.c), x = point.x, y = point.y - (pose.model ? 30 * ui : 0);
           if (x < -60 || y < -30 || x > width + 60 || y > height + 30) return;
-          var size = (pose.m ? 14 : 11) * ui, h = size + 6 * ui;
-          g.font = 'bold ' + size + 'px sans-serif';
-          var w = Math.max(h, g.measureText(pose.number).width + 10 * ui);
-          g.globalAlpha = pose.m ? 1 : pose.opacity;
-          rr(g, x - w / 2, y - h / 2, w, h, 6 * ui);
-          g.fillStyle = pose.color; g.fill();
-          g.lineWidth = 1.5 * ui; g.strokeStyle = '#fff'; g.stroke();
-          g.fillStyle = pose.ink; g.fillText(pose.number, x, y);
+          var badge=numberBadge(pose,canvas.width/width,badges);
+          g.globalAlpha=pose.m ? 1 : pose.opacity;
+          g.drawImage(badge.canvas,x-badge.width/2,y-badge.height/2,badge.width,badge.height);
         });
       });
     }
-    var numberPoses = [];
+    var numberPoses = [], fleetDirty = true, nearMoving = false;
+    view3d.vehicleSceneChanged = function () { fleetDirty=true; farDue=0; };
     function advanceVehicles(frameTime) {
       var repaint = false;
       numberPoses.forEach(function (pose) {
         var v = pose.vehicle;
-        if (!v.mo || !pose.animate) return;
+        if (!pose.animate || !movingVehicles.has(v)) return;
         var pos = posAt(v, frameTime);
         if (pos[0] === pose.lat && pos[1] === pose.lon) return;
         pose.lat = pos[0]; pose.lon = pos[1];
@@ -624,12 +641,12 @@
       var t0 = performance.now(), nb = view3d.bounds(0.3), b = m3.getBounds(), now = performance.now(), doFar = now >= farDue;
       var s = nb.getSouth(), n = nb.getNorth(), w = nb.getWest(), e = nb.getEast(), feats = [], far = [], seen = {};
       var fs = b.getSouth(), fn = b.getNorth(), fw = b.getWest(), fe = b.getEast();
-      drawn = []; numberPoses = [];
-      if (doFar) { farDue = now + 500; farDrawn = []; }
+      drawn = []; numberPoses = []; nearMoving = false;
+      if (doFar) { farDue = now + 500; farPending=false; farDrawn = []; }
       var close = m3.getZoom() >= vehicleModelZoom;
       var previousPoses = modelPoses, repaint = false;
       modelPoses = new Map();
-      if (close) refreshRails(now);
+
       function add(v) {
         if (!v || !v.pos || seen[v.d.key]) return;
         var model = close && !!vehicleMeshes[vehicleMeshType(v.d.type)];
@@ -643,9 +660,11 @@
           }
           return;
         }
+        model = model && !!availableVehicleMesh(vehicleMeshType(d.type));
         var numbered = rv || labelsBySearch || m3.getZoom() >= LABEL_ZOOM - 1;
         var animate = numbered && (v === selected || (la >= s && la <= n && lo >= w && lo <= e));
-        if (animate && v.mo) {
+        if (movingVehicles.has(v)) nearMoving = true;
+        if (animate && movingVehicles.has(v)) {
           posAt(v, frameTime);
           la = v.pos[0]; lo = v.pos[1];
         }
@@ -653,6 +672,7 @@
         model = model && Number.isFinite(heading);
         if (v === selected && !model) return;
         if (model && d.type === 0) {
+          refreshRails(now);
           var rail = railPosition(lo, la, heading, railSegments);
           if (rail) {
             lo = rail.at[0]; la = rail.at[1]; heading = rail.bearing;
@@ -683,6 +703,7 @@
           if (rail && animate) { pose.rail = rail; pose.localRails = localRails(rail); }
           modelPoses.set(v, pose);
         }
+        if (model && !rv) return; // Mesh, canvas label and tap target already use the pose.
         feats.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [lo, la] },
           properties: { k: d.key, model: model ? 1 : 0, c: d.color, ink: ink, t: String(d.shown), b: typeof d.bearing === 'number' && !v.parked ? Math.round(d.bearing) : -1,
                         pk: v.parked ? 1 : 0, m: rv ? 1 : 0, tag: rv ? rv.tag : '' } });
@@ -695,7 +716,7 @@
       var tolerance = { lng: halfPixel, lat: halfPixel * Math.cos(toRad(m3.getCenter().lat)) };
       submitPointSource('v3-veh', feats, tolerance);
       if (doFar) submitPointSource('v3-veh-far', far, tolerance);
-      vehN = feats.length; farN = farDrawn.length;
+      vehN = drawn.length; farN = farDrawn.length;
       vehMs.push(performance.now() - t0);
       if (vehMs.length > 100) vehMs.shift();
       // a search that leaves few vehicles labels them at any zoom (LABEL_MAX), as in 2D
@@ -705,7 +726,7 @@
         m3.setLayerZoomRange('v3-veh-dir', labelsBy ? 0 : LABEL_ZOOM - 1, 24);
       }
     }
-    view3d.feedChanged = function (list) { shown = list || []; vehDue = 0; farDue = 0; };
+    view3d.feedChanged = function (list) { shown = list || []; fleetDirty=true; vehDue = 0; farDue = 0; };
     view3d.drawn = function () { return drawn; };
     function trackFrame() {
       var v = selected;
@@ -728,7 +749,7 @@
       if (pop && popKind === 'veh' && popRef === v) pop.setLngLat(at);
     }
     view3d.selectChanged = function () {
-      vehDue = 0;
+      fleetDirty=true; vehDue = 0;
       if (pop && popKind === 'veh' && popRef !== selected) closePop();
     };
     // A tap: the closest drawn vehicle within reach wins (as on the 2D map): 12 px around a dot, the size of its
@@ -914,7 +935,7 @@
       routeLayer.eachLayer(function (l) { sig += L.stamp(l) + ','; });
       if (savedPlaces.destinationLine) { var d0 = savedPlaces.destinationLine.getLatLngs()[0]; sig += 'd' + d0.lat.toFixed(6) + ',' + d0.lng.toFixed(6); }
       if (sig !== rtSig) { rtSig = sig; syncRoute(); }
-      if (dim !== dimNow) { dimNow = dim; applyDim(dim); }
+      if (dim !== dimNow) { dimNow = dim; fleetDirty=true; applyDim(dim); }
       mapEl.classList.toggle('rt-far', viewZoom() < ROUTE_TAG_ZOOM);
     }
     function syncRoute() {
@@ -999,13 +1020,12 @@
       // v103: all other stops in one layer (DOM markers for hundreds of stops would be slow); the open one is enlarged
       var feats = [];
       stopsDrawn = [];
-      stopLayer.eachLayer(function (mk) {
-        var st = mk._stop;
-        if (!st) return;
-        var sel = mk === sheetMarker || (pop && popKind === 'stop' && popRef === mk) ? 1 : 0;
-        var img = metroTimetable.serves(st.id) ? 'v3stop-metro' : 'v3stop-' + (mk._color || 'x');
+      visibleStops.forEach(function (item) {
+        var st = item.stop, mk = st._mk;
+        var sel = mk && (mk === sheetMarker || (pop && popKind === 'stop' && popRef === mk)) ? 1 : 0;
+        var img = metroTimetable.serves(st.id) ? 'v3stop-metro' : 'v3stop-' + (item.color || 'x');
         feats.push({ type: 'Feature', properties: { img: img, sel: sel }, geometry: { type: 'Point', coordinates: [st.lon, st.lat] } });
-        stopsDrawn.push({ mk: mk, c: [st.lon, st.lat] });
+        stopsDrawn.push({ item: item, c: [st.lon, st.lat] });
       });
       submitPointSource('v3-stops', feats);
     }
@@ -1013,9 +1033,9 @@
       var best = null, bd = Infinity, rad = 14 * ui;
       for (var i = 0; i < stopsDrawn.length; i++) {
         var q = m3.project(stopsDrawn[i].c), dx = q.x - p.x, dy = q.y - p.y, d = dx * dx + dy * dy;
-        if (Math.abs(dx) <= rad && Math.abs(dy) <= rad && d < bd) { bd = d; best = stopsDrawn[i].mk; }
+        if (Math.abs(dx) <= rad && Math.abs(dy) <= rad && d < bd) { bd = d; best = stopsDrawn[i].item; }
       }
-      return best;
+      return best && ordinaryStopMarker(best.stop, best.color);
     }
     view3d.counts = function () {
       var lbl = labelsBySearch || viewZoom() >= LABEL_ZOOM;
@@ -1101,11 +1121,12 @@
     }
     // back in 2D: every marker where the motion planner says, the cameras start fresh
     function back2d() {
+      drawMe();
       for (var k in vehicles) {
         var v = vehicles[k];
         if (!v.pos) continue;
-        v.dot.setLatLng(v.pos);
-        if (v.pillInMap && v.pill) v.pill.setLatLng(v.pos);
+        if (v.dotInMap) syncMarkerPosition(v.dot,v.pos);
+        if (v.pillInMap && v.pill) syncMarkerPosition(v.pill,v.pos);
       }
       followCam.off = null; locCam.off = null; lookAt = 0; pathSyncAt = 0;
       if (selected && shapes) drawPath(selected);
@@ -1212,8 +1233,13 @@
       drawMe3();
       if (!m3.getSource('v3-veh')) return;
       var now = performance.now();
-      if (now >= vehDue) { vehDue = now + 1000 / VIEW3D_VEH_HZ; buildVeh(frameTime); }
-      else advanceVehicles(frameTime);
+      if (now >= vehDue && (fleetDirty || nearMoving || ((farPending || movingVehicles.size) && now >= farDue))) {
+        var dirty = fleetDirty;
+        fleetDirty=false;
+        vehDue=now+1000/VIEW3D_VEH_HZ;
+        buildVeh(frameTime);
+        if (dirty) m3.triggerRepaint();
+      } else if (nearMoving) advanceVehicles(frameTime);
       trackFrame();
       followCam3();   // v102
       locCam3();
@@ -1268,7 +1294,7 @@
       meMk.getElement().classList.toggle('stale', stale);
       beamMk.getElement().classList.toggle('off', !(fresh && loc.heading !== null && !stale));
       if (loc.heading !== null && Math.abs(beamMk.getRotation() - loc.heading) > 0.1) beamMk.setRotation(loc.heading);
-      setAcc(ll, loc.fix.acc);
+      setAcc(loc.fix.ll, loc.fix.acc);
     }
 
     // ---- My places: the flags (read only here; placing and moving one is done in 2D) ----

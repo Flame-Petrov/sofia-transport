@@ -103,6 +103,7 @@
         if (v === hoverV) hideHover();
         dotLayer.removeLayer(v.dot);
         if (v.pill) pillLayer.removeLayer(v.pill);
+        forgetMotion(v);
         delete vehicles[key];
         changed = true;
       });

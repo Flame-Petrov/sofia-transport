@@ -81,7 +81,7 @@
     if (!!v.parked === on) return;
     v.parked = on;
     v.parkedSince = on ? Date.now() : null;
-    if (on) v.mo = null;
+    if (on) { v.mo = null; forgetMotion(v); }
     v.dot.setStyle({ fillOpacity: on ? 0.45 : 1, dashArray: on ? '3 3' : null });
     if (v.pill) { v.k = iconKey(v.d); v.pill.setIcon(iconFor(v.d)); keepTop(v); }
     refreshPopup(v);

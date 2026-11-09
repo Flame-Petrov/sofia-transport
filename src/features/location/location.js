@@ -316,6 +316,11 @@
   function drawMe() {
     if (!loc.fix || loc.state === 'off' || loc.state === 'err') return;
     var now = Date.now(), ll = meShown(), stale = now - loc.fix.t > LOC_STALE_MS;
+    if (loc.fix.t !== loc.drawnFixT) {
+      loc.drawnFixT = loc.fix.t;
+      if (savedPlaces) savedPlaces.refreshDestination();
+    }
+    if (view3d.on) return;
     if (!loc.acc) {
       loc.acc = L.circle(ll, { radius: loc.fix.acc, pane: 'meAccPane', renderer: meSvg, interactive: false,
         color: '#1A73E8', weight: 1, opacity: 0.35, fillColor: '#1A73E8', fillOpacity: 0.12 }).addTo(map);
@@ -331,10 +336,7 @@
     var cone = el.querySelector('.me-cone');
     cone.hidden = !(fresh && loc.heading !== null);
     if (loc.heading !== null) cone.style.setProperty('--h', loc.heading.toFixed(1) + 'deg');
-    if (loc.fix.t !== loc.drawnFixT) {
-      loc.drawnFixT = loc.fix.t;
-      if (savedPlaces) savedPlaces.refreshDestination();
-    }
+
   }
   // rows for Diagnostics
   function locDiag() {

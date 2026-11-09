@@ -4,8 +4,30 @@
   var vehicleMeshes = { 0: '{{vehicle-model tram}}', 3: '{{vehicle-model bus}}', 11: '{{vehicle-model trolleybus}}' };
   var vehicleModelZoom = 16; // MapLibre zoom (17 on the flat map).
   var vehicleModelMetresPerUnit = 1.8;
+  var decodedMeshes = {}, meshRequests = {}, meshRetryAt = {};
+  function availableVehicleMesh(type) {
+    var asset = vehicleMeshes[type];
+    if (!asset || decodedMeshes[type]) return decodedMeshes[type];
+    if (!asset.startsWith('models/')) {
+      decodedMeshes[type] = vehicleMeshVertices(asset);
+    } else if (!meshRequests[type] && !(Date.now() < meshRetryAt[type])) {
+      meshRequests[type] = fetch(asset).then(function (response) {
+        if (!response.ok) throw new Error('Vehicle model HTTP ' + response.status);
+        return response.arrayBuffer();
+      }).then(function (bytes) {
+        decodedMeshes[type] = vehicleMeshVertices(new Uint8Array(bytes));
+        view3d.vehicleSceneChanged();
+      }).catch(function () {
+        meshRetryAt[type] = Date.now() + 30000;
+        setTimeout(view3d.vehicleSceneChanged, 30001);
+      })
+        .finally(function () { delete meshRequests[type]; });
+    }
+    return decodedMeshes[type];
+  }
   function vehicleMeshVertices(encoded) {
-    var bytes = Uint8Array.from(atob(encoded), function (c) { return c.charCodeAt(0); });
+    var bytes = typeof encoded === 'string'
+      ? Uint8Array.from(atob(encoded), function (c) { return c.charCodeAt(0); }) : encoded;
     var jsonLength = new DataView(bytes.buffer).getUint32(12, true);
     var doc = JSON.parse(new TextDecoder().decode(bytes.subarray(20, 20 + jsonLength)));
     function values(index) {
@@ -52,11 +74,6 @@
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
         ['matrix','anchor','heading','endHeadings','scale','color'].forEach(function (k) { loc[k] = gl.getUniformLocation(program,k); });
         ['pos','normal','tone'].forEach(function (k) { loc[k] = gl.getAttribLocation(program,k); });
-        Object.keys(vehicleMeshes).forEach(function (type) {
-          var data = vehicleMeshVertices(vehicleMeshes[type]), buf = gl.createBuffer();
-          gl.bindBuffer(gl.ARRAY_BUFFER,buf); gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
-          buffers[type] = { buf: buf, count: data.length / 7 };
-        });
       },
       render: function (gl, matrix) {
         if (map.getZoom() < vehicleModelZoom) return;
@@ -64,8 +81,14 @@
         gl.uniformMatrix4fv(loc.matrix,false,matrix);
         gl.enableVertexAttribArray(loc.tone); gl.enableVertexAttribArray(loc.pos); gl.enableVertexAttribArray(loc.normal);
         points().forEach(function (f) {
-          var mesh = buffers[vehicleMeshType(f.type)];
-          if (!mesh || !f.model) return;
+          if (!f.model) return;
+          var type = vehicleMeshType(f.type), mesh = buffers[type];
+          if (!mesh) {
+            var data = decodedMeshes[type], buf = gl.createBuffer();
+            gl.bindBuffer(gl.ARRAY_BUFFER,buf);
+            gl.bufferData(gl.ARRAY_BUFFER,data,gl.STATIC_DRAW);
+            mesh = buffers[type] = { buf: buf, count: data.length / 7 };
+          }
           var h = (f.bearing || 0) * Math.PI / 180;
           var altitude = map.getTerrain() ? map.queryTerrainElevation(f.c) || 0 : 0;
           var p = maplibregl.MercatorCoordinate.fromLngLat(f.c,altitude);

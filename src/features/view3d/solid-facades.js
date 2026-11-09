@@ -3,8 +3,8 @@
     var map, program, buffer, textures = [], batches = [], origin;
     var attrs, uniforms, dirty = true, lastBuild = -Infinity;
     var materials = ['green','blue','purple','gold','facade','ivory','clay'];
-    var meshCache = new Map();
-    function terrainChanged() { meshCache.clear(); invalidate(); }
+    var meshCache = new Map(), previousKeys = null;
+    function terrainChanged() { previousKeys=null; meshCache.clear(); invalidate(); }
     function invalidate() { dirty = true; }
     function sourceChanged(event) {
       if (event.sourceId === sourceId) invalidate();
@@ -19,7 +19,7 @@
       if (!origin || Math.hypot(center.x-origin.x,center.y-origin.y)>0.001) {
         origin = center;
         origin.unit = origin.meterInMercatorCoordinateUnits();
-        meshCache.clear();
+        previousKeys=null; meshCache.clear();
       }
       var groups = materials.map(function () { return []; }), seen = new Set();
       var terrain = !!map.getTerrain();
@@ -31,7 +31,7 @@
         var polygons = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
         polygons.forEach(function (rings) {
           // Retain separate parts of the same ID at a tile boundary.
-          var key = f.id + '/' + base + '/' + top + '/' + JSON.stringify(rings);
+          var key = index + '/' + f.id + '/' + base + '/' + top + '/' + JSON.stringify(rings);
           if (seen.has(key)) return;
           seen.add(key);
           if (meshCache.has(key)) { group.push(meshCache.get(key)); return; }
@@ -61,6 +61,8 @@
           group.push(mesh);
         });
       });
+      if (sameBuildingKeys(previousKeys,seen)) return null;
+      previousKeys=seen;
       meshCache.forEach(function(_,key){ if (!seen.has(key)) meshCache.delete(key); });
       var size = groups.reduce(function (n,g) {return g.reduce(function(total,mesh){return total+mesh.length;},n);},0);
       var vertices = new Float32Array(size), offset=0;
@@ -107,7 +109,8 @@
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
         var now=performance.now();
         if (dirty && now-lastBuild>=180) {
-          gl.bufferData(gl.ARRAY_BUFFER,rebuild(),gl.DYNAMIC_DRAW);
+          var data=rebuild();
+          if (data !== null) gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
           dirty=false; lastBuild=now;
         } else if (dirty) map.triggerRepaint();
         if (!origin) return;

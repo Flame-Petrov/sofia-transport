@@ -4,8 +4,7 @@
   // (below the panel), leaving room for its popup above it.
   var FOCUS_ZOOM = 16, autoFocusOff = false;
   function freeTop() {
-    var pb = document.getElementById('panel').getBoundingClientRect().bottom;
-    return isPhone() ? pb : 0;
+    return isPhone() ? document.getElementById('panel').getBoundingClientRect().bottom : 0;
   }
   var focusRequest = 0;
   function cancelFocusCard() { focusRequest++; }

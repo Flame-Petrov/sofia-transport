@@ -51,10 +51,18 @@
       var packed = key && sofiaBuildingTiles[key[1]];
       if (packed) {
         try {
+          if (packed.startsWith('tiles/')) {
+            var response = await fetch(packed, { signal: controller.signal });
+            if (!response.ok) throw new Error('Building tile HTTP ' + response.status);
+            return { data: await response.arrayBuffer() };
+          }
           var bytes = Uint8Array.from(atob(packed), function (c) { return c.charCodeAt(0); });
           var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
           return { data: await new Response(stream).arrayBuffer() };
-        } catch (e) { /* Use the cached street map if a bundled tile cannot be decoded. */ }
+        } catch (e) {
+          if (controller.signal.aborted) throw e;
+          // Fall back to the street tile when the prepared geometry is unavailable.
+        }
       }
       var original = await getTile(url, controller.signal);
       return { data: original.d.slice(0) };

@@ -30,13 +30,14 @@
       return open().then(function (db) {
         if (!db) return null;
         return new Promise(function (res) {
-          setTimeout(function () { res(null); }, 2000);   // a stuck request counts as "not saved"
+          var timer = setTimeout(function () { res(null); }, 2000);
+          function finish(value) { clearTimeout(timer); res(value); }
           try {
-            var r = fn(db.transaction(store, mode).objectStore(store));
-            if (!r) return res(null);
-            r.onsuccess = function () { res(r.result === undefined ? null : r.result); };
-            r.onerror = function () { res(null); };
-          } catch (e) { res(null); }
+            var tx = db.transaction(store, mode), r = fn(tx.objectStore(store));
+            tx.onabort = tx.onerror = r.onerror = function () { finish(null); };
+            if (mode === 'readwrite') tx.oncomplete = function () { finish(r.result); };
+            else r.onsuccess = function () { finish(r.result === undefined ? null : r.result); };
+          } catch (e) { finish(null); }
         });
       });
     }

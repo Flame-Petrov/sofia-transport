@@ -4,7 +4,7 @@
   function drawFocusStop() {
     focusLayer.clearLayers();
     focusMarker = null;
-    if (!focusedStop) { if (view3d.on) view3d.stopsChanged(); return; }
+    if (!focusedStop) { if (view3d.on) renderStops(); return; }
     if (stopMarkers[focusedStop.id]) { stopLayer.removeLayer(stopMarkers[focusedStop.id]); delete stopMarkers[focusedStop.id]; }
     if (routeStopMarkers[focusedStop.id]) { routeStopLayer.removeLayer(routeStopMarkers[focusedStop.id]); delete routeStopMarkers[focusedStop.id]; }
     focusMarker = stopMarker(focusedStop, 'focus', null, 1000);
@@ -13,7 +13,7 @@
     });
     focusLayer.addLayer(focusMarker);
     raise(focusMarker, true);
-    if (view3d.on) view3d.stopsChanged();   // v101
+    if (view3d.on) renderStops();
   }
   function clearRouteStops() {
     routeStopLayer.clearLayers();
@@ -37,11 +37,29 @@
     }
     return false;
   }
+  var visibleStops = new Map();
   function renderStops() {
-    renderStops2d();
-    if (view3d.on) view3d.stopsChanged();   // v101: the 3D map shows the same stop markers
+    visibleStops = stopsInView();
+    var open = sheetMarker || (view3d.on && view3d.popStop && view3d.popStop());
+    if (open && open._stop && !visibleStops.has(open._stop.id) &&
+        open === open._stop._mk && !twinsOf(open._stop.id).some(function (id) {
+          return routeStopMarkers[id] || (focusedStop && focusedStop.id === id);
+        })) {
+      visibleStops.set(open._stop.id,{stop:open._stop,color:open._color});
+    }
+    if (view3d.on) { view3d.stopsChanged(); return; }
+    Object.keys(stopMarkers).forEach(function (id) {
+      var mk = stopMarkers[id];
+      if (visibleStops.has(id) || mk.isPopupOpen() || mk === sheetMarker) return;
+      stopLayer.removeLayer(mk);
+      delete stopMarkers[id];
+    });
+    visibleStops.forEach(function (item,id) {
+      var mk = ordinaryStopMarker(item.stop,item.color);
+      if (!stopMarkers[id]) stopLayer.addLayer(stopMarkers[id]=mk);
+    });
   }
-  function renderStops2d() {
+  function stopsInView() {
     var searching = searchStops !== null;
     var zoom = viewZoom(), show = zoom >= (searching ? 11 : STOP_ZOOM);
     var metroOnly = activeTypes[1] && !activeTypes[0] && !activeTypes[3] && !activeTypes[11];
@@ -68,14 +86,8 @@
       return true;
     }
     function markerColor(id) { return metroTimetable.serves(id) ? TYPES[1].color : searching ? searchStops[id] || null : null; }
-    Object.keys(stopMarkers).forEach(function (id) {
-      var mk = stopMarkers[id], color = markerColor(id);
-      if (wanted(stops[id]) && mk._color === color) return;
-      if (mk.isPopupOpen() || mk === sheetMarker) return;   // don't yank an open popup away
-      stopLayer.removeLayer(mk);
-      delete stopMarkers[id];
-    });
-    if (!show && !showMetro) return;
+    var visible = new Map();
+    if (!show && !showMetro) return visible;
     var candidates;
     if (!show || metroOnly) {
       candidates = Array.from(metroTimetable.stationIds(), function (id) { return stops[id]; }).filter(Boolean);
@@ -97,20 +109,20 @@
     }
     for (var i = 0; i < candidates.length; i++) {
       var st = candidates[i], id = st.id;
-      if (stopMarkers[id] || !wanted(st)) continue;
-      var color = markerColor(id);
-      var mk = st._mk;
-      if (!mk) {
-        mk = st._mk = stopMarker(st, color ? 'route' : '', color, color ? 200 : 0);
-        mk._color = color;
-      } else {
-        if (mk._color !== color) {
-          mk._color = color;
-          mk.setIcon(stopIcon(color ? 'route' : '', color, st));
-          mk.setZIndexOffset(color ? 200 : 0);
-        }
-      }
-      stopLayer.addLayer(stopMarkers[id] = mk);
+      if (wanted(st)) visible.set(id,{stop:st,color:markerColor(id)});
     }
+    return visible;
   }
 
+  function ordinaryStopMarker(st, color) {
+    var mk = st._mk;
+    if (!mk) {
+      mk = st._mk = stopMarker(st, color ? 'route' : '', color, color ? 200 : 0);
+      mk._color = color;
+    } else if (mk._color !== color) {
+      mk._color = color;
+      mk.setIcon(stopIcon(color ? 'route' : '', color, st));
+      mk.setZIndexOffset(color ? 200 : 0);
+    }
+    return mk;
+  }

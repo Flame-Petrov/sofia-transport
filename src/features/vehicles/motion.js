@@ -28,10 +28,43 @@
   }
   // Closest point on the route (to the segment, not just a vertex). The vehicle's heading and its
   // previous position along the route break ties where the route passes the same street twice.
+  // Index segment bounding boxes once per immutable route shape. Long outliers
+  // stay in a short overflow list instead of filling thousands of grid cells.
+  function nearbySegments(m, lat, lon, cosLat) {
+    if (m.pts.length < 64 || cosLat < 0.1) return null;
+    var cellSize = 0.005;
+    if (!m.segmentGrid) {
+      var cells = new Map(), long = [];
+      for (var i = 0; i + 1 < m.pts.length; i++) {
+        var a = m.pts[i], b = m.pts[i+1];
+        var s = Math.floor(Math.min(a[0],b[0])/cellSize), n = Math.floor(Math.max(a[0],b[0])/cellSize);
+        var w = Math.floor(Math.min(a[1],b[1])/cellSize), e = Math.floor(Math.max(a[1],b[1])/cellSize);
+        if ((n-s+1)*(e-w+1) > 64) { long.push(i); continue; }
+        for (var y=s;y<=n;y++) for (var x=w;x<=e;x++) {
+          var key=y+','+x;
+          if (!cells.has(key)) cells.set(key, []);
+          cells.get(key).push(i);
+        }
+      }
+      m.segmentGrid={cells:cells,long:long};
+    }
+    var radius=150/(6371000*Math.PI/180), ids=new Set(m.segmentGrid.long);
+    for (var y=Math.floor((lat-radius)/cellSize);y<=Math.floor((lat+radius)/cellSize);y++) {
+      for (var x=Math.floor((lon-radius/cosLat)/cellSize);x<=Math.floor((lon+radius/cosLat)/cellSize);x++) {
+        var hits=m.segmentGrid.cells.get(y+','+x);
+        if (hits) for (var i of hits) ids.add(i);
+      }
+    }
+    return Array.from(ids).sort(function(a,b){return a-b;});
+  }
+
   function projectAlong(m, lat, lon, bearing, prevS) {
     var pts = m.pts, R = 6371000 * Math.PI / 180, cosLat = Math.cos(toRad(lat));
     var best = null, bestScore = Infinity;
-    for (var i = 0; i < pts.length - 1; i++) {
+    var candidates = nearbySegments(m, lat, lon, cosLat);
+    var length = candidates ? candidates.length : pts.length - 1;
+    for (var j = 0; j < length; j++) {
+      var i = candidates ? candidates[j] : j;
       var a = pts[i], b = pts[i + 1];
       var ax = (a[1] - lon) * cosLat * R, ay = (a[0] - lat) * R, bx = (b[1] - lon) * cosLat * R, by = (b[0] - lat) * R;
       var dx = bx - ax, dy = by - ay, len2 = dx * dx + dy * dy;
@@ -66,7 +99,32 @@
     return motionViewBounds;
   }
 
+  var movingVehicles = new Set(), visibleMoving = new Set();
+  function forgetMotion(v) {
+    movingVehicles.delete(v);
+    visibleMoving.delete(v);
+  }
+  function motionEnded(mo, now) {
+    if (!mo) return true;
+    if (mo.kind === 'line') {
+      return (mo.a[0] === mo.b[0] && mo.a[1] === mo.b[1]) || now >= mo.t0 + mo.dur;
+    }
+    if (mo.s0 === mo.s1 && !mo.v1) return true;
+    if (now < mo.t0 + mo.dur) return false;
+    return !mo.smooth || !mo.v1 || coastS(mo, now) >= mo.m.total || now >= mo.t0 + mo.dur + 16 * COAST_MS;
+  }
   function planMotion(v, isNew) {
+    makeMotionPlan(v, isNew);
+    if (motionEnded(v.mo, Date.now())) {
+      var pos = posAt(v, Date.now());
+      if (pos) setPos(v, pos[0], pos[1]);
+      forgetMotion(v);
+    } else {
+      movingVehicles.add(v);
+      lastFull = 0;
+    }
+  }
+  function makeMotionPlan(v, isNew) {
     var d = v.d, now = Date.now();
     if (d.metroPlan) {
       v.mo = d.metroPlan;
@@ -130,7 +188,7 @@
   var COAST_MS = 1500;
   function coastS(mo, now) {
     var x = now - mo.t0 - mo.dur;
-    return Math.min(mo.m.total, mo.s1 + mo.v1 * COAST_MS * (1 - Math.exp(-x / COAST_MS)));
+    return Math.min(mo.m.total, mo.s1 + mo.v1 * COAST_MS * (x >= 16 * COAST_MS ? 1 : 1 - Math.exp(-x / COAST_MS)));
   }
   // The icon's current speed along the road (m per ms) in move mo, if it runs on route m
   function velAt(mo, m, now) {
@@ -183,23 +241,33 @@
     // movement against the displayed coordinate, then catch up on full ticks.
     var halfPixel = 180 / (256 * Math.pow(2, map.getZoom()));
     var tolerance = { lng: halfPixel, lat: halfPixel * Math.cos(toRad((minLat + maxLat) / 2)) };
-    var count = 0;
-    var interval = view3d.on ? 1000 / VIEW3D_VEH_HZ : onScreenCount < 150 ? 0 : 50;
+    var interval = view3d.on ? 1000 / VIEW3D_VEH_HZ : visibleMoving.size < 150 ? 0 : 50;
     var batch = ts - lastBatch >= interval;
     if (batch) lastBatch = ts;
-    if (full) lastFull = now;
-    for (var k in vehicles) {
-      var v = vehicles[k];
-      if (!v.mo || !v.pos) continue;
-      var lat = v.pos[0], lon = v.pos[1];
-      var vis = lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon;
-      if (vis) count++;
-      if (v === selected || (vis && batch) || full) {
-        var p = posAt(v, now);
-        if (p) setPos(v, p[0], p[1], (full || v === selected || v === hoverV) ? null : tolerance);
-      }
+    if (full) {
+      lastFull = now;
+      visibleMoving.clear();
     }
-    if (batch || full) onScreenCount = count;
+    var flatView = full && !view3d.on && movingVehicles.size ? flatMarkerView() : null;
+    function advance(v) {
+      var p = posAt(v, now);
+      if (!p) { forgetMotion(v); return; }
+      var ended = motionEnded(v.mo, now);
+      var visible = p[0] >= minLat && p[0] <= maxLat && p[1] >= minLon && p[1] <= maxLon;
+      if (flatView && v.filterMatch) updateFlatVehicle(v, flatView);
+      setPos(v, p[0], p[1], (full || ended || v === selected || v === hoverV) ? null : tolerance);
+      if (ended) {
+        forgetMotion(v);
+        if (view3d.on) view3d.vehicleSceneChanged();
+      }
+      else if (full && visible && (v.filterMatch || v === selected || routeVeh[v.d.key])) visibleMoving.add(v);
+    }
+    if (full) movingVehicles.forEach(advance);
+    else {
+      if (batch) visibleMoving.forEach(advance);
+      if (selected && movingVehicles.has(selected) && !(batch && visibleMoving.has(selected))) advance(selected);
+    }
+    onScreenCount = visibleMoving.size;
     followFrame();
     locFrame();
     if (view3d.on) view3d.frame(now);

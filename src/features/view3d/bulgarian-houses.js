@@ -206,21 +206,55 @@
     return true;
   }
 
+  function sameBuildingKeys(previous, current) {
+    if (!previous || previous.size !== current.size) return false;
+    for (var key of current) if (!previous.has(key)) return false;
+    return true;
+  }
+
   function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
     var map, program, buffer, matrixLoc, anchorLoc, position, color, origin;
     var dirty=true, count=0, lastBuild=0, terrain;
+    var previousKeys = null, meshCache = new Map();
     function moved(){dirty=true;}
-    function sourceChanged(event){if(event.sourceId===sourceId) dirty=true;}
+    function resetGeometry(){previousKeys=null;meshCache.clear();moved();}
+    function sourceChanged(event){
+      var dem = map.getTerrain();
+      if (dem && event.sourceId === dem.source) resetGeometry();
+      else if (event.sourceId === sourceId && !canopy) moved();
+    }
     function rebuild(){
-      origin=maplibregl.MercatorCoordinate.fromLngLat(map.getCenter());
-      origin.unit=origin.meterInMercatorCoordinateUnits();
-      if (canopy) return metroCanopyVertices(map, origin);
+      var center = maplibregl.MercatorCoordinate.fromLngLat(map.getCenter());
+      if (!origin || Math.hypot(center.x-origin.x,center.y-origin.y)>0.001) {
+        origin=center;
+        origin.unit=origin.meterInMercatorCoordinateUnits();
+        resetGeometry();
+      }
+      if (canopy) {
+        var sections = visibleMetroRoofSegments(map.getBounds());
+        if (sameBuildingKeys(previousKeys, sections)) return null;
+        previousKeys=sections;
+        return metroCanopyVertices(map, origin, sections);
+      }
       var features=map.queryRenderedFeatures({layers:[materialLayer],filter:['in','material','green','purple']});
-      var seen=new Set(),vertices=[];
+      var seen=new Set(), usedIds=new Set(), meshes=[], size=0;
       features.forEach(function(f){
-        if(!seen.has(f.id) && bulgarianHouse(f,vertices,origin,map)) seen.add(f.id);
+        if (usedIds.has(f.id)) return;
+        var key=JSON.stringify([f.id,f.properties.render_height,f.properties.render_min_height,f.geometry]);
+        if (!meshCache.has(key)) {
+          var vertices=[];
+          meshCache.set(key,bulgarianHouse(f,vertices,origin,map) ? new Float32Array(vertices) : null);
+        }
+        seen.add(key);
+        var mesh=meshCache.get(key);
+        if (mesh) { usedIds.add(f.id); meshes.push(mesh); size+=mesh.length; }
       });
-      return new Float32Array(vertices);
+      if (sameBuildingKeys(previousKeys,seen)) return null;
+      previousKeys=seen;
+      meshCache.forEach(function(_,key){if (!seen.has(key)) meshCache.delete(key);});
+      var data=new Float32Array(size), offset=0;
+      meshes.forEach(function(mesh){data.set(mesh,offset);offset+=mesh.length;});
+      return data;
     }
     return {
       id:materialLayer+(canopy ? '-metro-roofs' : '-houses'),type:'custom',renderingMode:'3d',
@@ -240,20 +274,23 @@
         position=gl.getAttribLocation(program,'pos');color=gl.getAttribLocation(program,'rgb');
         matrixLoc=gl.getUniformLocation(program,'offsetMatrix');anchorLoc=gl.getUniformLocation(program,'anchor');
         buffer=gl.createBuffer();
-        map.on('moveend',moved);map.on('sourcedata',sourceChanged);map.on('terrain',moved);
+        map.on('move',moved);map.on('resize',moved);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
       },
       render:function(gl,matrix){
         if(map.getZoom()<(canopy ? 13 : 15) /* app zoom 16 */ || map.getLayoutProperty(materialLayer,'visibility')==='none'){
-          dirty=true;count=0;return;
+          dirty=true;return;
         }
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
         var now=performance.now(),currentTerrain=!!map.getTerrain();
         
         if((dirty && now-lastBuild>200) || terrain!==currentTerrain){
 
+          if (terrain!==currentTerrain) resetGeometry();
           var data = rebuild();
-          count = data.length / 6;
-          gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
+          if (data !== null) {
+            count = data.length / 6;
+            gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
+          }
           lastBuild=now;dirty=false;terrain=currentTerrain;
         } else if(dirty) map.triggerRepaint();
         if(!count)return;
@@ -267,7 +304,7 @@
         gl.disableVertexAttribArray(position);gl.disableVertexAttribArray(color);
       },
       onRemove:function(owner,gl){
-        owner.off('moveend',moved);owner.off('sourcedata',sourceChanged);owner.off('terrain',moved);
+        owner.off('move',moved);owner.off('resize',moved);owner.off('sourcedata',sourceChanged);owner.off('terrain',resetGeometry);
         gl.deleteBuffer(buffer);gl.deleteProgram(program);
       }
     };

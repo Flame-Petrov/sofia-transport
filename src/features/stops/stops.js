@@ -23,11 +23,11 @@
   }
   // GTFS times count from "noon minus 12 h" of the service day (keeps DST days right)
   function serviceBase(tid) {
-    var sd = (tuByTrip[tid] && tuByTrip[tid].startDate) || '', d = new Date();
-    if (/^\d{8}$/.test(sd)) d = new Date(+sd.slice(0, 4), +sd.slice(4, 6) - 1, +sd.slice(6, 8));
-    else if (ttTripDay(tid) === -1) d.setDate(d.getDate() - 1);   // v92: yesterday's trip still running after midnight
-    d.setHours(12, 0, 0, 0);
-    return d.getTime() - 12 * 3600 * 1000;
+    var sd = (tuByTrip[tid] && tuByTrip[tid].startDate) || '';
+    if (/^\d{8}$/.test(sd)) return noonMinus12(sd);
+    var day = ttTripDay(tid);
+    if (day !== null) return tt.base + (day === -1 ? tt.offY * 1000 : 0);
+    return noonMinus12(ymd(Date.now()));
   }
 
   // The trip's stops and timetable, read from stop_times.txt (large) by streaming through it,
@@ -158,7 +158,7 @@
     if (routeStops.some(function (r) { return typeof r.sAlong === 'number' && r.sAlong < along - 10; })) drawRouteStops();
   }
 
-  function drawRouteStops() {
+  function drawRouteStops(deferStopViews) {
     if (!selected) return;
     routeStops = computeRouteStops(selected);
     // drop stops the icon has already driven past (by position along the route, not just by the timetable)
@@ -193,9 +193,9 @@
     Object.keys(routeStopMarkers).forEach(function (id) {
       if (!keep[id]) { routeStopLayer.removeLayer(routeStopMarkers[id]); delete routeStopMarkers[id]; }
     });
-    renderStops();
+    if (!deferStopViews) renderStops();
     showTracking(selected);
-    refreshStopViews();
+    if (!deferStopViews) refreshStopViews();
     refreshVehPopup(selected);   // next stop / your stop in the vehicle popup
   }
 

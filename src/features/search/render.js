@@ -12,7 +12,11 @@
 
   function render(fit) {
     var toks = tokens(), keys = Object.keys(vehicles), matched = [];
-    keys.forEach(function (k) { if (matches(vehicles[k].d, toks)) matched.push(vehicles[k]); });
+    keys.forEach(function (k) {
+      var v = vehicles[k];
+      v.filterMatch = matches(v.d, toks);
+      if (v.filterMatch) matched.push(v);
+    });
 
     if (fit && toks.length && matched.length) {
       setLocFollow(false);
@@ -26,40 +30,56 @@
     updateSearchStops(toks, matched);
     renderStops();
     updatePopupPadding();
+    feedStatusCount = (toks.length ? fmtN(matched.length) + ' of ' : '') + fmtN(keys.length);
+    renderFeedStatus();
+  }
+  var feedStatusCount = '0';
+  function renderFeedStatus() {
     // status: Live (green) / Delayed, no new data for > 30 s (yellow) / feed failing (red) / Loading
     var at = feedTime ? new Date(feedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
     if (feedFailed) setStatus('err', 'Live feed unavailable');
     else if (!feedTime) setStatus('loading', 'Loading…');
     else if (Date.now() - lastNewDataAt > 30000) setStatus('warn', 'Delayed · last data ' + at);
-    else setStatus('ok', 'Live · ' + (toks.length ? fmtN(matched.length) + ' of ' : '') + fmtN(keys.length) + ' vehicles · ' + at);
+    else setStatus('ok', 'Live · ' + feedStatusCount + ' vehicles · ' + at);
+  }
+
+  function flatMarkerView() {
+    var b = viewLBounds(0.2);
+    return { south: b.getSouth(), north: b.getNorth(), west: b.getWest(), east: b.getEast(),
+             labels: viewZoom() >= LABEL_ZOOM || labelsBySearch };
+  }
+
+  function updateFlatVehicle(v, view) {
+    var lat = v.pos[0], lon = v.pos[1];
+    var inside = lat >= view.south && lat <= view.north && lon >= view.west && lon <= view.east;
+    var pinned = v === selected || !!routeVeh[v.d.key];
+    if (!inside && !pinned && !v.dot.isPopupOpen() && !(v.pill && v.pill.isPopupOpen())) {
+      if (v.dotInMap) { dotLayer.removeLayer(v.dot); v.dotInMap = false; }
+      if (v.pillInMap) { pillLayer.removeLayer(v.pill); v.pillInMap = false; }
+      return;
+    }
+    var asPill = (view.labels && inside) || pinned;
+    // when a vehicle switches between dot and label, its open popup moves with it
+    if (asPill) {
+      var dotOpen = v.dot.isPopupOpen();
+      if (v.dotInMap) { dotLayer.removeLayer(v.dot); v.dotInMap = false; }
+      var p = ensurePill(v);
+      if (!v.pillInMap) { syncMarkerPosition(p, v.pos); pillLayer.addLayer(p); v.pillInMap = true; keepTop(v); }
+      if (dotOpen && !p.isPopupOpen()) { p.openPopup(); popupClosedAt = 0; }
+    } else {
+      var pillOpen = !!(v.pill && v.pill.isPopupOpen());
+      if (v.pillInMap) { pillLayer.removeLayer(v.pill); v.pillInMap = false; }
+      if (!v.dotInMap) { syncMarkerPosition(v.dot, v.pos); dotLayer.addLayer(v.dot); v.dotInMap = true; }
+      if (pillOpen && !v.dot.isPopupOpen()) { v.dot.openPopup(); popupClosedAt = 0; }
+    }
   }
 
   function renderVehicleMarkers(keys, matched) {
     switching = true;
-    var labels = viewZoom() >= LABEL_ZOOM || labelsBySearch;
-    var b = viewLBounds(0.2);
-    var minLat = b.getSouth(), maxLat = b.getNorth(), minLon = b.getWest(), maxLon = b.getEast();
-    var isMatch = {};
-    matched.forEach(function (v) {
-      isMatch[v.d.key] = true;
-      var lat = v.pos ? v.pos[0] : v.d.lat, lon = v.pos ? v.pos[1] : v.d.lon;
-      var asPill = (labels && (lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon)) || v === selected || !!routeVeh[v.d.key];
-      // when a vehicle switches between dot and label, its open popup moves with it
-      if (asPill) {
-        var dotOpen = v.dot.isPopupOpen();
-        if (v.dotInMap) { dotLayer.removeLayer(v.dot); v.dotInMap = false; }
-        var p = ensurePill(v);
-        if (!v.pillInMap) { syncMarkerPosition(p, v.pos); pillLayer.addLayer(p); v.pillInMap = true; keepTop(v); }
-        if (dotOpen && !p.isPopupOpen()) { p.openPopup(); popupClosedAt = 0; }
-      } else {
-        var pillOpen = !!(v.pill && v.pill.isPopupOpen());
-        if (v.pillInMap) { pillLayer.removeLayer(v.pill); v.pillInMap = false; }
-        if (!v.dotInMap) { syncMarkerPosition(v.dot, v.pos); dotLayer.addLayer(v.dot); v.dotInMap = true; }
-        if (pillOpen && !v.dot.isPopupOpen()) { v.dot.openPopup(); popupClosedAt = 0; }
-      }
-    });
+    var view = flatMarkerView();
+    matched.forEach(function (v) { updateFlatVehicle(v, view); });
     keys.forEach(function (k) {
-      if (isMatch[k]) return;
+      if (vehicles[k].filterMatch) return;
       var v = vehicles[k];
       if (v.dotInMap) { dotLayer.removeLayer(v.dot); v.dotInMap = false; }
       if (routeVeh[k]) { var rp = ensurePill(v); if (!v.pillInMap) { syncMarkerPosition(rp, v.pos); pillLayer.addLayer(rp); v.pillInMap = true; } return; }   // v99: yours stays

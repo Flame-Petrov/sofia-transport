@@ -11,7 +11,7 @@
   // sorted by departure and never overtaking each other (else they go to a second pattern), are rows of a
   // times matrix in seconds from today's "noon − 12 h". Yesterday's trips running past midnight are in it
   // too (their times shifted by a day).
-  var TT_VER = 2;
+  var TT_VER = 3;
   var tt = null, ttBusy = null, ttInfo = { state: '', ms: 0, from: '', err: '' };
   var ttFirst = {}, ttInstPat = null, ttStopIx = {}, ttByTrip = {};   // derived when the index is put to use (not saved)
   var sofiaDay = new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Sofia', year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -248,7 +248,7 @@
       if (!(m >= 0)) { var A = stops[x.stopIds[a]], B = stops[x.stopIds[b]]; m = A && B ? Math.round(distM([A.lat, A.lon], [B.lat, B.lon]) * 1.3 / 1.2) : 300; }
       from.push(a); to.push(b); sec.push(m);
     }).then(function (had) {
-      if (!had || !from.length) {
+      if (!had) {
         x.stopIds.forEach(function (id, a) {
           var A = stops[id];
           if (!A) return;

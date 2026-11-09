@@ -77,7 +77,21 @@
   // One search. access / egress: [{ s: stop index, sec: walking seconds }]; dep: seconds from tt.base;
   // ban: { inst: true } first vehicles not to take ("the next one"). Returns every round's labels and the
   // best arrival at the place for each number of vehicles that beats fewer vehicles.
-  function raptor(access, egress, dep, ov, ban, maxK) {   // maxK: at most this many vehicles (v97; default ROUTE_ROUNDS)
+  var livePatternCache = new WeakMap();
+  function livePatterns(overlay) {
+    if (livePatternCache.has(overlay)) return livePatternCache.get(overlay);
+    var groups = new Map();
+    Object.keys(overlay).forEach(function (key) {
+      var inst = Number(key), pattern = ttInstPat[inst];
+      if (!groups.has(pattern)) groups.set(pattern, []);
+      groups.get(pattern).push(inst);
+    });
+    livePatternCache.set(overlay, groups);
+    return groups;
+  }
+
+  function raptor(access, egress, dep, ov, ban, maxK) {
+    var liveGroups = livePatterns(ov);   // maxK: at most this many vehicles (v97; default ROUTE_ROUNDS)
     var nS = tt.stopIds.length, limit = dep + ROUTE_HORIZON_MIN * 60, rounds = maxK || ROUTE_ROUNDS;
     var best = new Int32Array(nS).fill(R_INF), bKind = new Int8Array(nS).fill(-1), bRound = new Int8Array(nS);
     var isMarked = new Uint8Array(nS), marked = [], m, j, i;
@@ -91,6 +105,14 @@
     var egW = new Int32Array(nS).fill(R_INF);
     egress.forEach(function (e) { if (e.sec < egW[e.s]) egW[e.s] = e.sec; });
     var R = [r0], results = [], destBest = R_INF, qPos = new Int32Array(tt.patRoute.length).fill(-1);
+    function recordArrival(stop, stopIndex, time, inst, boardIndex, boardStop) {
+      if (time >= best[stop] || time >= destBest) return;
+      if (rd.rt[stop] === R_INF) rideMarked.push(stop);
+      rd.rt[stop] = time; rd.ri[stop] = inst; rd.rb[stop] = boardIndex; rd.ra[stop] = stopIndex;
+      rd.rr[stop] = pRound[boardStop]; rd.rk[stop] = pKind[boardStop];
+      best[stop] = time; bKind[stop] = 1; bRound[stop] = k;
+      if (!isMarked[stop]) { isMarked[stop] = 1; marked.push(stop); }
+    }
     for (var k = 1; k <= rounds && marked.length; k++) {
       var pBest = best.slice(), pKind = bKind.slice(), pRound = bRound.slice(), qList = [];
       // the patterns through the stops reached in the last round, from their earliest such stop
@@ -110,38 +132,38 @@
         var p = qList[q], i0 = qPos[p];
         qPos[p] = -1;
         var o = tt.patStopOff[p], L = tt.patStopOff[p + 1] - o, a0 = tt.patInstOff[p], nT = tt.patInstOff[p + 1] - a0, tOff = tt.patTimeOff[p];
-        var cur = -1, curRow = 0, curLv = null, curB = -1, fromR = 0, fromK = 0;
+        // Timetable construction guarantees unchanged trips in a pattern never overtake.
+        var cur = -1, curRow = 0, boardIndex = -1;
         for (i = i0; i < L; i++) {
           var s = tt.patStops[o + i];
-          if (cur >= 0) {   // riding: getting off here
-            var arr = curLv ? curLv.t[i] : tt.times[curRow + i];
-            if (arr !== R_SKIP && arr < best[s] && arr < destBest) {
-              rd.rt[s] = arr; rd.ri[s] = cur; rd.rb[s] = curB; rd.ra[s] = i; rd.rr[s] = fromR; rd.rk[s] = fromK;
-              best[s] = arr; bKind[s] = 1; bRound[s] = k;
-              if (!isMarked[s]) { isMarked[s] = 1; marked.push(s); }
-              rideMarked.push(s);
-            }
+          if (cur >= 0) recordArrival(s, i, tt.times[curRow+i], cur, boardIndex, tt.patStops[o+boardIndex]);
+          var need = pBest[s] + (pKind[s] === 1 ? MIN_CHANGE_S : 0);
+          if (need > limit || (cur >= 0 && need > tt.times[curRow+i])) continue;
+          var lo = 0, hi = cur < 0 ? nT : cur-a0;
+          while (lo < hi) {
+            var mid = (lo + hi) >> 1;
+            if (tt.times[tOff + mid*L + i] < need) lo = mid+1;
+            else hi = mid;
           }
-          var lab = pBest[s];
-          if (lab >= R_INF) continue;
-          var need = lab + (pKind[s] === 1 ? MIN_CHANGE_S : 0);   // off one vehicle, onto the next: a minute
-          var curDep = cur >= 0 ? (curLv ? curLv.t[i] : tt.times[curRow + i]) : R_INF;
-          if (need >= curDep) continue;
-          // the earliest trip leaving here at or after `need` (live times can reorder trips a little, so the
-          // trips around that time are all checked)
-          var lo = 0, hi = nT, key = need - 1800;
-          while (lo < hi) { var mid = (lo + hi) >> 1; if (tt.times[tOff + mid * L + i] < key) lo = mid + 1; else hi = mid; }
-          var bI = -1, bT = R_INF;
-          for (var x = lo; x < nT; x++) {
-            var sch = tt.times[tOff + x * L + i];
-            if (sch > limit || (bI >= 0 && sch > bT + 1800)) break;
-            if (ban && ban[a0 + x]) continue;   // v98: in every round (from round 2 the same trip was boarded again from your own stop, so "the next vehicle" came out as the main way and was dropped)
-            var lv = ov[a0 + x], tx = lv ? lv.t[i] : sch;
-            if (tx === R_SKIP || tx < need || tx < dep) continue;
-            if (tx < bT) { bT = tx; bI = x; }
+          for (var x=lo; x<nT && (cur < 0 || a0+x < cur); x++) {
+            if (tt.times[tOff+x*L+i] > limit) break;
+            if (ov[a0+x] || (ban && ban[a0+x])) continue;
+            cur=a0+x; curRow=tOff+x*L; boardIndex=i;
+            break;
           }
-          if (bI >= 0 && bT < curDep) {
-            cur = a0 + bI; curRow = tOff + bI * L; curLv = ov[cur] || null; curB = i; fromR = pRound[s]; fromK = pKind[s];
+        }
+        // A delayed or express trip may overtake, or skip the stop where another trip wins.
+        // Carry each predicted trip independently from its first reachable boarding stop.
+        var live = liveGroups.get(p);
+        if (live) for (var inst of live) {
+          if (ban && ban[inst]) continue;
+          var times = ov[inst].t, board = -1;
+          for (i=i0; i<L; i++) {
+            var time = times[i];
+            if (time === R_SKIP) continue;
+            var stop = tt.patStops[o+i];
+            if (board >= 0) recordArrival(stop, i, time, inst, board, tt.patStops[o+board]);
+            else if (time <= limit && time >= pBest[stop] + (pKind[stop] === 1 ? MIN_CHANGE_S : 0)) board=i;
           }
         }
       }
