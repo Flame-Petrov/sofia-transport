@@ -122,6 +122,33 @@
 
   // Per-shape lookup tables: cumulative distance and heading of each segment (built once per shape)
   var shapeMeta = {};
+  function tripShapeMeta(info) {
+    if ((routes[info.route_id] || {}).type !== 1) return metaFor(info.shape_id);
+    var key = 'metro|' + info.shape_id;
+    if (!shapeMeta[key]) shapeMeta[key] = smoothMetroShape(pathMeta(shapes[info.shape_id]));
+    return shapeMeta[key];
+  }
+
+  // Average by track distance so clusters of feed vertices at a station
+  // cannot pull the line sideways. Taper the window at each terminus.
+  function smoothMetroShape(raw) {
+    if (!raw.total) return raw;
+    var count = Math.ceil(raw.total / 8), points = [], sample = [0, 0];
+    for (var i = 0; i <= count; i++) {
+      var s = raw.total * (i / count), radius = Math.min(100, s, raw.total - s);
+      var lat = 0, lon = 0, weight = 0;
+      for (var j = -12; j <= 12; j++) {
+        pointLL(raw, s + j * radius / 12, sample);
+        var w = 13 - Math.abs(j);
+        lat += sample[0] * w;
+        lon += sample[1] * w;
+        weight += w;
+      }
+      points.push([lat / weight, lon / weight]);
+    }
+    return pathMeta(points);
+  }
+
   function metaFor(id) {
     var key = id + (snapped[id] ? '|snapped' : '');
     if (shapeMeta[key]) return shapeMeta[key];

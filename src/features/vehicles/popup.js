@@ -380,7 +380,7 @@
     focusedStop = st;
     focusGuessEta = null;
     if (runTid) {   // a stop of the next run: its time is a best guess until the bus starts that run
-      var info = trips[runTid], m = info && info.shape_id && shapes && shapes[info.shape_id] ? metaFor(info.shape_id) : null;
+      var info = trips[runTid], m = info && info.shape_id && shapes && shapes[info.shape_id] ? tripShapeMeta(info) : null;
       focusGuessEta = { predicted: eta, g: { sameWay: false, stopOnNew: m ? (stopAlong(m, st, 0) || 0) : 0, tripId: runTid } };
     }
     v.allStops = false;

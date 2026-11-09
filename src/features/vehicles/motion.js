@@ -24,7 +24,7 @@
     if (d.metroPlan) return d.metroPlan.m;
     var info = trips[d.tripRef];
     if (!shapes || !info || !info.shape_id || !shapes[info.shape_id] || shapes[info.shape_id].length < 2) return null;
-    return metaFor(info.shape_id);
+    return tripShapeMeta(info);
   }
   // Closest point on the route (to the segment, not just a vertex). The vehicle's heading and its
   // previous position along the route break ties where the route passes the same street twice.

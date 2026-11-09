@@ -9,7 +9,7 @@
     var a = ttStop(lg.from), b = ttStop(lg.to), info = trips[lg.tid];
     if (!a || !b) return null;
     if (shapes && info && info.shape_id && shapes[info.shape_id] && shapes[info.shape_id].length > 1) {
-      var m = metaFor(info.shape_id), s0 = stopAlong(m, a, 0), s1 = s0 !== null ? stopAlong(m, b, s0 + 1) : null;
+      var m = tripShapeMeta(info), s0 = stopAlong(m, a, 0), s1 = s0 !== null ? stopAlong(m, b, s0 + 1) : null;
       if (s0 !== null && s1 !== null && s1 > s0) {
         var pts = [pointAt(m, s0).ll];
         for (var i = 0; i < m.pts.length; i++) if (m.cum[i] > s0 && m.cum[i] < s1) pts.push(m.pts[i]);

@@ -29,7 +29,7 @@
     if (v !== selected || !fg || fg.g.sameWay || !fg.g.tripId || !focusedStop || !shapes) return null;
     var ti = trips[fg.g.tripId];
     if (!ti || !ti.shape_id || !shapes[ti.shape_id]) return null;
-    var m2 = metaFor(ti.shape_id), to = stopAlong(m2, focusedStop, 0);
+    var m2 = tripShapeMeta(ti), to = stopAlong(m2, focusedStop, 0);
     if (to === null) return null;
     var pts = [];
     for (var i = 0; i < m2.pts.length && m2.cum[i] < to; i++) pts.push(m2.pts[i]);
@@ -72,7 +72,7 @@
     refreshPopup(v);
     var tid = v.d.tripRef, info = trips[tid];
     if (tid) loadTripStops(tid).then(function () { if (selected === v) drawRouteStops(); });
-    if (info && info.shape_id && shapes && shapes[info.shape_id]) {
+    if (v.d.type !== 1 && info && info.shape_id && shapes && shapes[info.shape_id]) {
       snapShape(info.shape_id).then(function () { if (selected === v) { planMotion(v, false); drawPath(v); drawRouteStops(); } });
     }
   }
@@ -113,7 +113,7 @@
       if (nr) {
         var ni = trips[nr.tripId];
         v.pathNote += ' · next run → ' + (ni.headsign || '?') + ' ≈ ' + clockOf(nr.t) + (nr.linked ? '' : ' (best guess)');
-        pathPreview = L.polyline(metaFor(ni.shape_id).pts, {
+        pathPreview = L.polyline(tripShapeMeta(ni).pts, {
           renderer: pathRenderer, color: d.color, weight: w.preview, opacity: 0.55,
           dashArray: '1 12', lineCap: 'round', lineJoin: 'round', interactive: false
         }).addTo(pathLayer);

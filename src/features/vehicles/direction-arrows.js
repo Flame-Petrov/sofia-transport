@@ -129,7 +129,7 @@
     }
     var fg = focusGuessEta;
     if (!fg || fg.g.sameWay || !fg.g.tripId || !m || along === null) return out;
-    var ti = trips[fg.g.tripId], m2 = ti && ti.shape_id && shapes && shapes[ti.shape_id] ? metaFor(ti.shape_id) : null;
+    var ti = trips[fg.g.tripId], m2 = ti && ti.shape_id && shapes && shapes[ti.shape_id] ? tripShapeMeta(ti) : null;
     var to = m2 ? stopAlong(m2, focusedStop, 0) : null;
     if (typeof to !== 'number') return out;
     var runEnd = m.cum[m.cum.length - 1];

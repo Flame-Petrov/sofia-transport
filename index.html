@@ -3309,7 +3309,7 @@
     focusedStop = st;
     focusGuessEta = null;
     if (runTid) {   // a stop of the next run: its time is a best guess until the bus starts that run
-      var info = trips[runTid], m = info && info.shape_id && shapes && shapes[info.shape_id] ? metaFor(info.shape_id) : null;
+      var info = trips[runTid], m = info && info.shape_id && shapes && shapes[info.shape_id] ? tripShapeMeta(info) : null;
       focusGuessEta = { predicted: eta, g: { sameWay: false, stopOnNew: m ? (stopAlong(m, st, 0) || 0) : 0, tripId: runTid } };
     }
     v.allStops = false;
@@ -3497,6 +3497,33 @@
 
   // Per-shape lookup tables: cumulative distance and heading of each segment (built once per shape)
   var shapeMeta = {};
+  function tripShapeMeta(info) {
+    if ((routes[info.route_id] || {}).type !== 1) return metaFor(info.shape_id);
+    var key = 'metro|' + info.shape_id;
+    if (!shapeMeta[key]) shapeMeta[key] = smoothMetroShape(pathMeta(shapes[info.shape_id]));
+    return shapeMeta[key];
+  }
+
+  // Average by track distance so clusters of feed vertices at a station
+  // cannot pull the line sideways. Taper the window at each terminus.
+  function smoothMetroShape(raw) {
+    if (!raw.total) return raw;
+    var count = Math.ceil(raw.total / 8), points = [], sample = [0, 0];
+    for (var i = 0; i <= count; i++) {
+      var s = raw.total * (i / count), radius = Math.min(100, s, raw.total - s);
+      var lat = 0, lon = 0, weight = 0;
+      for (var j = -12; j <= 12; j++) {
+        pointLL(raw, s + j * radius / 12, sample);
+        var w = 13 - Math.abs(j);
+        lat += sample[0] * w;
+        lon += sample[1] * w;
+        weight += w;
+      }
+      points.push([lat / weight, lon / weight]);
+    }
+    return pathMeta(points);
+  }
+
   function metaFor(id) {
     var key = id + (snapped[id] ? '|snapped' : '');
     if (shapeMeta[key]) return shapeMeta[key];
@@ -3648,7 +3675,7 @@
     if (v !== selected || !fg || fg.g.sameWay || !fg.g.tripId || !focusedStop || !shapes) return null;
     var ti = trips[fg.g.tripId];
     if (!ti || !ti.shape_id || !shapes[ti.shape_id]) return null;
-    var m2 = metaFor(ti.shape_id), to = stopAlong(m2, focusedStop, 0);
+    var m2 = tripShapeMeta(ti), to = stopAlong(m2, focusedStop, 0);
     if (to === null) return null;
     var pts = [];
     for (var i = 0; i < m2.pts.length && m2.cum[i] < to; i++) pts.push(m2.pts[i]);
@@ -3691,7 +3718,7 @@
     refreshPopup(v);
     var tid = v.d.tripRef, info = trips[tid];
     if (tid) loadTripStops(tid).then(function () { if (selected === v) drawRouteStops(); });
-    if (info && info.shape_id && shapes && shapes[info.shape_id]) {
+    if (v.d.type !== 1 && info && info.shape_id && shapes && shapes[info.shape_id]) {
       snapShape(info.shape_id).then(function () { if (selected === v) { planMotion(v, false); drawPath(v); drawRouteStops(); } });
     }
   }
@@ -3732,7 +3759,7 @@
       if (nr) {
         var ni = trips[nr.tripId];
         v.pathNote += ' · next run → ' + (ni.headsign || '?') + ' ≈ ' + clockOf(nr.t) + (nr.linked ? '' : ' (best guess)');
-        pathPreview = L.polyline(metaFor(ni.shape_id).pts, {
+        pathPreview = L.polyline(tripShapeMeta(ni).pts, {
           renderer: pathRenderer, color: d.color, weight: w.preview, opacity: 0.55,
           dashArray: '1 12', lineCap: 'round', lineJoin: 'round', interactive: false
         }).addTo(pathLayer);
@@ -3943,7 +3970,7 @@
     }
     var fg = focusGuessEta;
     if (!fg || fg.g.sameWay || !fg.g.tripId || !m || along === null) return out;
-    var ti = trips[fg.g.tripId], m2 = ti && ti.shape_id && shapes && shapes[ti.shape_id] ? metaFor(ti.shape_id) : null;
+    var ti = trips[fg.g.tripId], m2 = ti && ti.shape_id && shapes && shapes[ti.shape_id] ? tripShapeMeta(ti) : null;
     var to = m2 ? stopAlong(m2, focusedStop, 0) : null;
     if (typeof to !== 'number') return out;
     var runEnd = m.cum[m.cum.length - 1];
@@ -4672,7 +4699,7 @@
       for (var i = 0; i < run.length; i++) stations.push(stops[tt.stopIds[tt.patStops[run.start + i]]]);
       var path = null;
       if (stations.every(Boolean)) {
-        var m = hasShape && metaFor(shape), distances = [], last = 0;
+        var m = hasShape && tripShapeMeta(trips[run.tid]), distances = [], last = 0;
         if (m) {
           for (var j = 0; j < stations.length; j++) {
             var s = stopAlong(m, stations[j], last);
@@ -4682,8 +4709,13 @@
           }
         }
         if (distances.length !== stations.length) {
-          m = pathMeta(stations.map(function (st) { return [st.lat, st.lon]; }));
-          distances = m.cum;
+          m = smoothMetroShape(pathMeta(stations.map(function (st) { return [st.lat, st.lon]; })));
+          last = 0;
+          distances = stations.map(function (st, index) {
+            var position = projectAlong(m, st.lat, st.lon, null, last);
+            if (position) last = Math.max(last, position.s);
+            return index === stations.length - 1 ? m.total : last;
+          });
         }
         path = { m: m, distances: distances };
       }
@@ -7402,7 +7434,7 @@
     var a = ttStop(lg.from), b = ttStop(lg.to), info = trips[lg.tid];
     if (!a || !b) return null;
     if (shapes && info && info.shape_id && shapes[info.shape_id] && shapes[info.shape_id].length > 1) {
-      var m = metaFor(info.shape_id), s0 = stopAlong(m, a, 0), s1 = s0 !== null ? stopAlong(m, b, s0 + 1) : null;
+      var m = tripShapeMeta(info), s0 = stopAlong(m, a, 0), s1 = s0 !== null ? stopAlong(m, b, s0 + 1) : null;
       if (s0 !== null && s1 !== null && s1 > s0) {
         var pts = [pointAt(m, s0).ll];
         for (var i = 0; i < m.pts.length; i++) if (m.cum[i] > s0 && m.cum[i] < s1) pts.push(m.pts[i]);
@@ -8064,7 +8096,7 @@
     if (d.metroPlan) return d.metroPlan.m;
     var info = trips[d.tripRef];
     if (!shapes || !info || !info.shape_id || !shapes[info.shape_id] || shapes[info.shape_id].length < 2) return null;
-    return metaFor(info.shape_id);
+    return tripShapeMeta(info);
   }
   // Closest point on the route (to the segment, not just a vertex). The vehicle's heading and its
   // previous position along the route break ties where the route passes the same street twice.

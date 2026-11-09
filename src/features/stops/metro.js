@@ -40,7 +40,7 @@
       for (var i = 0; i < run.length; i++) stations.push(stops[tt.stopIds[tt.patStops[run.start + i]]]);
       var path = null;
       if (stations.every(Boolean)) {
-        var m = hasShape && metaFor(shape), distances = [], last = 0;
+        var m = hasShape && tripShapeMeta(trips[run.tid]), distances = [], last = 0;
         if (m) {
           for (var j = 0; j < stations.length; j++) {
             var s = stopAlong(m, stations[j], last);
@@ -50,8 +50,13 @@
           }
         }
         if (distances.length !== stations.length) {
-          m = pathMeta(stations.map(function (st) { return [st.lat, st.lon]; }));
-          distances = m.cum;
+          m = smoothMetroShape(pathMeta(stations.map(function (st) { return [st.lat, st.lon]; })));
+          last = 0;
+          distances = stations.map(function (st, index) {
+            var position = projectAlong(m, st.lat, st.lon, null, last);
+            if (position) last = Math.max(last, position.s);
+            return index === stations.length - 1 ? m.total : last;
+          });
         }
         path = { m: m, distances: distances };
       }
