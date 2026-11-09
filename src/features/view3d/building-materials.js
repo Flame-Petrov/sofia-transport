@@ -7,10 +7,14 @@
       for (var y = 0; y < 32; y++) {
         for (var x = 0; x < 32; x++) {
           var shade = 0;
-          if (material === 'green') shade = y % 8 === 0 || (x + 8 * Math.floor(y / 8)) % 16 === 0 ? -12 : 2;
-          if (material === 'blue') shade = x % 8 < 2 ? -14 : x % 8 === 2 ? 5 : 0;
-          if (material === 'purple') shade = y % 8 === 0 ? -14 : y % 8 === 1 ? 5 : 0;
-          if (material === 'gold') shade = ((x * 19 + y * 31 + x * y * 7) % 13) - 6;
+          if (material === 'green') {
+            var joint = (x + 8 * Math.floor(y / 8)) % 16, row = y % 8;
+            var distance = Math.min(joint, 16 - joint, row, 8 - row);
+            shade = Math.min(1, distance / 2) * 6 - 5;
+          }
+          if (material === 'blue') shade = -5 * Math.cos(x * Math.PI / 4);
+          if (material === 'purple') shade = -5 * Math.cos(y * Math.PI / 4);
+          if (material === 'gold') shade = (((x * 19 + y * 31 + x * y * 7) % 13) - 6) / 2;
           var offset = (y * 32 + x) * 4;
           for (var c = 0; c < 3; c++) image.data[offset + c] = color[c] + shade;
           image.data[offset + 3] = 255;

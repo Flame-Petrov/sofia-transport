@@ -91,4 +91,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-08 — [Dismiss vehicle details on Follow](docs/marker-camera.md).** The follow transition now closes the card when a vehicle is selected directly. Both builds passed verification. Simulated clicks covered dot and pill popups, the phone sheet and the 3D popup. The launcher HTTP check timed out, so live browser verification remains open.
 
+**2026-11-09 — 3D edge smoothing.** Enabled multisample anti-aliasing on the tilted map, rebuilt all three [vehicle meshes](docs/vehicle-models.md) with smooth curved surfaces, and softened all four [building materials](docs/3d-building-textures.md). Both releases passed the build check. Verified the numbered release over HTTP and viewed textured buildings and live trams at close zoom in a 1280 × 720 browser. Frame time on a physical phone remains open.
+
+**2026-11-09 — [3D vehicle motion](docs/vehicle-models.md).** Nearby meshes, body taps and follow anchors share a per-frame pose. Labels follow the fleet cadence. Trams reuse adjacent rails between fleet updates, and GPS-only moving vehicles glide over the measured feed interval. Both releases passed build verification. A controlled 600-frame check covered buses, trolleybuses, GPS-only and route-matched trams on a bend, camera alignment and idle repaints. Physical phone frame timing remains open.
+
 <!-- AGENT-HANDOFF:END -->

@@ -115,6 +115,7 @@
           container: el, style: style3d(), center: [c.lng, c.lat], zoom: z - 1, pitch: 0, bearing: 0,
           minZoom: 8, maxZoom: 18, maxPitch: VIEW3D_MAX_PITCH,
           pixelRatio: mapPixelRatio(),
+          antialias: true,
           fadeDuration: 120, maxTileCacheZoomLevels: 3, attributionControl: false, renderWorldCopies: false,
           dragRotate: true, touchPitch: true, pitchWithRotate: true
         });
@@ -373,7 +374,7 @@
     }
     var railSource, railSegments = [], railsDirty = true, railRefreshAt = 0;
     var railNeighbors = new Map();
-    var tramPositions = new Map();
+    var modelPoses = new Map();
     function refreshRails(now) {
       if (!railSource || !railsDirty || now < railRefreshAt) return;
       railsDirty = false;
@@ -402,10 +403,10 @@
       }
     }
     // Work in local metres. At crossings prefer the tangent of the current trip.
-    function railPosition(lng, lat, heading) {
+    function railPosition(lng, lat, heading, segments, distanceOnly) {
       var east = 111320 * Math.cos(toRad(lat)), north = 111320, best = null, score = Infinity;
-      for (var i = 0; i < railSegments.length; i++) {
-        var a = railSegments[i][0], b = railSegments[i][1];
+      for (var i = 0; i < segments.length; i++) {
+        var a = segments[i][0], b = segments[i][1];
         if (lng < Math.min(a[0], b[0]) - 50/east || lng > Math.max(a[0], b[0]) + 50/east ||
             lat < Math.min(a[1], b[1]) - 50/north || lat > Math.max(a[1], b[1]) + 50/north) continue;
         var x = (a[0]-lng)*east, y = (a[1]-lat)*north;
@@ -418,10 +419,20 @@
         var diff = angleDiff(heading, bearing);
         var reversed = diff > 90;
         if (reversed) { bearing = (bearing+180)%360; diff = 180-diff; }
-        var cost = distance + diff * 0.25;
+        var cost = distanceOnly ? distance : distance + diff * 0.25;
         if (cost < score) {
           score = cost;
-          best = { at: [a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1])], bearing: bearing, forward: reversed ? a : b, backward: reversed ? b : a };
+          best = { at: [a[0]+t*(b[0]-a[0]), a[1]+t*(b[1]-a[1])], bearing: bearing, forward: reversed ? a : b, backward: reversed ? b : a,
+            endpoint: t === 0 ? a : t === 1 ? b : null };
+        }
+      }
+      // A GPS chord through a bend can favor the next segment before the
+      // center reaches it. At a simple joint use the closer of the two rails.
+      if (!distanceOnly && best && best.endpoint) {
+        var neighbors = railNeighbors.get(best.endpoint.join(','));
+        if (neighbors && neighbors.size === 2) {
+          var joint = Array.from(neighbors.values(), function (next) { return [best.endpoint, next]; });
+          return railPosition(lng, lat, heading, joint, true);
         }
       }
       return best;
@@ -470,9 +481,48 @@
       return [direction(rear[1], rear[0]), direction(rear[0], front[0]), direction(front[0], front[1])];
     }
     function vehicleAnchor(v) {
-      return tramPositions.get(v) || [v.pos[1], v.pos[0]];
+      var pose = modelPoses.get(v);
+      return pose ? pose.c : [v.pos[1], v.pos[0]];
     }
-    function buildVeh() {
+    // Between fleet updates a tram only needs its current rail and the branches
+    // touching either end. Refresh that neighborhood when it crosses a vertex.
+    function localRails(rail) {
+      var segments = [[rail.backward, rail.forward]];
+      function adjacent(node, other) {
+        var neighbors = railNeighbors.get(node.join(','));
+        if (neighbors) neighbors.forEach(function (next, key) {
+          if (key !== other.join(',')) segments.push([node, next]);
+        });
+      }
+      adjacent(rail.forward, rail.backward);
+      adjacent(rail.backward, rail.forward);
+      return segments;
+    }
+    function advanceModels(frameTime) {
+      var repaint = false;
+      modelPoses.forEach(function (pose, v) {
+        if (!v.mo || !pose.animate) return;
+        var pos = posAt(v, frameTime);
+        if (pos[0] === pose.lat && pos[1] === pose.lon) return;
+        pose.lat = pos[0]; pose.lon = pos[1];
+        var heading = modelBearing(v);
+        if (pose.rail) {
+          var rail = railPosition(pose.lon, pose.lat, heading, pose.localRails);
+          if (!rail) return; // The fleet update will reacquire a track or show the marker.
+          if (rail.forward !== pose.rail.forward || rail.backward !== pose.rail.backward) pose.localRails = localRails(rail);
+          pose.rail = rail;
+          pose.sections = tramHeadings(rail, v, vehicleModelMetresPerUnit);
+          pose.bearing = pose.sections[1];
+          pose.c = rail.at;
+        } else {
+          pose.bearing = heading;
+          pose.c = [pose.lon, pose.lat];
+        }
+        repaint = true;
+      });
+      if (repaint) m3.triggerRepaint();
+    }
+    function buildVeh(frameTime) {
       if (!m3 || !m3.getSource('v3-veh')) return;
       var t0 = performance.now(), nb = view3d.bounds(0.3), b = m3.getBounds(), now = performance.now(), doFar = now >= farDue;
       var s = nb.getSouth(), n = nb.getNorth(), w = nb.getWest(), e = nb.getEast(), feats = [], far = [], seen = {};
@@ -480,7 +530,8 @@
       drawn = [];
       if (doFar) { farDue = now + 500; farDrawn = []; }
       var close = m3.getZoom() >= vehicleModelZoom;
-      tramPositions.clear();
+      var previousPoses = modelPoses, repaint = false;
+      modelPoses = new Map();
       if (close) refreshRails(now);
       function add(v) {
         if (!v || !v.pos || seen[v.d.key]) return;
@@ -495,23 +546,36 @@
           }
           return;
         }
+        var animate = model && (v === selected || (la >= s && la <= n && lo >= w && lo <= e));
+        if (animate && v.mo) {
+          posAt(v, frameTime);
+          la = v.pos[0]; lo = v.pos[1];
+        }
         var heading = model ? modelBearing(v) : null;
         model = model && Number.isFinite(heading);
         if (v === selected && !model) return;
         if (model && d.type === 0) {
-          var rail = railPosition(lo, la, heading);
+          var rail = railPosition(lo, la, heading, railSegments);
           if (rail) {
             lo = rail.at[0]; la = rail.at[1]; heading = rail.bearing;
             var sections = tramHeadings(rail, v, vehicleModelMetresPerUnit);
             heading = sections[1];
-            tramPositions.set(v, rail.at);
           } else {
             model = false;
             if (v === selected) return;
           }
         }
         var ink = inkOf[d.color] || (inkOf[d.color] = lineTones(d.color).ink);
-        drawn.push({ k: d.key, c: [lo, la], m: !!rv, type: d.type, color: d.color, bearing: heading, sections: sections, model: model, opacity: (dimNow && !rv && v !== selected ? 0.35 : 1) * (v.parked ? 0.6 : 1) });
+        var pose = { k: d.key, c: [lo, la], m: !!rv, type: d.type, color: d.color, bearing: heading, sections: sections, model: model, opacity: (dimNow && !rv && v !== selected ? 0.35 : 1) * (v.parked ? 0.6 : 1) };
+        drawn.push(pose);
+        if (model) {
+          var prev = previousPoses.get(v);
+          if (!prev || lo !== prev.c[0] || la !== prev.c[1] || heading !== prev.bearing) repaint = true;
+          pose.labelAt = pose.c;
+          pose.animate = animate; pose.lat = v.pos[0]; pose.lon = v.pos[1];
+          if (rail && animate) { pose.rail = rail; pose.localRails = localRails(rail); }
+          modelPoses.set(v, pose);
+        }
         feats.push({ type: 'Feature', geometry: { type: 'Point', coordinates: [lo, la] },
           properties: { k: d.key, model: model ? 1 : 0, c: d.color, ink: ink, t: String(d.shown), b: typeof d.bearing === 'number' && !v.parked ? Math.round(d.bearing) : -1,
                         pk: v.parked ? 1 : 0, m: rv ? 1 : 0, tag: rv ? rv.tag : '' } });
@@ -519,6 +583,7 @@
       for (var i = 0; i < shown.length; i++) add(shown[i]);
       for (var k in routeVeh) add(vehicles[k]);
       add(selected);
+      if (repaint || previousPoses.size !== modelPoses.size) m3.triggerRepaint();
       var halfPixel = 180 / (512 * Math.pow(2, m3.getZoom()));
       var tolerance = { lng: halfPixel, lat: halfPixel * Math.cos(toRad(m3.getCenter().lat)) };
       submitPointSource('v3-veh', feats, tolerance);
@@ -550,7 +615,7 @@
       }
       var k = iconKey(v.d);
       if (k !== trkMk._k) { trkMk._k = k; trkMk.getElement().innerHTML = iconFor(v.d).options.html; }
-      trkMk.getElement().hidden = m3.getZoom() >= vehicleModelZoom && !!vehicleMeshes[v.d.type] && (v.d.type === 0 ? tramPositions.has(v) : Number.isFinite(modelBearing(v)));
+      trkMk.getElement().hidden = m3.getZoom() >= vehicleModelZoom && modelPoses.has(v);
       var atMarker = trkMk.getLngLat();
       if (atMarker.lng === at[0] && atMarker.lat === at[1]) return;
       trkMk.setLngLat(at);
@@ -576,9 +641,10 @@
           var vx = front.x-rear.x, vy = front.y-rear.y;
           var t = Math.max(0, Math.min(1, ((p.x-rear.x)*vx+(p.y-rear.y)*vy)/(vx*vx+vy*vy || 1)));
           var bodyDistance = Math.hypot(p.x-rear.x-t*vx, p.y-rear.y-t*vy);
-          var labelHit = dx <= rx && Math.abs(q.y - 30 * ui - p.y) <= ry;
+          var labelPoint = m3.project(f.labelAt);
+          var labelHit = Math.abs(labelPoint.x - p.x) <= rx && Math.abs(labelPoint.y - 30 * ui - p.y) <= ry;
           if (!labelHit && bodyDistance > 18 * ui) continue;
-          dx = labelHit ? dx : bodyDistance; dy = 0;
+          dx = labelHit ? Math.abs(labelPoint.x - p.x) : bodyDistance; dy = 0;
         } else if (dx > rx || dy > ry) continue;
         var d = dx * dx + dy * dy;
         if (d < bd) { bd = d; best = f.k; }
@@ -895,7 +961,7 @@
         view3d.on = false; closing = false; ready = false; camBusy = false;
         m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
-        tramPositions.clear(); railNeighbors.clear(); railSegments = []; trkMk = null; stopMks = {}; stopsDrawn = []; shown = []; drawn = []; farDrawn = []; labelsBy = null; rtMks = {}; rtSig = ''; fc.off = lc.off = null; userMoving = pointerDown = false;
+        modelPoses.clear(); railNeighbors.clear(); railSegments = []; trkMk = null; stopMks = {}; stopsDrawn = []; shown = []; drawn = []; farDrawn = []; labelsBy = null; rtMks = {}; rtSig = ''; fc.off = lc.off = null; userMoving = pointerDown = false;
         window.removeEventListener('mouseup', pointerOff, true); window.removeEventListener('touchend', pointerOff, true); window.removeEventListener('touchcancel', pointerOff, true);
         mapEl.classList.remove('v3on');
         handlers(true);
@@ -1029,12 +1095,13 @@
     view3d.camText = function () { return m3 ? 'p' + Math.round(m3.getPitch()) + '° b' + Math.round((m3.getBearing() + 360) % 360) + '°' : ''; };
 
     // ---- every frame (called at the end of motionFrame while 3D is open) ----
-    view3d.frame = function () {
+    view3d.frame = function (frameTime) {
       if (!m3) return;
       drawMe3();
       if (!m3.getSource('v3-veh')) return;
       var now = performance.now();
-      if (now >= vehDue) { vehDue = now + 1000 / VIEW3D_VEH_HZ; buildVeh(); }
+      if (now >= vehDue) { vehDue = now + 1000 / VIEW3D_VEH_HZ; buildVeh(frameTime); }
+      else advanceModels(frameTime);
       trackFrame();
       followCam3();   // v102
       locCam3();

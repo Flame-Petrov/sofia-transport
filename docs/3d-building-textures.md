@@ -41,6 +41,8 @@ For example, a 50 m-long, 12 m-high hall is purple even when it runs diagonally 
 
 ## Implementation and verification
 
+The pattern generator in `src/features/view3d/building-materials.js` feathers the green mortar joints, uses low-contrast periodic gradients for the blue and purple bands, and halves the gold grain amplitude. The extrusion follows the mapped footprint. To inspect pattern contrast independently of the building silhouette, toggle textures at a fixed camera position, then rotate past a diagonal roofline.
+
 - `tools/prepare_buildings.py` assembles OSM areas, associates mapped parts with an explicit building relation or the smallest containing outline, and measures the long side of the minimum rotated rectangle in UTM zone 34N. It assigns one material using the tallest roof in each group, then clips the individual geometries to zoom-14 Web Mercator tiles. The individual roof and base heights are retained.
 - `src/features/view3d/building-materials.js` owns the tile protocol, fallback, deterministic pattern images and layers. It copies the native extrusion styling and filters, then raises textured building opacity to 0.92 for stronger color. The native geometry stays available at zero opacity while textures are on, so switching off can restore the original paint without rebuilding the street layer.
 - `src/features/view3d/menu.html`, `view.css` and `view.js` own the checkbox, legend and preference. The style-load callback and switch handler use the same material routine. Each 3D map registers the images and layers on its first use of textures. The standalone build includes the material code and tile bundle through `src/page.html`.

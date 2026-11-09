@@ -34,7 +34,7 @@
   var VIEW3D_BUILDING_ZOOM = 15;      // 3D map: buildings stand up from this zoom
   var VIEW3D_BUILDING_OPACITY = 0.75; // a little see-through, so vehicles and lines behind buildings still show
   var VIEW3D_RETRY_MS = 864e5;        // after the 3D map ran out of memory on this device, its button is hidden this long
-  var VIEW3D_VEH_HZ = 15;             // v101: the vehicle layer is updated this often a second (the tracked vehicle: every frame)
+  var VIEW3D_VEH_HZ = 15;             // Fleet membership and near labels. Moving meshes update every frame.
   var VIEW3D_FREE_2D = false;         // v101: free the 2D vector map while 3D is open (less graphics memory, ~1 s to redraw on return)
   var VIEW3D_TERRAIN = false;         // v103: the terrain switch's default (hills and Vitosha from Mapterhorn's free elevation tiles)
   var VIEW3D_TURN_DEG_S = 90;         // v102: heading-up cameras turn at most this fast (degrees a second), so corners never swing

@@ -104,8 +104,9 @@
       return;
     }
     v.lastRep = null;
-    // no route known: glide to the reported position
-    v.mo = { kind: 'line', a: cur.slice(), b: [d.lat, d.lon], t0: now, dur: Math.min(dur, 3000) };
+    // Spread a moving GPS-only fix across the measured feed interval. A
+    // reported stop settles promptly, and neither case predicts beyond the fix.
+    v.mo = { kind: 'line', a: cur.slice(), b: [d.lat, d.lon], t0: now, dur: d.speed === 0 ? 3000 : feedInterval };
   }
 
   // Where along the road a move is at moment k (0…1): a smooth curve from the start speed v0 to the
@@ -194,7 +195,7 @@
     if (batch || full) onScreenCount = count;
     followFrame();
     locFrame();
-    if (view3d.on) view3d.frame();   // v100: the 3D map draws what the frame planned (its cameras, too)
+    if (view3d.on) view3d.frame(now);
     if (selected) syncPath(selected);
     if (selected && now - lastPassCheck > 300) { lastPassCheck = now; checkPassedStops(); }
   }

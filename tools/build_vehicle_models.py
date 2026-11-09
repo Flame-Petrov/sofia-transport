@@ -13,41 +13,47 @@ class Mesh:
     def __init__(self):
         self.faces = defaultdict(list)
 
-    def face(self, color, points):
-        a, b, c = points[:3]
-        u, v = [[p[i]-a[i] for i in range(3)] for p in (b,c)]
-        n = [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]]
-        normal = tuple(k/math.hypot(*n) for k in n)
+    def face(self, color, points, normals=None):
+        if normals is None:
+            a, b, c = points[:3]
+            u, v = [[p[i]-a[i] for i in range(3)] for p in (b,c)]
+            n = [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]]
+            normals = [tuple(k/math.hypot(*n) for k in n)] * len(points)
         for j in range(1, len(points)-1):
-            for p in (a, points[j], points[j+1]):
-                self.faces[color].append(tuple(p)+normal)
+            for i in (0, j, j+1):
+                self.faces[color].append(tuple(points[i]) + normals[i])
 
-    def prism(self, color, lower, upper):
+    def prism(self, color, lower, upper, radial=None):
         self.face(color, lower[::-1])
         self.face(color, upper)
         for i in range(len(lower)):
             j = (i+1) % len(lower)
-            self.face(color, [lower[i], lower[j], upper[j], upper[i]])
+            normals = None if radial is None else [radial[i], radial[j], radial[j], radial[i]]
+            self.face(color, [lower[i], lower[j], upper[j], upper[i]], normals)
 
     def body(self, color, z, length, width, bottom, top, bevel=.13):
         x, h = width/2, length/2
         d = min(bevel, x/2, h/2)
-        def ring(y, inset):
-            points = []
-            for cx, cz, start in ((1,1,-90),(1,-1,0),(-1,-1,90),(-1,1,180)):
-                for step in range(5):
-                    angle = math.radians(start+step*22.5)
-                    points.append((cx*(x-d)+(d-inset)*math.cos(angle), y,
-                                   z+cz*(h-d)-(d-inset)*math.sin(angle)))
-            return points
+        corners = []
+        for cx, cz, start in ((1,1,-90),(1,-1,0),(-1,-1,90),(-1,1,180)):
+            for step in range(7):
+                angle = math.radians(start + step * 15)
+                corners.append((cx*(x-d), z+cz*(h-d), math.cos(angle), -math.sin(angle)))
+
         lip = min(d*.65,(top-bottom)*.22)
-        rings = [ring(bottom,lip),ring(bottom+lip,0),ring(top-lip,0),ring(top,lip)]
-        self.face(color, rings[0][::-1])
-        self.face(color, rings[-1])
-        for low, high in zip(rings,rings[1:]):
+        rings = []
+        for y, inset, vertical in ((bottom, lip, -1), (bottom+lip, 0, 0),
+                                   (top-lip, 0, 0), (top, lip, 1)):
+            points = [(cx+(d-inset)*nx, y, cz+(d-inset)*nz) for cx, cz, nx, nz in corners]
+            normals = [(0, vertical, 0) if vertical else (nx, 0, nz) for _, _, nx, nz in corners]
+            rings.append((points, normals))
+        self.face(color, rings[0][0][::-1])
+        self.face(color, rings[-1][0])
+        for (low, low_normals), (high, high_normals) in zip(rings,rings[1:]):
             for i in range(len(low)):
                 j = (i+1)%len(low)
-                self.face(color,[low[i],low[j],high[j],high[i]])
+                self.face(color, [low[i],low[j],high[j],high[i]],
+                          [low_normals[i],low_normals[j],high_normals[j],high_normals[i]])
     def box(self, color, x,y,z,w,h,l):
         ring = [(x-w/2,z+l/2),(x+w/2,z+l/2),(x+w/2,z-l/2),(x-w/2,z-l/2)]
         self.prism(color, *[[(a,b,c) for a,c in ring] for b in (y,y+h)])
@@ -62,8 +68,9 @@ class Mesh:
         u = unit(cross(direction,(0,1,0) if abs(direction[1]) < .9 else (1,0,0)))
         v = cross(direction,u)
         angles = [i*math.tau/sides for i in range(sides)]
-        self.prism(color,*[[tuple(p[j]+r*(u[j]*math.cos(t)+v[j]*math.sin(t)) for j in range(3))
-                            for t in angles] for p in (a,b)])
+        radial = [tuple(u[j]*math.cos(t) + v[j]*math.sin(t) for j in range(3)) for t in angles]
+        lower, upper = [[tuple(p[j]+r*n[j] for j in range(3)) for n in radial] for p in (a,b)]
+        self.prism(color, lower, upper, radial)
 
     def save(self,name):
         blob = bytearray()

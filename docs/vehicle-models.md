@@ -1,5 +1,7 @@
 # Surface vehicle models
 
+The tilted map requests multisample anti-aliasing in `src/features/view3d/view.js` at the existing drawing resolution. In `tools/build_vehicle_models.py`, rounded body corners use six segments per quarter turn. Radial vertex normals give curved bodywork, wheels and poles continuous shading. Roof panels, door frames and wheel end caps use flat normals. To inspect the result, zoom close to a surface vehicle and rotate the map past its roofline and cab.
+
 The GLBs in `models/` use metres, face +Z and rest on Y=0. The twelve-metre city bus and trolleybus have double doors, separate wheels, window mullions and rooftop equipment. The three-section tram has bellows, a pantograph and a body-colored skirt that reaches rail height on each section. The tram mesh contains no wheels or hubs. The trolleybus has two trailing collector poles. The models represent vehicle classes rather than specific fleet units.
 
 Run `python tools/build_vehicle_models.py` from the site directory to regenerate the meshes. The page builder embeds them in both releases. In `src/features/view3d/vehicle-models.js`, the shader tints the body, glazing, tires and fittings with shades of the vehicle marker color.
@@ -13,3 +15,7 @@ The tram articulates at both bellows. The view walks connected rail segments for
 In 3D, buses and trolleybuses face along the animated route segment or the direction of a straight move longer than three metres. At a stop the view can use the directed trip shape, reported bearing or last heading for the same trip. Without a heading the vehicle keeps its ordinary marker. To check, compare the model heading with the bearing between successive displayed positions on a straight street.
 
 The 3D layer renders one mesh unit as 1.8 ground metres. Zooming changes the apparent size of a vehicle with the surrounding street. The tram uses the same fixed ground scale when sampling its articulation angles. Verify by zooming from MapLibre level 16 through 18 on a parked vehicle and comparing its length against a nearby building.
+
+Nearby moving models sample the vehicle motion plan on each animation frame. The follow camera, popup and body hit target use that pose. Fleet membership and line labels refresh up to 15 times per second, and distant dots refresh twice per second. Between fleet updates, a tram projects onto its matched rail and adjoining segments as it crosses a vertex. In `src/features/vehicles/motion.js`, a moving vehicle without a matched route glides to the GPS fix over the measured feed interval. A reported zero speed uses a three-second correction.
+
+To check movement, zoom in on a moving bus with the camera stationary, then follow it and tap its body. Repeat with a tram crossing a bend. Check that a stationary fleet allows the model layer to stop requesting repaints.
