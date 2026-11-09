@@ -912,11 +912,14 @@
     }
     view3d.pathChanged = function () {
       if (!m3 || !m3.getSource('v3-trk-tail')) return;
-      if (flow) flow.draw3d = null;   // resync the head when the sources are replaced
-      var lls = pathLine ? pathLine.getLatLngs() : null, x = [];
+      var x = [];
       trk.color = pathLine ? pathLine.options.color : '#888'; trk.tailRef = null;
-      setSrc('v3-trk-tail', lls && lls.length > 1 ? lineFeat(lls, trk.color) : EMPTY);
-      setSrc('v3-trk-head', EMPTY);
+      if (selected && selected.pos && pathLine && flow) {
+        syncPath(selected, true);
+      } else {
+        setSrc('v3-trk-tail', EMPTY);
+        setSrc('v3-trk-head', EMPTY);
+      }
       if (pathPreview) { var f = lineFeat(pathPreview.getLatLngs(), pathPreview.options.color); f.properties.dash = 1; x.push(f); }
       if (pathEnd) { var e = pathEnd.getLatLng(); x.push({ type: 'Feature', properties: { end: 1 }, geometry: { type: 'Point', coordinates: [e.lng, e.lat] } }); }
       setSrc('v3-trk-x', { type: 'FeatureCollection', features: x });

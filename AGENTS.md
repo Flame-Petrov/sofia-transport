@@ -29,6 +29,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [Tracked metro route](docs/marker-camera.md).** The 3D route sources now initialize from current vehicle progress, including when the hidden flat map is zooming.
+
 **2026-11-09 — [Larger residential buildings](docs/3d-building-textures.md).** Added five size-selected designs under the Bulgarian houses and apartments switch. Check the next size tier on rectangular residential blocks at zoom 18.
 
 **2026-11-09 — [Metro carriage turns](docs/vehicle-models.md).** The 3D metro model samples its timetable path at the carriage ends and pivots on every moving frame. A controlled replay of the numbered build covered 801 frames each on left and right bends, including both termini. Live WebGL appearance remains unverified.

@@ -159,11 +159,11 @@
     return true;
   }
   // Every frame: the line starts exactly at the icon and the part already driven is cut away
-  function syncPath(v) {
-    if (!pathLine || !flow || !v.pos || zooming) return;
+  function syncPath(v, force) {
+    if (!pathLine || !flow || !v.pos || (zooming && !view3d.on)) return;
     var now = performance.now();
-    if (now - pathSyncAt < 8) return;   // every frame: at 30/s the line's start trailed the icon
-    if (flow.drawLat === v.pos[0] && flow.drawLon === v.pos[1] &&
+    if (!force && now - pathSyncAt < 8) return;   // every frame: at 30/s the line's start trailed the icon
+    if (!force && flow.drawLat === v.pos[0] && flow.drawLon === v.pos[1] &&
         flow.drawAlong === v.along && flow.draw3d === view3d.on) return;
     flow.drawLat = v.pos[0]; flow.drawLon = v.pos[1];
     flow.drawAlong = v.along; flow.draw3d = view3d.on;
