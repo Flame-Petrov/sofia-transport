@@ -98,7 +98,8 @@ def read_buildings(path):
         height = elevation(tags, ("height", "building:height"), ("levels", "building:levels"), 5, math.ceil)
         base = elevation(tags, ("min_height", "building:min_height"), ("min_level", "building:min_level"), 0, math.floor)
         # The covered metro uses its own open, curved mesh.
-        if fid in {6302364622, 6302364632, 14248382822, 14248382832, 14248382842}:
+        if fid in {6318019402, 6318019432, 6318019462, 6318019492, 6318019522,
+                   6318019552, 6318019582, 6318019622, 6302364622, 6302364632, 14248382822, 14248382832, 14248382842}:
             continue
         if height >= 3660 or base >= 3660:
             continue

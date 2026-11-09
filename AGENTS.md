@@ -31,6 +31,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-09 — [Yug metro entrance](docs/3d-building-textures.md).** Extended the western vault along eight adjoining prepared footprints and removed their residential extrusions.
+
 **2026-11-09 — [Zoom-stable façades](docs/3d-building-textures.md).** Opaque wall textures repeat in metres. Camera updates select and cache visible wall meshes.
 
 **2026-11-09 — [House-mode façades](docs/3d-building-textures.md).** Reduced fallback window size and varied plaster finishes on non-residential-model outlines.
