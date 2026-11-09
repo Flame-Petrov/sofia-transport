@@ -9483,9 +9483,9 @@
     return true;
   }
 
-  function bulgarianHouseLayer(materialLayer, sourceId, classColor) {
+  function bulgarianHouseLayer(materialLayer, sourceId) {
     var map, program, buffer, matrixLoc, anchorLoc, position, color, origin;
-    var dirty=true, count=0, lastBuild=0, terrain, colored;
+    var dirty=true, count=0, lastBuild=0, terrain;
     function moved(){dirty=true;}
     function sourceChanged(event){if(event.sourceId===sourceId) dirty=true;}
     function rebuild(){
@@ -9494,7 +9494,7 @@
       origin.unit=origin.meterInMercatorCoordinateUnits();
       var seen=new Set(),vertices=[];
       features.forEach(function(f){
-        if(!seen.has(f.id) && bulgarianHouse(f,vertices,origin,map,colored && classColor)) seen.add(f.id);
+        if(!seen.has(f.id) && bulgarianHouse(f,vertices,origin,map)) seen.add(f.id);
       });
       count=vertices.length/6;
       return new Float32Array(vertices);
