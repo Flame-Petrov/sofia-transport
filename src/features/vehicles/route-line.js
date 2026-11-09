@@ -205,9 +205,22 @@
   }
   var snapStats = {};
 
+  function nextRouteVertex(m, along) {
+    var lo = 0, hi = m.cum.length;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (m.cum[mid] <= along) lo = mid + 1;
+      else hi = mid;
+    }
+    return lo;
+  }
+
   // The part of the route still ahead, and how far along the route the vehicle is.
   // When the line passes the same street twice, the vehicle's heading picks the right direction.
-  function remainingPath(m, lat, lon, bearing) {
+  function remainingPath(m, lat, lon, bearing, along) {
+    if (typeof along === 'number') {
+      return { path: [[lat, lon]].concat(m.pts.slice(nextRouteVertex(m, along))), along: along };
+    }
     var pts = m.pts, here = [lat, lon], best = 0, bestD = Infinity, ds = [], i;
     for (i = 0; i < pts.length; i++) { var dd = distM(here, pts[i]); ds.push(dd); if (dd < bestD) { bestD = dd; best = i; } }
     if (typeof bearing === 'number' && pts.length > 1) {

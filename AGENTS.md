@@ -99,4 +99,6 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 **2026-11-09 — [3D map controls](docs/3d-controls.md).** Added an illustrated guide on each entry to 3D and Ctrl+arrow rotation and tilt on the focused canvas. Both builds and JavaScript syntax passed. Simulated input verified dismissal, focus and all four shortcuts. The launcher HTTP check could not connect, so live browser verification remains open.
 
+**2026-11-09 — [Remaining route during GPS motion](docs/vehicle-models.md).** Fixed the tracked line and arrows doubling back behind a bus during a straight GPS glide. Both release builds passed verification. Replayed GPS and route-matched motion through the final vertex in both map modes using the numbered release served over HTTP. A separate geometry check exercised the initial route draw and seven vertex crossings against the 3D line and arrow sources. The live X9 ride was not replayed.
+
 <!-- AGENT-HANDOFF:END -->

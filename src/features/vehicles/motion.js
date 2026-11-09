@@ -37,7 +37,7 @@
       var t = len2 ? Math.max(0, Math.min(1, -(ax * dx + ay * dy) / len2)) : 0;
       var px = ax + dx * t, py = ay + dy * t, dist = Math.sqrt(px * px + py * py);
       if (dist > 150) continue;
-      var sAt = m.cum[i] + t * Math.sqrt(len2);
+      var sAt = m.cum[i] + t * (m.cum[i + 1] - m.cum[i]);
       var score = dist;
       if (typeof bearing === 'number' && len2 > 1) score += angleDiff(m.bear[i], bearing) * 0.5;
       if (typeof prevS === 'number' && Math.abs(sAt - prevS) > 500) score += 100;

@@ -122,7 +122,7 @@
       return false;
     }
     var pos = v.pos || [d.lat, d.lon];
-    var r = remainingPath(m, pos[0], pos[1], d.bearing);
+    var r = remainingPath(m, pos[0], pos[1], d.bearing, runAlong(v, m));
     if (r.path.length < 2) { stopArrows(); v.pathNote = ''; return false; }
     v.pathNote = '';
     // picked as the bus that comes back after this run: its way back to your stop, dashed, under this run
@@ -153,7 +153,7 @@
 
     // arrows slide along the route on their own; they're anchored to the route, not the vehicle,
     // so a position update only trims the ones behind the vehicle instead of making them jump
-    flow = { m: m, along: typeof v.along === 'number' && v.mo && v.mo.m === m ? v.along : r.along };
+    flow = { m: m, along: r.along };
     startArrows();
     if (v === selected) showTracking(v);
     return true;
@@ -171,17 +171,15 @@
     var m = flow.m;
     if (v.mo && v.mo.kind === 'route' && v.mo.m === m && typeof v.along === 'number') {
       flow.along = v.along;
-      var lo = 0, hi = m.cum.length - 1;
-      while (lo < hi) { var mid = (lo + hi) >> 1; if (m.cum[mid] <= v.along) lo = mid + 1; else hi = mid; }
-      if (!m._latLngs) {
-        m._latLngs = m.pts.map(function (p) { return L.latLng(p[0], p[1]); });
-      }
-      if (lo !== flow._lastLo || !flow._tail) {
-        flow._lastLo = lo;
-        flow._tail = m._latLngs.slice(lo);
-      }
-    } else if (!flow._tail) {
-      flow._tail = pathLine.getLatLngs().slice(1);
+    } else {
+      var projected = projectAlong(m, v.pos[0], v.pos[1], v.d.bearing, flow.along);
+      if (projected) flow.along = projected.s;
+    }
+    var lo = nextRouteVertex(m, flow.along);
+    if (lo !== flow._lastLo) {
+      if (!m._latLngs) m._latLngs = m.pts.map(function (p) { return L.latLng(p[0], p[1]); });
+      flow._lastLo = lo;
+      flow._tail = m._latLngs.slice(lo);
     }
     var tail = flow._tail;
     var head = tail.length ? [L.latLng(v.pos[0], v.pos[1]), tail[0]] : [];
