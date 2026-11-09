@@ -73,13 +73,10 @@
         var source = style.sources[layer.source];
         if (!source.tiles || !source.tiles.every(function (url) { return /^ofm:\/\//.test(url); })) return;
         if (!map3.getLayer(layer.id + '-material')) {
-          if ((!enabled && !houses) || (layer.layout && layer.layout.visibility === 'none')) return;
+          if (layer.layout && layer.layout.visibility === 'none') return;
           install(map3, layer, source);
         }
-        var usePrepared = enabled || houses;
-        map3.setLayoutProperty(layer.id + '-neutral', 'visibility', usePrepared ? 'visible' : 'none');
         var material = layer.id + '-material';
-        map3.setLayoutProperty(material, 'visibility', usePrepared ? 'visible' : 'none');
         map3.setPaintProperty(material, 'fill-extrusion-opacity', enabled ? 0.92 : VIEW3D_BUILDING_OPACITY);
         map3.setPaintProperty(material, 'fill-extrusion-pattern', enabled ? ['image', ['concat', 'v3-material-', ['get', 'material']]] : null);
         if (houses && !map3.getLayer(material + '-houses')) {
@@ -88,9 +85,7 @@
         } else if (!houses && map3.getLayer(material + '-houses')) {
           map3.removeLayer(material + '-houses');
         }
-        // Keep the native geometry ready. Changing its layout would rebuild
-        // street-source buckets before the neutral buildings could reappear.
-        map3.setPaintProperty(layer.id, 'fill-extrusion-opacity', usePrepared ? 0 : VIEW3D_BUILDING_OPACITY);
+        map3.setPaintProperty(layer.id, 'fill-extrusion-opacity', 0);
       });
     }
     return { apply: apply };

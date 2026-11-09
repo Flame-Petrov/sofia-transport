@@ -2,7 +2,7 @@
 
 ## Shipped data and renderer
 
-With both menu switches off, the tilted map uses the original street-map extrusions. Enabling building textures or house designs draws a bundled building-only vector source at the same layer position. The source contains 255 native zoom-14 tiles. Each tile includes a buffer for buildings that cross its edge. The renderer decompresses requested tiles individually. Outside complete extract tiles, or if a tile cannot be decoded, the same source reads the original OpenFreeMap tile through the app’s offline cache and uses the neutral paint.
+The tilted map uses the bundled building source with either appearance switch on or off. With both off it uses neutral paint. At South Bus Station, the prepared footprint for way 630236462 uses an estimated 12 m underside and 14 m deck top. To check clearance, tilt the map at close zoom and rotate around the station with house designs on and off. The source contains 255 native zoom-14 tiles. Each tile includes a buffer for buildings that cross its edge. The renderer decompresses requested tiles individually. Outside complete extract tiles, or if a tile cannot be decoded, the same source reads the original OpenFreeMap tile through the app’s offline cache and uses the neutral paint.
 
 The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded building tile is approximately 143 KB. The four 32 × 32 RGBA patterns together contain 16 KiB of pixel data. No geometry measurements take place on the device.
 

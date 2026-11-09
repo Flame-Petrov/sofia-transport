@@ -97,6 +97,10 @@ def read_buildings(path):
         monument = tags.get("historic") == "monument" or (fid in REVIEWED and tags.get("wikidata") == REVIEWED[fid])
         height = elevation(tags, ("height", "building:height"), ("levels", "building:levels"), 5, math.ceil)
         base = elevation(tags, ("min_height", "building:min_height"), ("min_level", "building:min_level"), 0, math.floor)
+        # The South Bus Station viaduct is mapped as a building outline.
+        # Give its unmeasured deck clearance above the low-rise roofs.
+        if fid == 6302364622 and base == 0 and height == 5:
+            base, height = 12, 14
         if height >= 3660 or base >= 3660:
             continue
         buildings[fid] = Building(fid, geom, part, height, base, monument)
