@@ -1262,7 +1262,7 @@
     // ---- My places: the flags (read only here; placing and moving one is done in 2D) ----
     function pinHtml(p) {
       var d = p.id === savedPlaces.destinationId ? savedPlaces.distanceFromMe(p) : null;
-      return '<div class="pin-ic">' + savedPlaces.markerSvg(p) + '</div><div class="pin-lbl">' + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
+      return '<div class="pin-ic">' + savedPlaces.markerSvg(p) + '</div>' + savedPlaces.labelOpen(p) + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
     }
     function syncPins() {
       if (!m3) return;

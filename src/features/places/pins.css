@@ -12,6 +12,7 @@
   .pin-mk.dest .pin-ic { color: var(--dest); width: 32px; height: 40px; transform: translate(-6px, -39px); }
   .pin-mk.dest .pin-lbl { background: var(--dest); color: #fff; }
   .pin-mk.dest .pin-lbl small { color: #FFE3EC; }
+  .pin-mk .pin-lbl.custom small { color: inherit; }
   .pin-mk.leaflet-marker-dragging .pin-lbl { opacity: .6; }
   .pin-pop .leaflet-popup-content { margin: 14px; min-width: 210px; }
   .pin-pop .leaflet-popup-content-wrapper { border-radius: 14px; }

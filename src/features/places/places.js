@@ -29,6 +29,16 @@
     function markerColor(p) {
       return typeof p.color === 'string' && /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : '';
     }
+    function labelOpen(p) {
+      var color = markerColor(p);
+      if (!color) return '<div class="pin-lbl">';
+      var channels = color.slice(1).match(/../g).map(function (hex) {
+        var value = parseInt(hex, 16) / 255;
+        return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+      });
+      var luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+      return '<div class="pin-lbl custom" style="background:' + color + ';color:' + (luminance > 0.179 ? '#000' : '#fff') + '">';
+    }
     function markerSvg(p) {
       var svg = markerShape(p), color = markerColor(p);
       return color ? svg.replace('<svg ', '<svg style="color:' + color + '" ') : svg;
@@ -51,7 +61,7 @@
     }
     function pinIcon(p) {
       return L.divIcon({ className: 'pin-mk' + (p.id === destId ? ' dest' : ''), iconSize: null,
-        html: '<div class="pin-ic">' + markerSvg(p) + '</div><div class="pin-lbl">' + esc(p.name) + '</div>' });
+        html: '<div class="pin-ic">' + markerSvg(p) + '</div>' + labelOpen(p) + esc(p.name) + '</div>' });
     }
     function pinPopupHtml(p) {
       var d = distFromMe(p), isDest = p.id === destId;
@@ -279,6 +289,7 @@
       refreshDestination: drawDestLine,
       distanceFromMe: distFromMe,
       markerSvg: markerSvg,
+      labelOpen: labelOpen,
       popupHtml: pinPopupHtml,
       add: addPlace
     };

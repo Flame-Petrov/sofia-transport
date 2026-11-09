@@ -6,4 +6,4 @@ The picker, icon definitions and local storage update live in `src/features/plac
 
 To verify, open a flag, choose Home and reopen the popup after a reload. Check the Home button is selected and the marker matches it. Switch map modes and check the same place.
 
-Open **Marker color** to choose a custom color for this place. The icon uses that color in both map modes and in My places. A destination keeps its highlighted name label. **Reset** restores the automatic marker color. To verify, choose a color, reload, switch map modes, and use Reset in the popup.
+Open **Marker color** to choose a custom color for this place. The icon uses that color in both map modes and in My places. The map label background matches the custom color, including for the active destination. Its name and distance use contrasting black or white text. Check both a light and a dark color. **Reset** restores the automatic marker color. To verify, choose a color, reload, switch map modes, and use Reset in the popup.

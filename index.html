@@ -590,6 +590,7 @@
   .pin-mk.dest .pin-ic { color: var(--dest); width: 32px; height: 40px; transform: translate(-6px, -39px); }
   .pin-mk.dest .pin-lbl { background: var(--dest); color: #fff; }
   .pin-mk.dest .pin-lbl small { color: #FFE3EC; }
+  .pin-mk .pin-lbl.custom small { color: inherit; }
   .pin-mk.leaflet-marker-dragging .pin-lbl { opacity: .6; }
   .pin-pop .leaflet-popup-content { margin: 14px; min-width: 210px; }
   .pin-pop .leaflet-popup-content-wrapper { border-radius: 14px; }
@@ -6377,6 +6378,16 @@
     function markerColor(p) {
       return typeof p.color === 'string' && /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : '';
     }
+    function labelOpen(p) {
+      var color = markerColor(p);
+      if (!color) return '<div class="pin-lbl">';
+      var channels = color.slice(1).match(/../g).map(function (hex) {
+        var value = parseInt(hex, 16) / 255;
+        return value <= 0.04045 ? value / 12.92 : Math.pow((value + 0.055) / 1.055, 2.4);
+      });
+      var luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+      return '<div class="pin-lbl custom" style="background:' + color + ';color:' + (luminance > 0.179 ? '#000' : '#fff') + '">';
+    }
     function markerSvg(p) {
       var svg = markerShape(p), color = markerColor(p);
       return color ? svg.replace('<svg ', '<svg style="color:' + color + '" ') : svg;
@@ -6399,7 +6410,7 @@
     }
     function pinIcon(p) {
       return L.divIcon({ className: 'pin-mk' + (p.id === destId ? ' dest' : ''), iconSize: null,
-        html: '<div class="pin-ic">' + markerSvg(p) + '</div><div class="pin-lbl">' + esc(p.name) + '</div>' });
+        html: '<div class="pin-ic">' + markerSvg(p) + '</div>' + labelOpen(p) + esc(p.name) + '</div>' });
     }
     function pinPopupHtml(p) {
       var d = distFromMe(p), isDest = p.id === destId;
@@ -6627,6 +6638,7 @@
       refreshDestination: drawDestLine,
       distanceFromMe: distFromMe,
       markerSvg: markerSvg,
+      labelOpen: labelOpen,
       popupHtml: pinPopupHtml,
       add: addPlace
     };
@@ -11341,7 +11353,7 @@
     // ---- My places: the flags (read only here; placing and moving one is done in 2D) ----
     function pinHtml(p) {
       var d = p.id === savedPlaces.destinationId ? savedPlaces.distanceFromMe(p) : null;
-      return '<div class="pin-ic">' + savedPlaces.markerSvg(p) + '</div><div class="pin-lbl">' + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
+      return '<div class="pin-ic">' + savedPlaces.markerSvg(p) + '</div>' + savedPlaces.labelOpen(p) + esc(p.name) + (d !== null ? ' <small>· ' + fmtM(d) + '</small>' : '') + '</div>';
     }
     function syncPins() {
       if (!m3) return;
