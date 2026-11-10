@@ -1,18 +1,18 @@
-// Export the same vertex streams and 32 px materials used by the standalone app.
+// Export the app's house vertex streams and one 32 px bay of the façade style behind each catalog material.
 const fs = require('node:fs');
 const path = require('node:path');
 const vm = require('node:vm');
 const source = path.join(__dirname, '../src/features/view3d');
 const origin = {x: 0.012345, y: 0.023456, unit: 1e-7};
 const context = vm.createContext({
-  ImageData: class { constructor(w,h) { this.data = new Uint8ClampedArray(w*h*4); } },
+  ImageData: class { constructor(w,h) { this.width = w; this.height = h; this.data = new Uint8ClampedArray(w*h*4); } },
   maplibregl: { MercatorCoordinate: { fromLngLat: ([x,y]) => ({
     x: origin.x + x * origin.unit, y: origin.y + y * origin.unit,
     meterInMercatorCoordinateUnits: () => origin.unit
   }) } }
 });
 vm.runInContext(fs.readFileSync(path.join(source,'bulgarian-houses.js'),'utf8'),context);
-vm.runInContext(fs.readFileSync(path.join(source,'building-materials.js'),'utf8'),context);
+vm.runInContext(fs.readFileSync(path.join(source,'facade-styles.js'),'utf8'),context);
 const textures = {};
 const map = {getTerrain: () => false};
 const models = [];
@@ -28,7 +28,10 @@ for (const [tier, designs] of [context.houseDesigns, context.apartmentDesigns].e
     models.push({name:design.name, tier, vertices});
   }
 }
-for (const name of ['green','blue','purple','gold','facade','ivory','clay']) {
-  textures[name] = Array.from(context.buildingMaterials.pattern(name).data);
+const catalog = {green:['plaster',0], blue:['glass',0], purple:['panel',1], gold:['stone',0],
+  facade:['plaster',1], ivory:['plaster',8], clay:['plaster',9]};
+for (const [name, [style, tint]] of Object.entries(catalog)) {
+  const tints = context.facadeStyles.styles[context.facadeStyles.names.indexOf(style)].tints;
+  textures[name] = Array.from(context.facadeStyles.swatch(style, tints[tint], 32).data);
 }
 process.stdout.write(JSON.stringify({models,textures}));

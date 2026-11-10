@@ -79,6 +79,7 @@ const buildingOrigin = { x: .012345, y: .023456, unit: 1e-7 };
 const buildingLibrary = { MercatorCoordinate: { fromLngLat: ([x,y]) => ({
   x: buildingOrigin.x + x*buildingOrigin.unit, y: buildingOrigin.y + y*buildingOrigin.unit,
   meterInMercatorCoordinateUnits: () => buildingOrigin.unit }) } };
+class FakeImageData { constructor(w,h) { this.width=w; this.height=h; this.data=new Uint8ClampedArray(w*h*4); } }
 function footprints(count) {
   return Array.from({length:count},(_,i) => ({ id:i+1,
     properties:{render_height:16,render_min_height:0,material:'green'},
@@ -114,18 +115,18 @@ test('house batches survive camera movement and refresh after geometry, source o
 });
 
 test('wall and house batches share one building query, and only a pan beyond the margin repeats it', () => {
-  const a = app(['features/view3d/building-view','features/view3d/bulgarian-houses','features/view3d/solid-facades'],
-    { maplibregl: buildingLibrary });
+  const a = app(['features/view3d/building-view','features/view3d/bulgarian-houses','features/view3d/facade-styles',
+    'features/view3d/solid-facades'], { maplibregl: buildingLibrary, ImageData: FakeImageData });
   const features = footprints(20), wallBytes = [], houseBytes = [], map = buildingMap(features);
   let ms = 1000;
   a.performance = { now: () => ms };
-  const walls = a.solidFacadeLayer('material','tiles',true,noop), houses = a.bulgarianHouseLayer('material','tiles',false);
+  const walls = a.solidFacadeLayer('material','tiles',true), houses = a.bulgarianHouseLayer('material','tiles',false);
   const wallGl = buildingGl(wallBytes), houseGl = buildingGl(houseBytes);
   const render = () => { for (let i=0;i<3;i++) { walls.render(wallGl,new Float32Array(16)); houses.render(houseGl,new Float32Array(16)); ms+=40; } };
   walls.onAdd(map,wallGl); houses.onAdd(map,houseGl);
   render();
-  // Four wall edges per footprint, two triangles each, six floats per corner.
-  assert.deepEqual([wallBytes[0],houseBytes.length,map.state.queries],[20*4*36*4,1,1]);
+  // Four wall edges per footprint, two triangles each, eight floats per corner.
+  assert.deepEqual([wallBytes[0],houseBytes.length,map.state.queries],[20*4*48*4,1,1]);
   // 240 frames of follow-style drift, about 160 px in total.
   for (let i=1;i<=240;i++) { map.shift.x=i*150/240; map.shift.y=-i*60/240; map.fire('move'); render(); }
   assert.deepEqual([wallBytes.length,houseBytes.length,map.state.queries],[1,1,1]);
@@ -137,12 +138,63 @@ test('wall and house batches share one building query, and only a pan beyond the
     geometry:{type:'Polygon',coordinates:[[[40,0],[60,0],[60,10],[40,0]]]} });
   ms+=300; map.shift.x=260; map.fire('move'); render();
   assert.equal(map.state.queries,2);
-  assert.equal(wallBytes.at(-1),(20*4+3)*36*4);
+  assert.equal(wallBytes.at(-1),(20*4+3)*48*4);
   assert.equal(houseBytes.length,1);
   // A zoom jump or a resize also repeats the query; an unchanged result uploads nothing.
   map.state.zoom=17; ms+=300; map.fire('move'); render();
   ms+=300; map.fire('resize'); render();
   assert.deepEqual([map.state.queries,wallBytes.length],[4,3]);
+});
+
+test('every wall carries whole window bays and floors in one colour per building', () => {
+  const a = app(['features/view3d/building-view','features/view3d/bulgarian-houses','features/view3d/facade-styles',
+    'features/view3d/solid-facades'], { maplibregl: buildingLibrary, ImageData: FakeImageData });
+  // A 35 m by 9 m block with a one-metre notch, in degrees near the equator.
+  const m = 1/111195, ring = [[0,0],[35*m,0],[35*m,9*m],[18*m,9*m],[18*m,8*m],[0,8*m],[0,0]];
+  const features = [{ id:120, properties:{render_height:17,render_min_height:0,material:'green',style:'panel'},
+    geometry:{type:'Polygon',coordinates:[ring]} }];
+  const map = buildingMap(features), uploads = [];
+  const gl = new Proxy({ getShaderParameter: () => true, getProgramParameter: () => true,
+    bufferData: (_, data) => uploads.push(Array.from(data)) }, { get: (o,k) => k in o ? o[k] : noop });
+  let ms = 1000;
+  a.performance = { now: () => ms };
+  const walls = a.solidFacadeLayer('material','tiles',true);
+  walls.onAdd(map,gl);
+  for (let i=0;i<3;i++) { walls.render(gl,new Float32Array(16)); ms+=40; }
+  const corners = [];
+  for (let i=0;i<uploads[0].length;i+=8) corners.push(uploads[0].slice(i,i+8));
+  assert.equal(corners.length,6*6);
+  // 17 m of panel block at 3.1 m a floor is five floors.
+  assert.ok(corners.every(c => Number.isInteger(c[3]) && (c[4]===0 || c[4]===5)));
+  assert.equal(new Set(corners.map(c => c[6])).size,1);
+  // The 35 m front fits ten 3.6 m bays; the one-metre return has no windows.
+  const spans = [];
+  for (let i=0;i<corners.length;i+=6) spans.push([corners[i+1][3]-corners[i][3],corners[i][5]]);
+  assert.deepEqual(spans[0],[10,105]);
+  assert.deepEqual(spans[3],[1,205]);
+});
+
+test('a footprint keeps its look, parts follow their building and mapped colours win', () => {
+  const a = app(['features/view3d/facade-styles'], { ImageData: FakeImageData });
+  const { look, names, styles, images } = a.facadeStyles;
+  const block = { material:'green', style:'brick' };
+  assert.deepEqual(look(block,1234562,true),look({...block},1234562,true));
+  assert.equal(names[look(block,1234562,true).style],'brick');
+  // A part stores its building's seed, so the tower matches the podium.
+  assert.deepEqual(look({...block,seed:456},99992,true),look(block,1234562,true));
+  assert.equal(look({...block,wall:'#bc9375'},1234562,true).color,0xbc9375);
+  // With only house designs on, every wall is plaster.
+  assert.equal(names[look(block,1234562,false).style],'plaster');
+  // Street tiles name no style: the broad class and the spot on the map decide.
+  assert.equal(names[look({material:'gold'},7,true,[23.32,42.69]).style],'stone');
+  assert.notEqual(look({},7,true,[23.32,42.69]).seed,look({},7,true,[23.33,42.69]).seed);
+  const tints = new Set();
+  for (let id=10;id<4000;id+=10) tints.add(look(block,id,true).color);
+  assert.ok(tints.size>=styles[names.indexOf('brick')].tints.length*5);
+  names.forEach((_,i) => {
+    const set = images(i);
+    assert.deepEqual([set.ground.width,set.ground.height,set.middle.height,set.crown.height],[128,64,128,64]);
+  });
 });
 
 test('footprint keys separate different outlines and match equal ones', () => {

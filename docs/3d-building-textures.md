@@ -4,7 +4,7 @@
 
 The tilted map uses the bundled building source with either appearance switch on or off. With both off it uses neutral paint. Mapped roof sections, including eight adjoining footprints at the Yug Bus Station entrance, along the metro use open barrel vaults from `metro-canopies.js` in every appearance mode. The 3D metro pose in `view.js` aligns each direction with its side of the covered track and blends back onto the scheduled path outside the portals. The shell has a shaded underside, steel portal frames and concrete side posts at approximately eight-metre intervals. These details are illustrative. Their eaves follow the mapped edges. The 4.5 m spring height and 5 m rise are rendering estimates. Inspect the portal at 23.36150 E, 42.66058 N in tilted view. The source contains 255 native zoom-14 tiles. Each tile includes a buffer for buildings that cross its edge. The hosted build fetches individual binary tiles from `tiles/buildings/14/`. The numbered page decompresses requested tiles individually from its embedded bundle. Outside complete extract tiles, or if a tile cannot be decoded, the same source reads the original OpenFreeMap tile through the app’s offline cache and uses a warm window pattern when either appearance switch is on.
 
-The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded building tile is approximately 143 KB. The seven 32 × 32 RGBA patterns together contain 28 KiB of pixel data. The material classifications are computed during preparation. When house designs are enabled, the device still measures visible footprints to generate their meshes.
+The checked-in bundle adds 3.60 MB to the standalone HTML. The 13 façade styles are painted on the device into 39 small sheets, about 1.7 MB of pixels before mipmaps. The material class and façade style are computed during preparation. When house designs are enabled, the device still measures visible footprints to generate their meshes.
 
 **Source and refresh.** Building geometry and classifications are derived from © OpenStreetMap contributors and distributed under ODbL 1.0. The BBBike Sofia extract used here has replication timestamp `2026-11-07T00:00:00Z`. In a Python environment with `osmium`, `shapely` (2.1+), `pyproj` and `mapbox-vector-tile`, run `python site/tools/prepare_buildings.py Sofia.osm.pbf` from the workspace root to regenerate `building-tiles.js`, then rebuild the HTML. Use the rectangular Sofia extract and recheck the reviewed outlines and tile samples when refreshing. [Extract](https://download.bbbike.org/osm/bbbike/Sofia/) · [OSM attribution and license](https://www.openstreetmap.org/copyright)
 
@@ -22,13 +22,46 @@ The checked-in bundle adds 3.46 MB to the standalone HTML. The largest decoded b
 
 ## Rider experience
 
-The **3D building textures** switch sits directly below **3D view: terrain (Vitosha)** in the menu. It starts off. Turning it on gives Sofia’s buildings four original, lightly patterned materials from the existing building zoom (15 in the app). Turning it off uses a warm window pattern if house designs are enabled, or pale height-shaded extrusions if both switches are off. A rider following a tram can try both looks from the same camera position and keep following it.
+The **3D building textures** switch sits directly below **3D view: terrain (Vitosha)** in the menu. It starts off. Turning it on gives Sofia’s buildings 13 façade styles in varied wall and roof colours from the existing building zoom (15 in the app). Turning it off uses a warm window pattern if house designs are enabled, or pale height-shaded extrusions if both switches are off. A rider following a tram can try both looks from the same camera position and keep following it.
 
-Use the existing labelled checkbox with `role="switch"`. Show a compact text key beneath the enabled switch: “Plaster, brick, glass and limestone façades with muted roofs.” A rider on the flat vector map can set the preference before entering 3D. Hide the control when 3D is unavailable. Remember the choice across mode changes and reloads using `store()` and a dedicated `sofia_3d_building_textures` key.
+Use the existing labelled checkbox with `role="switch"`. Show a compact text key beneath the enabled switch: “Plaster, panel, brick, glass and stone façades in varied colours, with tiled and flat roofs.” A rider on the flat vector map can set the preference before entering 3D. Hide the control when 3D is unavailable. Remember the choice across mode changes and reloads using `store()` and a dedicated `sofia_3d_building_textures` key.
 
-## Which material a building gets
+## Which façade a building gets
 
-Evaluate the rows from top to bottom. The first match wins. The bundled classifications use the thresholds and swatches below.
+Each building group gets a **style**, a **seed** and, where OpenStreetMap records one, a wall and roof colour. The seed picks the wall tint from the style’s palette, a slight brightness shift, the roof colour and the brightness of individual windows. It comes from the feature ID, so a building looks the same after a pan or a reload. Parts of a larger building store their parent’s seed, so a tower matches its podium. The [style sheet](../models/facade-styles.png) shows every style in four of its tints.
+
+`facade()` in `tools/prepare_buildings.py` evaluates these rows from top to bottom. The first match wins. Where several styles are listed, the seed chooses one.
+
+| Priority | Building | Style |
+|---|---|---|
+| 1 | Verified monument | `stone`: dressed limestone, arched windows, heavy cornice |
+| 2 | Church, chapel, mosque, synagogue or other place of worship | `church`: smooth render, lancet windows, arched portal |
+| 3 | `building:material` glass or mirror | `glass`: curtain wall |
+| 4 | Garage, carport, shed, kiosk, service building, roof | `garage`: blank render over lift-up doors |
+| 5 | Industrial, warehouse, hangar, depot, or metal cladding | `industrial`: corrugated sheet, roller door |
+| 6 | Retail, supermarket, mall, or a building holding a shop | `retail`: glazed ground floor under a fascia |
+| 7 | School, kindergarten, university, hospital, government, civic | `public`: pilasters and large square windows |
+| 8 | Office or commercial | `glass` from 30 m, otherwise `office` with ribbon windows |
+| 9 | Hotel | `glass` from 40 m, otherwise `modern` |
+| 10 | House, detached, semi-detached, bungalow, terrace | `house`: shuttered windows, stone plinth, timber eave |
+| 11 | `building:material` brick | `brick` |
+| 12 | Apartments, residential, dormitory | `panel` from 14 m high and 35 m long; `panel` or `modern` from 20 m; otherwise `plaster`, `brick` or `modern` |
+| 13 | Untyped, from 45 m high | `glass` |
+| 14 | Untyped, from 30 m high | `panel`, `glass` or `modern` |
+| 15 | Untyped, ground span from 45 m | Up to 8 m high `industrial` or `retail`; from 15 m `panel`; otherwise `public`, `office` or `brick` |
+| 16 | Untyped, up to 5 m high and under 60 m² | `garage` |
+| 17 | Untyped, up to 8 m high and under 300 m² | `house` |
+| 18 | Everything else | `plaster`, `brick` or `modern` |
+
+The Sofia extract yields 69,910 house, 25,901 garage, 10,764 plaster, 7,108 modern, 5,712 panel, 5,598 brick, 4,166 industrial, 3,625 retail, 2,013 office, 1,716 public, 414 glass, 321 church and 19 stone footprints and parts. About two thirds of buildings carry only `building=yes`, so most styles come from rows 13 to 18 and are plausible rather than surveyed.
+
+Roofs are flat caps. Plaster, brick, house, church and garage buildings take one of four clay-tile shades or grey sheet metal. Panel, modern, office, glass, retail, industrial and public buildings take felt, gravel or membrane greys. A mapped `roof:colour` wins, as does a mapped `building:colour` for the walls (187 and 90 buildings in the extract).
+
+Street tiles outside the prepared extract name no style. There the broad material class below chooses among a few styles and the footprint’s position supplies the seed.
+
+### Material class
+
+The earlier four-way class is still stored as `material`. The house designs use it to decide which footprints may take a modelled house. Evaluate the rows from top to bottom. The first match wins.
 
 | Priority | Building rule | Proposed material |
 |---|---|---|
@@ -46,18 +79,18 @@ For example, a 50 m-long, 12 m-high hall uses muted brick even when it runs diag
 | House designs | Building textures | 3D appearance |
 |---|---|---|
 | Off | Off | Original height-shaded extrusions |
-| Off | On | Four building classes in their natural materials |
-| On | Off | Houses with natural plaster and terracotta roofs; finer sash windows on sand, ivory or clay plaster elsewhere |
-| On | On | Houses with natural façades and clay roofs; other buildings retain their natural materials |
+| Off | On | The 13 façade styles with varied wall and roof colours |
+| On | Off | Houses with natural plaster and terracotta roofs; plaster with sash windows in ten tints elsewhere, under plain roofs |
+| On | On | Houses with natural façades and clay roofs; other buildings keep their façade styles |
 
 The [five-design preview](../models/bulgarian-house-designs.png) shows the natural palettes. The reference meshes are [Shuttered gable](../models/house-shuttered-gable.glb), [Timber frame](../models/house-timber-frame.glb), [Brick cornice](../models/house-brick-cornice.glb), [Wooden veranda](../models/house-wooden-veranda.glb), and [Dormer cottage](../models/house-dormer-cottage.glb). The map uses the same procedural geometry in `src/features/view3d/bulgarian-houses.js`, scaled to each eligible footprint and batched for drawing.
 
 To verify, zoom to a residential street at app zoom 16 and try each combination above. With both switches on, turn just the designs off and check that small buildings show sand plaster. Turn designs back on, disable coloring, then reload and check that natural house finishes persist. Zoom out below 16 to check the transition back to extrusions.
 
-The pattern generator in `src/features/view3d/building-materials.js` supplies four repeating class materials. The patterned extrusion supplies the walls. A flat cap at the mapped roof height gives the roof a muted stone-gray finish whenever either appearance switch is enabled. The extrusion follows the mapped footprint. To inspect pattern contrast independently of the building silhouette, toggle textures at a fixed camera position, then rotate past a diagonal roofline.
+`src/features/view3d/facade-styles.js` paints the façade sheets and chooses each footprint’s look. `solid-facades.js` draws the walls. A flat cap at the mapped roof height carries the roof colour: varied with textures on, a muted stone-gray with only house designs on. The extrusion follows the mapped footprint. To inspect pattern contrast independently of the building silhouette, toggle textures at a fixed camera position, then rotate past a diagonal roofline.
 
-- `tools/prepare_buildings.py` assembles OSM areas, associates mapped parts with an explicit building relation or the smallest containing outline, and measures the long side of the minimum rotated rectangle in UTM zone 34N. It assigns one material using the tallest roof in each group, then clips the individual geometries to zoom-14 Web Mercator tiles. The individual roof and base heights are retained.
-- `src/features/view3d/building-materials.js` owns the tile protocol, fallback, deterministic pattern images and layers. It copies the native extrusion styling and filters, then raises textured building opacity to 0.92 for stronger color. The native geometry stays available at zero opacity while textures are on, so switching off can restore the original paint without rebuilding the street layer.
+- `tools/prepare_buildings.py` assembles OSM areas, associates mapped parts with an explicit building relation or the smallest containing outline, and measures the long side of the minimum rotated rectangle in UTM zone 34N. It assigns one material class, façade style and seed using the tallest roof in each group, then clips the individual geometries to zoom-14 Web Mercator tiles. The individual roof and base heights are retained. A feature stores `seed` only when it differs from the one the app derives from its own ID.
+- `src/features/view3d/building-materials.js` owns the tile protocol, fallback, roof colour expression and layers. It copies the native extrusion styling and filters, then raises textured building opacity to 0.92 for stronger color. The native geometry stays available at zero opacity while textures are on, so switching off can restore the original paint without rebuilding the street layer.
 - `src/features/view3d/menu.html`, `view.css` and `view.js` own the two switches, their hints and their saved preferences. The style-load callback and switch handler use the same material routine. Each 3D map registers the images and layers on its first use of textures. The standalone build includes the material code and tile bundle through `src/page.html`.
 - For a visual check, open the menu, enable **3D building textures**, enter 3D and zoom to Alexander Nevsky Square. Compare both settings at the same pitch and bearing, then check the tile-edge sample above. Switch while following a vehicle and reload with each setting.
 
@@ -75,6 +108,12 @@ The shipped tiles contain 133,769 distinct footprints and parts. All 3,757 IDs r
 
 The [21-model test sheet](../models/building-model-tests.png) shows the ten residential designs, four material-class exemplars and seven footprint forms. The latter include a courtyard, L and U wings, a rounded footprint, an irregular polygon, a multi-height complex and a raised deck. The GLBs in `models/` are metre-scale standalone examples. The standalone map builds its residential meshes locally and extrudes the actual mapped rings at their stored base and roof heights. This retains courtyard holes, orientation and the clearance under raised decks.
 
-Run `python site/tools/build_building_models.py` with Node, NumPy and Pillow installed. The exporter samples the residential mesh builder and the images registered by the app, writes the GLBs with embedded materials, then reads and rasterizes each exported GLB for the labeled test sheet. In the map, enable both building switches, enter 3D and zoom into Serdika to compare sand plaster, gray glazed towers, horizontal window bands and pitched roofs.
+Run `python site/tools/build_building_models.py` with Node, NumPy and Pillow installed. The exporter samples the residential mesh builder and one bay of the matching façade style, writes the GLBs with embedded materials, then reads and rasterizes each exported GLB for the labeled test sheet. The checked-in GLBs and test sheet predate the façade styles and still embed the earlier four materials. In the map, enable both building switches, enter 3D and zoom into Serdika to compare plaster, panel and brick blocks, glazed towers and pitched roofs.
 
-The live wall layer in `solid-facades.js` repeats each texture every six metres horizontally and vertically, with mipmaps for distant walls. The opaque footprint extrusion supplies the roof. The wall and house layers share one query of the screen plus a margin, held in `building-view.js`, and batch the geometry by material. Camera movement inside the margin does no building work. The [performance guide](rendering-performance.md) gives the rules for repeating the query and the measured effect. To verify, follow a vehicle with both switches on and check that walls stay textured to the screen edges, then drag quickly and rotate. With only house designs enabled, the footprint ID selects one of three plaster finishes. Check a façade through fractional and integer zoom levels, then pan a new block into view.
+## How a wall is drawn
+
+Each style has three sheets, two window bays wide: a ground floor with doors or shopfronts, two alternating middle floors, and a top floor with its cornice or parapet. `solid-facades.js` gives every wall a whole number of bays and floors from the style’s nominal bay width and floor height, so no window is cut at a corner or roofline. Walls shorter than 2.2 m stay plain. Parts that start above the ground skip the ground-floor sheet. Wall pixels in a sheet are grey and take the building’s tint in the shader. Glass, frames and doors keep their own colour, and each window gets its own brightness, with about one in eight showing light curtains. The base of each wall is slightly darkened. Sheets have mipmaps and, where the device supports it, 4× anisotropic filtering. Each corner is eight floats, two more than before, which makes a wall upload a third larger.
+
+To review the styles without the map, run `node tools/preview_facade_styles.cjs`, which rewrites `models/facade-styles.png`. To review them in the map, run `python tests/facade-shots-browser.py OUTPUT_DIR` with Playwright and Chrome installed. It saves seven fixed Sofia cameras: a close street view, the centre near and wide, a panel estate, residential blocks, an industrial zone and towers. Add `--houses` for both switches, `--plain` for house designs only, or `--standalone` for the numbered release. In the close view check that windows end cleanly at corners and rooflines, that ground floors and cornices differ from the floors between, and that neighbouring buildings differ in colour. The 2026-11-10 set is in the workspace under `debug images/Varied facades/`.
+
+The opaque footprint extrusion supplies the roof. The wall and house layers share one query of the screen plus a margin, held in `building-view.js`, and batch the geometry by material. Camera movement inside the margin does no building work. The [performance guide](rendering-performance.md) gives the rules for repeating the query and the measured effect. To verify, follow a vehicle with both switches on and check that walls stay textured to the screen edges, then drag quickly and rotate. With only house designs enabled, the footprint ID selects one of ten plaster tints. Check a façade through fractional and integer zoom levels, then pan a new block into view.

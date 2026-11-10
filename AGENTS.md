@@ -31,6 +31,8 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 <!-- AGENT-HANDOFF:START -->
 
+**2026-11-10 — [Varied building façades](docs/3d-building-textures.md#which-façade-a-building-gets).** Textured walls now use 13 styles from `src/features/view3d/facade-styles.js`, each with a ground floor, repeating floors and a top floor, tinted per building and fitted to whole bays and floors in `solid-facades.js`. Roof caps vary by style and seed. `tools/prepare_buildings.py` assigns the style from OSM tags and geometry; the regenerated tiles add 143 KB to the standalone page. All 36 Node tests and both build checks passed. Headless Chrome rendered seven cameras with textures only, with both switches on the numbered release and with house designs only, without page errors; shots are in the workspace under `debug images/Varied facades/`. The model catalog GLBs were not regenerated. Physical-phone appearance and frame time remain open.
+
 **2026-11-10 — [Texture lag during camera movement](docs/rendering-performance.md).** The wall and house batches share one padded building query in `src/features/view3d/building-view.js` and repeat it only when the camera leaves the margin or tiles change. Footprint keys are hashed, wall meshes fill typed arrays directly and prepared tiles are cached after decoding. All 34 Node tests and both build checks passed. In headless Chrome at 390 × 844 a follow-style drift made 0 building queries (42 to 53 before) and both browser replays passed. A screenshot is in the workspace under `debug images/Texture lag/`. Anti-aliasing, the hidden original building layer and physical-phone frame time remain open.
 
 **2026-11-09 — [Rendering performance measurements and regressions](docs/rendering-performance.md).** Hosted 3D assets load on demand. The numbered release embeds them. Buildings retain their meshes across camera changes, and settled vehicles leave the animation set. Added Chrome camera replay and regression coverage for viewport re-entry, GPS projection, live trip ordering, journey delays and overtaking, asset retry and offline transaction failure. All 32 Node tests passed. The guide records the measured workloads and remaining device checks.
@@ -81,7 +83,7 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 | Device location and compass | `features/location/location.js` | `shared/map/follow-camera.js` |
 | Journey planning and active guidance | `features/journeys/planner.js`, `features/journeys/guidance.js` | `walking.js` for street paths, `route-map.js` and `card.js` for presentation |
 | Downloaded map areas and tiles | `features/offline/areas.js` | `shared/map/` for base map and viewport preloading, `shared/storage/cache.js` for IndexedDB |
-| Tilted map, terrain, and 3D markers | `features/view3d/view.js` | Same feature's CSS and menu, plus the owning 2D feature for underlying data. Building batches read visible footprints from `building-view.js` |
+| Tilted map, terrain, and 3D markers | `features/view3d/view.js` | Same feature's CSS and menu, plus the owning 2D feature for underlying data. Building batches read visible footprints from `building-view.js`. Façade styles and per-building colours live in `facade-styles.js` |
 | Search, filters, and panel behavior | `features/search/`, `features/panel/` | `shared/ui/theme.css` for common styling |
 | Diagnostics and performance | `features/diagnostics/report.js`, `features/diagnostics/performance.js` | The feature producing the reported value |
 

@@ -1,49 +1,21 @@
   var buildingMaterials = (function () {
     var scheme = 'sofia-buildings', registered = false;
-    var colors = { green: [211, 195, 169], blue: [151, 148, 141], purple: [182, 148, 125], gold: [209, 193, 158] };
-
-    var plaster = { facade: [210,191,165], ivory: [217,210,194], clay: [195,164,143] };
     var facadeLayers = new WeakMap();
-
-    function pattern(material) {
-      var image = new ImageData(32, 32), color = colors[material];
-      for (var y = 0; y < 32; y++) {
-        for (var x = 0; x < 32; x++) {
-          var shade = 0;
-          color = colors[material];
-          var bay = x % 16, level = y % 16;
-          if (material === 'green') {
-            // Rendered masonry, inset sash windows and a stone sill.
-            shade = level === 15 || (x + 8 * Math.floor(y / 8)) % 16 === 0 ? -18 : 0;
-            if (bay >= 4 && bay <= 11 && level >= 3 && level <= 10)
-              color = bay === 8 || level === 7 ? [157,146,128] : [111,106,98];
-          }
-          if (material === 'blue') {
-            color = x % 8 === 0 ? [176,173,166] : level >= 13 ? [112,109,103] : colors.blue;
-            shade = (x % 8) * 2;
-          }
-          if (material === 'purple') {
-            color = level === 14 ? [160,142,125] : colors.purple;
-            if (bay >= 2 && bay <= 13 && level >= 4 && level <= 9)
-              color = bay % 4 === 0 ? [153,140,127] : [111,105,98];
-          }
-          if (material === 'gold') {
-            var block = (x + 8 * Math.floor(y / 8)) % 16;
-            shade = y % 8 === 0 || block === 0 ? -34 : ((x * 19 + y * 31) % 9) - 4;
-          }
-          if (plaster[material]) {
-            var frame = x % 16, floor = y % 16;
-            color = floor === 15 ? [165,145,125] :
-              frame >= 4 && frame <= 11 && floor >= 3 && floor <= 11 ?
-              (frame === 8 || floor === 7 ? [183,167,145] : [108,105,100]) : plaster[material];
-          }
-          var offset = (y * 32 + x) * 4;
-          for (var c = 0; c < 3; c++) image.data[offset + c] = color[c] + shade;
-          image.data[offset + 3] = 255;
-        }
-      }
-      return image;
+    // Roof caps by style and seed: clay tiles and sheet metal on older and smaller buildings,
+    // felt, gravel and membrane on flat-roofed blocks. A mapped roof colour wins.
+    var tiled = ['#a8644c','#93543f','#b4735a','#8a5a4c','#7d7f82'];
+    var flat = ['#77797c','#9a968e','#b3b0a8','#857a70','#8b8e8b'];
+    function bySeed(colors) {
+      var pick = ['match', ['%', ['coalesce', ['get', 'seed'], ['floor', ['/', ['to-number', ['id'], 0], 10]]], 5]];
+      colors.slice(1).forEach(function (color, i) { pick.push(i + 1, color); });
+      return pick.concat([colors[0]]);
     }
+    var ROOF_COLOR = ['case', ['has', 'roof'], ['to-color', ['get', 'roof'], '#a89d8e'],
+      ['match', ['get', 'style'],
+        ['plaster', 'brick', 'house', 'church', 'garage'], bySeed(tiled),
+        ['panel', 'modern', 'office', 'glass', 'retail', 'industrial', 'public'], bySeed(flat),
+        'stone', '#9aa79a',
+        '#a89d8e']];
 
     // Prepared tiles decoded recently. MapLibre asks for the same zoom-14 tile again at
     // every deeper zoom level, so a repeat request skips the download or decompression.
@@ -117,10 +89,10 @@
         var material = layer.id + '-material';
         var textured = enabled || houses;
         map3.setPaintProperty(material, 'fill-extrusion-opacity', textured ? 1 : VIEW3D_BUILDING_OPACITY);
-        map3.setPaintProperty(material, 'fill-extrusion-color', textured ? '#a89d8e' : layer.paint['fill-extrusion-color']);
+        map3.setPaintProperty(material, 'fill-extrusion-color', enabled ? ROOF_COLOR : houses ? '#a89d8e' : layer.paint['fill-extrusion-color']);
         var facade = material + '-facades';
         if (textured && !map3.getLayer(facade)) {
-          var walls = solidFacadeLayer(material, 'v3-material-' + layer.source, enabled, pattern);
+          var walls = solidFacadeLayer(material, 'v3-material-' + layer.source, enabled);
           map3.addLayer(walls, layer.id);
           if (!facadeLayers.has(map3)) facadeLayers.set(map3, new Map());
           facadeLayers.get(map3).set(facade, walls);
@@ -139,5 +111,5 @@
         map3.setPaintProperty(layer.id, 'fill-extrusion-opacity', 0);
       });
     }
-    return { apply: apply, pattern: pattern };
+    return { apply: apply };
   })();

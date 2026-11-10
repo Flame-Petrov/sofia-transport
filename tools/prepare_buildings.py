@@ -41,8 +41,14 @@ class Building:
     height: int
     base: int
     monument: bool
+    kind: str = ""
+    cladding: str = ""
+    wall: str = ""
+    roof: str = ""
     hidden: bool = False
     material: str = ""
+    style: str = ""
+    seed: int = 0
 
 
 def number(value):
@@ -62,6 +68,44 @@ def elevation(tags, height_keys, level_keys, default, rounding):
         if levels is not None:
             return rounding(levels * 3.66)
     return default
+
+
+COLOURS = {"white": "#f0eee8", "lightyellow": "#f0e6b4", "brown": "#8c6248", "tan": "#d2b48c", "red": "#b4503c",
+           "maroon": "#7a3a34", "navy": "#34425e", "darkgrey": "#6e7074", "grey": "#9a9a98", "gray": "#9a9a98",
+           "black": "#3c3c3e", "beige": "#e0d2b4", "yellow": "#e6cc6e", "green": "#6e9470", "blue": "#5a7aa6",
+           "orange": "#d08c50", "pink": "#e0b0a8", "silver": "#b4b8bc"}
+
+
+def colour(value):
+    """A mapped colour as #rrggbb, or nothing when it is not a plain hex value or a common name."""
+    value = (value or "").strip().lower()
+    if re.fullmatch(r"#?[0-9a-f]{6}", value):
+        return "#" + value.lstrip("#")
+    if re.fullmatch(r"#[0-9a-f]{3}", value):
+        return "#" + "".join(c * 2 for c in value[1:])
+    return COLOURS.get(value, "")
+
+
+def usage(tags):
+    """The building's use from its own value or from what it houses."""
+    kind = tags.get("building") or tags.get("building:part") or ""
+    if kind in ("yes", "no", ""):
+        if tags.get("amenity") == "place_of_worship":
+            kind = "church"
+        elif tags.get("shop"):
+            kind = "retail"
+        elif tags.get("office"):
+            kind = "office"
+        elif tags.get("tourism") in ("hotel", "hostel", "motel"):
+            kind = "hotel"
+        elif tags.get("amenity") in ("school", "kindergarten", "university", "college", "hospital", "clinic",
+                                     "townhall", "courthouse", "police", "fire_station", "library", "community_centre"):
+            kind = "public"
+        elif tags.get("man_made") in ("works", "storage_tank", "silo", "pumping_station"):
+            kind = "industrial"
+        else:
+            kind = ""
+    return kind
 
 
 def polygonal(geometry):
@@ -103,10 +147,78 @@ def read_buildings(path):
             continue
         if height >= 3660 or base >= 3660:
             continue
-        buildings[fid] = Building(fid, geom, part, height, base, monument)
+        buildings[fid] = Building(fid, geom, part, height, base, monument, usage(tags),
+                                  tags.get("building:material") or "", colour(tags.get("building:colour")),
+                                  colour(tags.get("roof:colour")))
     for fid in outlines & buildings.keys():
         buildings[fid].hidden = True
     return buildings, memberships
+
+
+WORSHIP = {"church", "cathedral", "chapel", "mosque", "synagogue", "temple", "monastery", "religious"}
+SHEDS = {"garage", "garages", "carport", "shed", "hut", "kiosk", "service", "container", "roof", "toilets"}
+WORKS = {"industrial", "warehouse", "factory", "manufacture", "hangar", "depot", "barn", "farm_auxiliary",
+         "greenhouse", "storage_tank", "silo", "transformer_tower"}
+SHOPS = {"retail", "supermarket", "mall", "kiosk_row"}
+CIVIC = {"school", "kindergarten", "university", "college", "hospital", "government", "public", "civic",
+         "train_station", "sports_hall", "fire_station", "library", "museum", "theatre"}
+HOMES = {"house", "detached", "semidetached_house", "bungalow", "terrace", "cabin", "farm", "villa"}
+FLATS = {"apartments", "residential", "dormitory"}
+
+
+def facade(kind, cladding, monument, roof, span, area, seed):
+    """One of the styles in src/features/view3d/facade-styles.js.
+
+    The mapped use decides first. Untyped buildings are judged by their height,
+    longest side and area, with the seed choosing between equally plausible looks.
+    """
+    pick = lambda *names: names[seed % len(names)]
+    if monument:
+        return "stone"
+    if kind in WORSHIP:
+        return "church"
+    if cladding in ("glass", "mirror"):
+        return "glass"
+    if kind in SHEDS:
+        return "garage"
+    if kind in WORKS or cladding in ("metal", "metal_sheet"):
+        return "industrial"
+    if kind in SHOPS:
+        return "retail"
+    if kind in CIVIC:
+        return "public"
+    if kind in ("office", "commercial"):
+        return "glass" if roof >= 30 else "office"
+    if kind == "hotel":
+        return "glass" if roof >= 40 else "modern"
+    if kind in HOMES:
+        return "house"
+    if cladding == "brick":
+        return "brick"
+    if kind in FLATS:
+        if roof >= 14 and span >= 35:
+            return "panel"
+        if roof >= 20:
+            return pick("panel", "modern")
+        return pick("plaster", "brick", "modern", "plaster")
+    if roof >= 45:
+        return "glass"
+    if roof >= 30:
+        return pick("panel", "glass", "panel", "modern", "panel")
+    if span >= 45:
+        if roof <= 8:
+            return pick("industrial", "retail", "industrial")
+        return "panel" if roof >= 15 else pick("public", "office", "brick")
+    if roof <= 5 and area < 60:
+        return "garage"
+    if roof <= 8 and area < 300:
+        return "house"
+    return pick("plaster", "brick", "plaster", "modern")
+
+
+def own_seed(fid):
+    """The seed the app derives from a feature ID when the tile stores none."""
+    return fid // 10 % 1000
 
 
 def classify(buildings, memberships):
@@ -124,17 +236,25 @@ def classify(buildings, memberships):
     for fid, parts in groups.items():
         parent = buildings[fid]
         roof = max([parent.height] + [p.height for p in parts])
-        if parent.monument or any(p.monument for p in parts):
+        monument = parent.monument or any(p.monument for p in parts)
+        metric = shapely.transform(parent.geometry, UTM.transform, interleaved=False)
+        corners = list(metric.minimum_rotated_rectangle.exterior.coords)
+        span = max(math.dist(a, b) for a, b in zip(corners, corners[1:]))
+        if monument:
             material = "gold"
         elif roof >= 30:
             material = "blue"
         else:
-            metric = shapely.transform(parent.geometry, UTM.transform, interleaved=False)
-            corners = list(metric.minimum_rotated_rectangle.exterior.coords)
-            span = max(math.dist(a, b) for a, b in zip(corners, corners[1:]))
             material = "purple" if span >= 45 else "green"
+        # Every part of a building shares one look, so a tower matches its podium.
+        seed = own_seed(fid)
+        kind = parent.kind or next((p.kind for p in parts if p.kind), "")
+        cladding = parent.cladding or next((p.cladding for p in parts if p.cladding), "")
+        style = facade(kind, cladding, monument, roof, span, metric.area, seed)
         for part in parts:
-            part.material = material
+            part.material, part.style, part.seed = material, style, seed
+            part.wall = part.wall or parent.wall
+            part.roof = part.roof or parent.roof
 
 
 def make_tiles(buildings, bounds):
@@ -156,8 +276,16 @@ def make_tiles(buildings, bounds):
                 if geom.is_empty or geom.area == 0:
                     continue
                 b = visible[i]
-                features.append({"id": b.id, "geometry": geom, "properties": {
-                    "material": b.material, "render_height": b.height, "render_min_height": b.base}})
+                properties = {"material": b.material, "render_height": b.height, "render_min_height": b.base,
+                              "style": b.style}
+                # Only a part that belongs to another outline needs its building's seed spelled out.
+                if b.seed != own_seed(b.id):
+                    properties["seed"] = b.seed
+                if b.wall:
+                    properties["wall"] = b.wall
+                if b.roof:
+                    properties["roof"] = b.roof
+                features.append({"id": b.id, "geometry": geom, "properties": properties})
             data = mapbox_vector_tile.encode({"name": "building", "features": features},
                                              default_options={"quantize_bounds": tile.bounds})
             tiles[f"{x}/{y}"] = base64.b64encode(gzip.compress(data, compresslevel=9, mtime=0)).decode("ascii")
@@ -179,7 +307,8 @@ def main():
     tiles = make_tiles(buildings, bounds)
     OUTPUT.write_text(f"  // © OpenStreetMap contributors, ODbL. BBBike Sofia {date}. Generated by tools/prepare_buildings.py.\n"
                       + "  var sofiaBuildingTiles = " + json.dumps(tiles, indent=2) + ";\n", encoding="utf-8")
-    print(f"{len(tiles)} tiles, {OUTPUT.stat().st_size:,} bytes,", dict(Counter(b.material for b in buildings.values())))
+    print(f"{len(tiles)} tiles, {OUTPUT.stat().st_size:,} bytes,", dict(Counter(b.material for b in buildings.values())),
+          dict(Counter(b.style for b in buildings.values())))
 
 
 if __name__ == "__main__":
