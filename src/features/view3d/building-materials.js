@@ -45,20 +45,38 @@
       return image;
     }
 
+    // Prepared tiles decoded recently. MapLibre asks for the same zoom-14 tile again at
+    // every deeper zoom level, so a repeat request skips the download or decompression.
+    var decodedTiles = new Map(), DECODED_TILE_LIMIT = 16;
+    function preparedTile(key, packed) {
+      var ready = decodedTiles.get(key);
+      decodedTiles.delete(key);
+      if (!ready) {
+        if (packed.startsWith('tiles/')) {
+          ready = fetch(packed).then(function (response) {
+            if (!response.ok) throw new Error('Building tile HTTP ' + response.status);
+            return response.arrayBuffer();
+          });
+        } else {
+          var text = atob(packed), bytes = new Uint8Array(text.length);
+          for (var i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
+          ready = new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
+        }
+        ready.catch(function () { if (decodedTiles.get(key) === ready) decodedTiles.delete(key); });
+      }
+      decodedTiles.set(key, ready);   // most recent last
+      if (decodedTiles.size > DECODED_TILE_LIMIT) decodedTiles.delete(decodedTiles.keys().next().value);
+      return ready;
+    }
+
     async function buildingTile(request, controller) {
       var url = request.url.replace(scheme + '://', 'https://');
       var key = /\/14\/(\d+\/\d+)\.pbf$/.exec(url);
       var packed = key && sofiaBuildingTiles[key[1]];
       if (packed) {
         try {
-          if (packed.startsWith('tiles/')) {
-            var response = await fetch(packed, { signal: controller.signal });
-            if (!response.ok) throw new Error('Building tile HTTP ' + response.status);
-            return { data: await response.arrayBuffer() };
-          }
-          var bytes = Uint8Array.from(atob(packed), function (c) { return c.charCodeAt(0); });
-          var stream = new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'));
-          return { data: await new Response(stream).arrayBuffer() };
+          // MapLibre hands the buffer to its worker, so each request gets its own copy.
+          return { data: (await preparedTile(key[1], packed)).slice(0) };
         } catch (e) {
           if (controller.signal.aborted) throw e;
           // Fall back to the street tile when the prepared geometry is unavailable.

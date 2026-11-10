@@ -1,20 +1,48 @@
   // UV coordinates are measured on the footprint, so camera zoom never changes the repeat.
   function solidFacadeLayer(materialId, sourceId, classified, pattern) {
     var map, program, buffer, textures = [], batches = [], origin;
-    var attrs, uniforms, dirty = true, lastBuild = -Infinity;
+    var attrs, uniforms, dirty = true, lastBuild = -Infinity, view, built = -1, asleep = false;
     var materials = ['green','blue','purple','gold','facade','ivory','clay'];
     var meshCache = new Map(), previousKeys = null;
-    function terrainChanged() { previousKeys=null; meshCache.clear(); invalidate(); }
-    function invalidate() { dirty = true; }
+    function terrainChanged() { previousKeys=null; meshCache.clear(); dirty = true; }
+    function moved() { view.cameraMoved(); }
+    function resized() { view.invalidate(); }
     function sourceChanged(event) {
-      if (event.sourceId === sourceId) invalidate();
+      if (event.sourceId === sourceId) view.invalidate();
       else if (map.getTerrain() && event.sourceId === map.getTerrain().source) terrainChanged();
     }
 
+    // Two triangles per wall edge, six floats per corner: position, then u, v and shade.
+    function wallMesh(rings, base, top, terrain) {
+      var edges = 0;
+      rings.forEach(function (ring) { edges += Math.max(0, ring.length-1); });
+      var mesh = new Float32Array(edges*36), n = 0;
+      var first = rings[0][0];
+      var unit = 1 / (2*Math.PI*6371008.8*Math.cos(first[1]*Math.PI/180));   // one metre in Mercator units here
+      var elevation = terrain ? map.queryTerrainElevation(first) || 0 : 0;
+      var bottom = (base + elevation) * unit / origin.unit;
+      var roof = (top + elevation) * unit / origin.unit;
+      var shade;
+      function corner(x,y,z,u,v) { mesh[n++]=x; mesh[n++]=y; mesh[n++]=z; mesh[n++]=u; mesh[n++]=v; mesh[n++]=shade; }
+      rings.forEach(function (ring) {
+        var px = mercatorX(ring[0][0]), py = mercatorY(ring[0][1]);
+        for (var j=1; j<ring.length; j++) {
+          var qx = mercatorX(ring[j][0]), qy = mercatorY(ring[j][1]);
+          var dx = qx-px, dy = qy-py, len = Math.hypot(dx,dy);
+          if (!len) continue;
+          var x=(px-origin.x)/origin.unit, y=(py-origin.y)/origin.unit;
+          var nx=(qx-origin.x)/origin.unit, ny=(qy-origin.y)/origin.unit;
+          var u=len/unit/6;
+          shade=0.87+0.10*(dx-dy)/len/Math.SQRT2;
+          corner(x,y,bottom,0,base/6); corner(nx,ny,bottom,u,base/6); corner(nx,ny,roof,u,top/6);
+          corner(x,y,bottom,0,base/6); corner(nx,ny,roof,u,top/6); corner(x,y,roof,0,top/6);
+          px=qx; py=qy;
+        }
+      });
+      return n < mesh.length ? mesh.subarray(0,n) : mesh;
+    }
+
     function rebuild() {
-      var canvas = map.getCanvas();
-      var features = map.queryRenderedFeatures([[0,0],[canvas.clientWidth,canvas.clientHeight]],
-        {layers:[materialId]});
       var center = maplibregl.MercatorCoordinate.fromLngLat(map.getCenter());
       if (!origin || Math.hypot(center.x-origin.x,center.y-origin.y)>0.001) {
         origin = center;
@@ -23,42 +51,20 @@
       }
       var groups = materials.map(function () { return []; }), seen = new Set();
       var terrain = !!map.getTerrain();
-      features.forEach(function (f) {
+      view.features.forEach(function (f) {
         var props = f.properties, top = Number(props.render_height), base = Number(props.render_min_height || 0);
         if (!(top > base)) return;
         var index = classified ? materials.indexOf(props.material) : 4 + Math.abs(Number(f.id) || 0) % 3;
-        var group = groups[index < 0 ? 4 : index];
+        if (index < 0) index = 4;
+        var group = groups[index];
         var polygons = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
         polygons.forEach(function (rings) {
           // Retain separate parts of the same ID at a tile boundary.
-          var key = index + '/' + f.id + '/' + base + '/' + top + '/' + JSON.stringify(rings);
+          var key = index + '/' + f.id + '/' + base + '/' + top + '/' + footprintKey(rings);
           if (seen.has(key)) return;
           seen.add(key);
-          if (meshCache.has(key)) { group.push(meshCache.get(key)); return; }
-          var out = [];
-          var anchor = maplibregl.MercatorCoordinate.fromLngLat(rings[0][0]);
-          var unit = anchor.meterInMercatorCoordinateUnits();
-          var elevation = terrain ? map.queryTerrainElevation(rings[0][0]) || 0 : 0;
-          var bottom = (base + elevation) * unit / origin.unit;
-          var roof = (top + elevation) * unit / origin.unit;
-          rings.forEach(function (ring) {
-            var prev = maplibregl.MercatorCoordinate.fromLngLat(ring[0]);
-            for (var j=1; j<ring.length; j++) {
-              var next = maplibregl.MercatorCoordinate.fromLngLat(ring[j]);
-              var dx = next.x-prev.x, dy = next.y-prev.y, len = Math.hypot(dx,dy);
-              if (!len) continue;
-              var x=(prev.x-origin.x)/origin.unit, y=(prev.y-origin.y)/origin.unit;
-              var nx=(next.x-origin.x)/origin.unit, ny=(next.y-origin.y)/origin.unit;
-              var u=len/unit/6, shade=0.87+0.10*(dx-dy)/len/Math.SQRT2;
-              var a=[x,y,bottom,0,base/6,shade], b=[nx,ny,bottom,u,base/6,shade];
-              var c=[nx,ny,roof,u,top/6,shade], d=[x,y,roof,0,top/6,shade];
-              out.push(...a,...b,...c,...a,...c,...d);
-              prev=next;
-            }
-          });
-          var mesh = new Float32Array(out);
-          meshCache.set(key,mesh);
-          group.push(mesh);
+          if (!meshCache.has(key)) meshCache.set(key, wallMesh(rings, base, top, terrain));
+          group.push(meshCache.get(key));
         });
       });
       if (sameBuildingKeys(previousKeys,seen)) return null;
@@ -76,9 +82,10 @@
 
     return {
       id:materialId+'-facades', type:'custom', renderingMode:'3d',
-      setClassified:function(value) { if (classified!==value) { classified=value; invalidate(); } },
+      setClassified:function(value) { if (classified!==value) { classified=value; dirty=true; } },
       onAdd:function(owner,gl) {
         map=owner; program=gl.createProgram();
+        view=buildingView(map,materialId); view.invalidate();
         function attach(type,source) {
           var shader=gl.createShader(type);
           gl.shaderSource(shader,source); gl.compileShader(shader);
@@ -100,19 +107,21 @@
           gl.generateMipmap(gl.TEXTURE_2D);
           return tex;
         });
-        map.on('move',invalidate); map.on('resize',invalidate); map.on('terrain',terrainChanged);
+        map.on('move',moved); map.on('resize',resized); map.on('terrain',terrainChanged);
         map.on('sourcedata',sourceChanged);
       },
       render:function(gl,matrix) {
         var layer=map.getLayer(materialId);
-        if (!layer || map.getZoom()<(layer.minzoom || 0)) { dirty=true; return; }
+        if (!layer || map.getZoom()<(layer.minzoom || 0)) { asleep=true; return; }
+        if (asleep) { asleep=false; dirty=true; view.invalidate(); }
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
-        var now=performance.now();
-        if (dirty && now-lastBuild>=180) {
+        // The shared query decides when the visible buildings may have changed.
+        var now=performance.now(), version=view.refresh(now), due=dirty || version!==built;
+        if (due && now-lastBuild>=180 && now>view.queriedAt) {
           var data=rebuild();
           if (data !== null) gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
-          dirty=false; lastBuild=now;
-        } else if (dirty) map.triggerRepaint();
+          dirty=false; lastBuild=now; built=version;
+        } else if (due) map.triggerRepaint();
         if (!origin) return;
         gl.useProgram(program);
         gl.uniform4fv(uniforms[0],[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];}));
@@ -128,7 +137,7 @@
         gl.disable(gl.POLYGON_OFFSET_FILL);
       },
       onRemove:function(owner,gl) {
-        owner.off('move',invalidate); owner.off('resize',invalidate); owner.off('terrain',terrainChanged);
+        owner.off('move',moved); owner.off('resize',resized); owner.off('terrain',terrainChanged);
         owner.off('sourcedata',sourceChanged);
         textures.forEach(function(t){gl.deleteTexture(t);});
         gl.deleteBuffer(buffer); gl.deleteProgram(program);

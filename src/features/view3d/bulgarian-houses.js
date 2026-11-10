@@ -214,14 +214,15 @@
 
   function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
     var map, program, buffer, matrixLoc, anchorLoc, position, color, origin;
-    var dirty=true, count=0, lastBuild=0, terrain;
+    var dirty=true, count=0, lastBuild=0, terrain, view, built=-1, asleep=false;
     var previousKeys = null, meshCache = new Map();
-    function moved(){dirty=true;}
-    function resetGeometry(){previousKeys=null;meshCache.clear();moved();}
+    function moved(){ if (canopy) dirty=true; else view.cameraMoved(); }
+    function resized(){ if (canopy) dirty=true; else view.invalidate(); }
+    function resetGeometry(){previousKeys=null;meshCache.clear();dirty=true;}
     function sourceChanged(event){
       var dem = map.getTerrain();
       if (dem && event.sourceId === dem.source) resetGeometry();
-      else if (event.sourceId === sourceId && !canopy) moved();
+      else if (event.sourceId === sourceId && !canopy) view.invalidate();
     }
     function rebuild(){
       var center = maplibregl.MercatorCoordinate.fromLngLat(map.getCenter());
@@ -236,11 +237,12 @@
         previousKeys=sections;
         return metroCanopyVertices(map, origin, sections);
       }
-      var features=map.queryRenderedFeatures({layers:[materialLayer],filter:['in','material','green','purple']});
       var seen=new Set(), usedIds=new Set(), meshes=[], size=0;
-      features.forEach(function(f){
-        if (usedIds.has(f.id)) return;
-        var key=JSON.stringify([f.id,f.properties.render_height,f.properties.render_min_height,f.geometry]);
+      view.features.forEach(function(f){
+        var material=f.properties.material;
+        if ((material!=='green' && material!=='purple') || usedIds.has(f.id)) return;
+        var shape=f.geometry, polygons=shape.type==='Polygon' ? [shape.coordinates] : shape.coordinates;
+        var key=f.id+'/'+f.properties.render_height+'/'+f.properties.render_min_height+'/'+polygons.map(footprintKey).join('|');
         if (!meshCache.has(key)) {
           var vertices=[];
           meshCache.set(key,bulgarianHouse(f,vertices,origin,map) ? new Float32Array(vertices) : null);
@@ -260,6 +262,7 @@
       id:materialLayer+(canopy ? '-metro-roofs' : '-houses'),type:'custom',renderingMode:'3d',
       onAdd:function(owner,gl){
         map=owner;
+        if (!canopy) { view=buildingView(map,materialLayer); view.invalidate(); }
         program=gl.createProgram();
         function attach(type,source){
           var shader=gl.createShader(type);
@@ -274,25 +277,28 @@
         position=gl.getAttribLocation(program,'pos');color=gl.getAttribLocation(program,'rgb');
         matrixLoc=gl.getUniformLocation(program,'offsetMatrix');anchorLoc=gl.getUniformLocation(program,'anchor');
         buffer=gl.createBuffer();
-        map.on('move',moved);map.on('resize',moved);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
+        map.on('move',moved);map.on('resize',resized);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
       },
       render:function(gl,matrix){
         if(map.getZoom()<(canopy ? 13 : 15) /* app zoom 16 */ || map.getLayoutProperty(materialLayer,'visibility')==='none'){
-          dirty=true;return;
+          asleep=true;return;
         }
+        if (asleep) { asleep=false; dirty=true; if (view) view.invalidate(); }
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
         var now=performance.now(),currentTerrain=!!map.getTerrain();
-        
-        if((dirty && now-lastBuild>200) || terrain!==currentTerrain){
-
+        // The shared query decides when the visible buildings may have changed.
+        var version = view ? view.refresh(now) : built;
+        var due = dirty || version!==built;
+        var free = !view || now-view.queriedAt>=30;   // walls take the frame after a query
+        if((due && free && now-lastBuild>200) || terrain!==currentTerrain){
           if (terrain!==currentTerrain) resetGeometry();
           var data = rebuild();
           if (data !== null) {
             count = data.length / 6;
             gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
           }
-          lastBuild=now;dirty=false;terrain=currentTerrain;
-        } else if(dirty) map.triggerRepaint();
+          lastBuild=now;dirty=false;terrain=currentTerrain;built=version;
+        } else if(due) map.triggerRepaint();
         if(!count)return;
         gl.useProgram(program);gl.disable(gl.CULL_FACE);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
         var anchor=[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];});
@@ -304,7 +310,7 @@
         gl.disableVertexAttribArray(position);gl.disableVertexAttribArray(color);
       },
       onRemove:function(owner,gl){
-        owner.off('move',moved);owner.off('resize',moved);owner.off('sourcedata',sourceChanged);owner.off('terrain',resetGeometry);
+        owner.off('move',moved);owner.off('resize',resized);owner.off('sourcedata',sourceChanged);owner.off('terrain',resetGeometry);
         gl.deleteBuffer(buffer);gl.deleteProgram(program);
       }
     };

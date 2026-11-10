@@ -57,37 +57,102 @@ test('culling detaches an offscreen dot, reattaches it at its new pose, and keep
   assert.ok(attached.has(v.pill));
 });
 
-test('house batches survive camera movement and refresh after geometry, source or terrain changes', () => {
-  const origin={x:.012345,y:.023456,unit:1e-7};
-  const a = app(['features/view3d/bulgarian-houses'], { maplibregl: { MercatorCoordinate: {
-    fromLngLat: ([x,y]) => ({ x:origin.x+x*origin.unit, y:origin.y+y*origin.unit,
-      meterInMercatorCoordinateUnits: () => origin.unit }) } } });
-  const features = Array.from({length:50},(_,i) => ({ id:i+1, properties:{render_height:16,render_min_height:0},
-    geometry:{type:'Polygon',coordinates:[[[0,0],[32,0],[32,16],[0,16],[0,0]]]} }));
-  const events = {}, uploads = [];
-  const gl = new Proxy({ getShaderParameter: () => true, getProgramParameter: () => true,
+// A flat stand-in for the 3D map: `shift` pans the picture in screen pixels.
+function buildingMap(features) {
+  const events = {}, shift = { x: 0, y: 0 }, state = { queries: 0, dem: null, zoom: 16 };
+  const map = { events, shift, state,
+    getCenter: () => Object.assign([0,0], { lng: 0, lat: 0 }), getZoom: () => state.zoom,
+    getPitch: () => 0, getBearing: () => 0, getCanvas: () => ({ clientWidth: 390, clientHeight: 844 }),
+    project: ([x,y]) => ({ x: 195 + x*1e5 - shift.x, y: 422 - y*1e5 - shift.y }),
+    getLayoutProperty: () => 'visible', getLayer: () => ({ minzoom: 14 }),
+    on: (name, cb) => { (events[name] ||= []).push(cb); },
+    fire: (name, event) => (events[name] || []).forEach(cb => cb(event)),
+    getTerrain: () => state.dem, queryTerrainElevation: () => 4,
+    queryRenderedFeatures: () => { state.queries++; return features; }, triggerRepaint: noop };
+  return map;
+}
+function buildingGl(uploads) {
+  return new Proxy({ getShaderParameter: () => true, getProgramParameter: () => true,
     bufferData: (_, data) => uploads.push(data.byteLength) }, { get: (o,k) => k in o ? o[k] : noop });
-  let ms = 1000, dem = null;
+}
+const buildingOrigin = { x: .012345, y: .023456, unit: 1e-7 };
+const buildingLibrary = { MercatorCoordinate: { fromLngLat: ([x,y]) => ({
+  x: buildingOrigin.x + x*buildingOrigin.unit, y: buildingOrigin.y + y*buildingOrigin.unit,
+  meterInMercatorCoordinateUnits: () => buildingOrigin.unit }) } };
+function footprints(count) {
+  return Array.from({length:count},(_,i) => ({ id:i+1,
+    properties:{render_height:16,render_min_height:0,material:'green'},
+    geometry:{type:'Polygon',coordinates:[[[0,0],[32,0],[32,16],[0,16],[0,0]]]} }));
+}
+
+test('house batches survive camera movement and refresh after geometry, source or terrain changes', () => {
+  const a = app(['features/view3d/building-view','features/view3d/bulgarian-houses'], { maplibregl: buildingLibrary });
+  const features = footprints(50), uploads = [], map = buildingMap(features), gl = buildingGl(uploads);
+  let ms = 1000;
   a.performance = { now: () => ms };
-  const map = { getCenter: () => [0,0],getZoom: () => 16,getLayoutProperty: () => 'visible',
-    on: (name, cb) => { events[name]=cb; }, getTerrain: () => dem,queryTerrainElevation: () => 4,
-    queryRenderedFeatures: () => features, triggerRepaint: noop };
   const layer = a.bulgarianHouseLayer('material','tiles',false);
-  const render = () => layer.render(gl,new Float32Array(16));
+  // The query, the wall batch and the house batch each take their own frame.
+  const render = () => { for (let i=0;i<3;i++) { layer.render(gl,new Float32Array(16)); ms+=40; } };
   layer.onAdd(map,gl);
   render();
   assert.equal(uploads[0],3779136);
-  for (let i=1;i<=60;i++) { ms=1000+i*1000/60; events.move(); render(); }
-  assert.equal(uploads.length,1);
-  features.reverse(); ms+=300; events.move(); render();
-  assert.equal(uploads.length,1);
-  features[0].properties.render_height=7; ms+=300; events.sourcedata({sourceId:'tiles'}); render();
+  // A pan inside the padded margin neither queries the map nor uploads.
+  for (let i=1;i<=60;i++) { map.shift.x=i*2; map.fire('move'); render(); }
+  assert.deepEqual([uploads.length,map.state.queries],[1,1]);
+  features.reverse(); ms+=300; map.fire('sourcedata',{sourceId:'tiles'}); render();
+  assert.deepEqual([uploads.length,map.state.queries],[1,2]);
+  features[0].properties.render_height=7; ms+=300; map.fire('sourcedata',{sourceId:'tiles'}); render();
   assert.equal(uploads.length,2);
-  dem={source:'dem'}; ms+=300; events.terrain(); render();
-  ms+=300; events.sourcedata({sourceId:'dem'}); render();
+  map.state.dem={source:'dem'}; ms+=300; map.fire('terrain'); render();
+  ms+=300; map.fire('sourcedata',{sourceId:'dem'}); render();
   assert.equal(uploads.length,4);
-  features.length=0; ms+=300; events.move(); render();
+  // Leaving the margin asks the map again.
+  const before=map.state.queries;
+  features.length=0; ms+=300; map.shift.x=400; map.fire('move'); render();
+  assert.equal(map.state.queries,before+1);
   assert.equal(uploads.at(-1),0);
+});
+
+test('wall and house batches share one building query, and only a pan beyond the margin repeats it', () => {
+  const a = app(['features/view3d/building-view','features/view3d/bulgarian-houses','features/view3d/solid-facades'],
+    { maplibregl: buildingLibrary });
+  const features = footprints(20), wallBytes = [], houseBytes = [], map = buildingMap(features);
+  let ms = 1000;
+  a.performance = { now: () => ms };
+  const walls = a.solidFacadeLayer('material','tiles',true,noop), houses = a.bulgarianHouseLayer('material','tiles',false);
+  const wallGl = buildingGl(wallBytes), houseGl = buildingGl(houseBytes);
+  const render = () => { for (let i=0;i<3;i++) { walls.render(wallGl,new Float32Array(16)); houses.render(houseGl,new Float32Array(16)); ms+=40; } };
+  walls.onAdd(map,wallGl); houses.onAdd(map,houseGl);
+  render();
+  // Four wall edges per footprint, two triangles each, six floats per corner.
+  assert.deepEqual([wallBytes[0],houseBytes.length,map.state.queries],[20*4*36*4,1,1]);
+  // 240 frames of follow-style drift, about 160 px in total.
+  for (let i=1;i<=240;i++) { map.shift.x=i*150/240; map.shift.y=-i*60/240; map.fire('move'); render(); }
+  assert.deepEqual([wallBytes.length,houseBytes.length,map.state.queries],[1,1,1]);
+  // Changing the material mode rebuilds the walls from the features already held.
+  walls.setClassified(false); ms+=300; render();
+  assert.deepEqual([wallBytes.length,map.state.queries],[2,1]);
+  // A new block scrolls in after the camera leaves the margin.
+  features.push({ id:99, properties:{render_height:9,render_min_height:0,material:'blue'},
+    geometry:{type:'Polygon',coordinates:[[[40,0],[60,0],[60,10],[40,0]]]} });
+  ms+=300; map.shift.x=260; map.fire('move'); render();
+  assert.equal(map.state.queries,2);
+  assert.equal(wallBytes.at(-1),(20*4+3)*36*4);
+  assert.equal(houseBytes.length,1);
+  // A zoom jump or a resize also repeats the query; an unchanged result uploads nothing.
+  map.state.zoom=17; ms+=300; map.fire('move'); render();
+  ms+=300; map.fire('resize'); render();
+  assert.deepEqual([map.state.queries,wallBytes.length],[4,3]);
+});
+
+test('footprint keys separate different outlines and match equal ones', () => {
+  const a = app(['features/view3d/building-view']);
+  const ring = [[23.3219,42.6977],[23.3221,42.6977],[23.3221,42.6979],[23.3219,42.6977]];
+  const moved = ring.map(p => [p[0]+1e-6,p[1]]);
+  assert.equal(a.footprintKey([ring]),a.footprintKey([ring.map(p => p.slice())]));
+  assert.notEqual(a.footprintKey([ring]),a.footprintKey([moved]));
+  assert.notEqual(a.footprintKey([ring]),a.footprintKey([ring,moved]));
+  assert.notEqual(a.footprintKey([ring]),a.footprintKey([ring.slice().reverse()]));
 });
 
 test('indexed projection agrees with the full scan at intersections, long segments and distant fixes', () => {

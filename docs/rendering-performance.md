@@ -12,10 +12,14 @@ The baseline is the hosted page at `dce706d`. The final hosted HTML is 700,268 b
 | 300 settled vehicles, 240 animation ticks, vehicle registry visits | 72,000 | 0 |
 | Same 240 ticks, vehicle pose evaluations | 25,500 | 0 |
 | 1,002-point route shape, candidate segments for the sampled fix | 1,001 | Fewer than 80 |
+| Both building switches on, 240-frame follow-style drift (about 8 m), building queries and buffer uploads | 42 to 53 queries, 36 to 45 uploads, 77 to 94 MB | 0 queries, 0 uploads |
+| Same view, 240-frame drag across about 240 m with a 24° turn | 43 to 47 queries, 107 to 117 MB uploaded | 3 queries, 6 uploads, about 49 MB |
 
 The Chrome replay uses Leaflet 1.9.4, MapLibre GL JS 4.7.1, a 390 × 844 viewport at DPR 2 with SwiftShader enabled. It enters 3D through the map control, enables house designs and places a bus near 23.322 E, 42.698 N at MapLibre zoom 16.3 and pitch 55°. The street style and feed are controlled. Buildings come from the shipped Sofia tiles. Each camera step alternates longitude by 0.00000001° and waits 150 ms. The counter measures bytes passed to the building-layer WebGL upload call after warm-up. Initial uploads vary with tile arrival order. The original renderer throttled rebuilds, so small timing differences changed how many fell inside each run. Moving 0.006° east subsequently causes a fresh upload in each rebuilt version.
 
 The hosted replay requested two prepared tiles and only the bus GLB. It requested no local 3D assets before entering 3D. Release 102 requested neither a building file nor a model file. Both versions showed a modeled bus, opened a stop sheet from a 3D map tap, accepted their first simulated GPS fix in 3D, and restored the stop and location markers on return to 2D.
+
+The last two rows come from `tests/texture-pan-browser.py` on 2026-11-10, with `7988541` as the baseline, in the same Chrome setup as below. Ranges cover the runs made that day. Frames over 34 ms fell from 12 to 47 before to 0 during the drift, and from 15 to 38 before to 4 to 6 during the drag. The slowest drag frame varied between runs, 48 to 84 ms before and 47 to 134 ms after, because a query after leaving the margin covers a larger area. SwiftShader frame times are a relative comparison only.
 
 ## Changes and failure cases
 
@@ -24,6 +28,7 @@ The hosted replay requested two prepared tiles and only the bus GLB. It requeste
 | 2D vehicles | `features/vehicles/motion.js` tracks active plans and retires them at their endpoint. `features/search/render.js` limits ordinary markers to a padded viewport. Routed and selected vehicles stay available. The tests wake a settled bus, move an offscreen bus back on screen and check its actual endpoint. |
 | Vehicle projection | The motion planner indexes segments of long shapes on first use. It includes unusually long segments separately and keeps the original segment order for ties. The indexed result matched the exhaustive result for 150 combinations of position, heading and prior distance. |
 | 3D buildings | `bulgarian-houses.js`, `solid-facades.js` and `metro-canopies.js` reuse visible geometry. Reordered features can reuse an upload. Geometry, height, material class on façades, terrain and a coordinate-origin change can invalidate the applicable cache. Tests cover changed heights, terrain source updates and an empty viewport. |
+| Building queries | `building-view.js` holds one padded viewport query per building layer for the wall and house batches. The query repeats after a tile, resize or large zoom change, or when ground points under the screen corners have shifted by more than 70% of the padding. The padding is 30% of the longer screen edge, less at the top so it stays below the horizon. The batches rebuild on the frames after the query. Footprint cache keys use a point count and rolling hash. `building-materials.js` keeps the 16 most recently decoded prepared tiles. Tests cover a drift inside the margin, a pan beyond it, zoom, resize, shared use by both layers and key collisions between similar outlines. |
 | 3D vehicles and labels | `view.js` skips settled fleet rebuilds, limits distant refreshes, and omits ordinary modeled vehicles from redundant GeoJSON. It caches up to 256 line badge images per map. Rail matching runs when a visible tram needs it. `vehicle-models.js` requests eligible model types, shares in-flight requests, retains decoded vertices and creates GPU buffers per context. A failed request leaves the symbol available. A regression test verifies retry and decoding after recovery. |
 | Stops and GPS | `your-stop.js` supplies ordinary stop records to both maps. A newly visible ordinary 3D stop allocates its Leaflet marker on tap. Route and focused stops retain their special markers. `location.js` and `follow-camera.js` skip hidden Leaflet location updates. Chrome checked the stop sheet, simulated GPS and marker restoration across a mode switch. |
 | Feed updates | `shared/transit/live-feed.js` applies vehicle positions without waiting for trip predictions. Repeated position timestamps update freshness. Late trip responses can enrich the latest records, and an older response cannot replace a newer successful one. The malformed-payload test checks that all previous trip indexes remain usable. |
@@ -56,10 +61,11 @@ The optional browser comparison requires Python Playwright, an installed Chrome,
 
 ```sh
 python site/tests/rendering-browser.py --baseline dce706d
+python site/tests/texture-pan-browser.py --baseline 7988541
 python serve.py --no-open
 ```
 
 ## Remaining costs
 
-A camera move can still trigger a throttled visible-feature query and serialization of footprint keys. Crossing a coverage boundary rebuilds and uploads the changed visible batch. Vehicle meshes still issue a draw per visible vehicle. Label placement still projects and draws visible badges on MapLibre renders. A physical-phone trace during a long pan or a crowded moving-fleet follow would distinguish these costs and establish frame-time percentiles and memory pressure. The byte and operation counters above measure the work removed under the stated workloads.
+Leaving the padded margin repeats the visible-feature query, and a changed result rebuilds and uploads the whole wall or house batch (about 8 MB per upload in the drag above). Buildings just outside the queried area show plain wall colour until the next query. The original building layer stays loaded at zero opacity, so building geometry is tessellated twice in the worker. Multisample anti-aliasing and the second wall pass add GPU cost that this software-rendered replay cannot measure. Vehicle meshes still issue a draw per visible vehicle. Label placement still projects and draws visible badges on MapLibre renders. A physical-phone trace during a long pan or a crowded moving-fleet follow would distinguish these costs and establish frame-time percentiles and memory pressure. The byte and operation counters above measure the work removed under the stated workloads.
 
