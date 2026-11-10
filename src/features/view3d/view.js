@@ -28,6 +28,7 @@
     var stopsDrawn = [], terrainOn = store('sofia_3d_terrain') === null ? VIEW3D_TERRAIN : store('sofia_3d_terrain') === '1', demAttr = false;   // v103
     var textureBox = document.getElementById('v3Textures');
     var houseBox = document.getElementById('v3HouseDesigns');
+    var dayBox = document.getElementById('v3Daylight');
     var controlsHelp = document.getElementById('v3Help');
     controlsHelp.querySelector('button').onclick = function () {
       controlsHelp.close();
@@ -78,6 +79,7 @@
       a.setAttribute('aria-pressed', view3d.on ? 'true' : 'false');
       document.getElementById('v3TerRow').hidden = !/^vector/.test(mapMode);   // v103
       document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream;
+      document.getElementById('v3DayRow').hidden = !show;
       document.getElementById('v3TextureKey').hidden = !textureBox.checked;
       document.getElementById('v3HouseHint').hidden = !houseBox.checked;
       var m = memo(), bx = document.getElementById('v3Box');
@@ -223,6 +225,7 @@
     function onLoad() {
       if (!m3 || m3.getSource('v3-me-acc')) return;
       var sym = firstOf('symbol');
+      daylightMap.attach(m3);
       m3.addSource('v3-me-acc', { type: 'geojson', data: EMPTY });
       m3.addLayer({ id: 'v3-me-acc', type: 'fill', source: 'v3-me-acc',
         paint: { 'fill-color': '#1A73E8', 'fill-opacity': 0.12, 'fill-outline-color': 'rgba(26,115,232,.45)' } }, sym);
@@ -1090,6 +1093,7 @@
         try { if (mm) { c = mm.getCenter(); z = mm.getZoom() + 1; } } catch (e) {}
         scheduleViewportPrefetch();
         view3d.on = false; closing = false; ready = false; camBusy = false;
+        daylightMap.detach();
         m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
         numberPoses = []; modelPoses.clear(); railNeighbors.clear(); railSegments = []; trkMk = null; stopMks = {}; stopsDrawn = []; shown = []; drawn = []; farDrawn = []; labelsBy = null; rtMks = {}; rtSig = ''; fc.off = lc.off = null; userMoving = pointerDown = false;
@@ -1474,6 +1478,16 @@
       refresh();
       applyBuildingTextures();
     };
+
+    // Day and night cycle: the clock and its subscribers live in shared/map/daylight.js and view3d/daylight-map.js.
+    dayBox.checked = store('sofia_3d_daylight') === '1';
+    daylight.setEnabled(dayBox.checked);
+    dayBox.onchange = function () { store('sofia_3d_daylight', this.checked ? '1' : '0'); daylight.setEnabled(this.checked); };
+    var timeParam = /[?&]daytime=(\d{1,2}):(\d{2})/.exec(location.search);
+    if (timeParam) daylight.preview(+timeParam[1] * 60 + +timeParam[2]);   // test aid: pin Sofia's clock
+    daylight.subscribe(function () { if (m3) m3.triggerRepaint(); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) daylight.refresh(); });
+    view3d.daylight = daylight;
 
     view3d.open = open;
     view3d.close = close;

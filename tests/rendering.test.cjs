@@ -96,7 +96,7 @@ test('house batches survive camera movement and refresh after geometry, source o
   const render = () => { for (let i=0;i<3;i++) { layer.render(gl,new Float32Array(16)); ms+=40; } };
   layer.onAdd(map,gl);
   render();
-  assert.equal(uploads[0],3779136);
+  assert.equal(uploads[0],6298560);   // ten floats a corner: position, colour, normal and window light
   // A pan inside the padded margin neither queries the map nor uploads.
   for (let i=1;i<=60;i++) { map.shift.x=i*2; map.fire('move'); render(); }
   assert.deepEqual([uploads.length,map.state.queries],[1,1]);

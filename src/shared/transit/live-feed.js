@@ -140,6 +140,7 @@
         if (!force && ts && ts === lastHeaderTs) { renderFeedStatus(); return; }
         lastHeaderTs = ts;
         feedTime = ts ? ts * 1000 : Date.now();
+        if (ts) daylight.clockOffset(feedTime);   // a device clock far off the feed's would skew the sun
         var arrived = Date.now();
         // no new data for a long while (tab in the background, computer asleep, feed stalled):
         // this update places every vehicle where it is instead of animating from its old spot

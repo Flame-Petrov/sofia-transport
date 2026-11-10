@@ -61,10 +61,15 @@
       var p=corners[i], d=Math.hypot(p[0]-center[0],p[1]-center[1]);
       return [p[0]+extra*(p[0]-center[0])/d,p[1]+extra*(p[1]-center[1])/d,z];
     }
+    // Corner: position, colour, outward normal and a window-light draw (0 for anything that is not glass).
     function tri(a,b,c,color,shade) {
+      var u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+      var n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]], m=Math.hypot(n[0],n[1],n[2])||1;
+      var out=(a[0]-center[0])*n[0]+(a[1]-center[1])*n[1]+(a[2]-height/2)*n[2]<0 ? -1/m : 1/m;
+      var h=Math.sin(a[0]*12.9898+a[1]*78.233+a[2]*37.719)*43758.5453, emit=color===glass ? 0.02+0.96*(h-Math.floor(h)) : 0;
       [a,b,c].forEach(function(p) {
         vertices.push((site.x-origin.x+p[0]*unit)/origin.unit,(site.y-origin.y+p[1]*unit)/origin.unit,
-          (p[2]+elevation)*unit/origin.unit,color[0]*shade,color[1]*shade,color[2]*shade);
+          (p[2]+elevation)*unit/origin.unit,color[0]*shade,color[1]*shade,color[2]*shade,n[0]*out,n[1]*out,n[2]*out,emit);
       });
     }
     function quad(a,b,c,d,color,shade) {tri(a,b,c,color,shade);tri(a,c,d,color,shade);}
@@ -213,7 +218,7 @@
   }
 
   function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
-    var map, program, buffer, matrixLoc, anchorLoc, position, color, origin;
+    var map, program, buffer, matrixLoc, anchorLoc, position, color, normal, emitLoc, lightLocs, shadowProgram, origin;
     var dirty=true, count=0, lastBuild=0, terrain, view, built=-1, asleep=false;
     var previousKeys = null, meshCache = new Map();
     function moved(){ if (canopy) dirty=true; else view.cameraMoved(); }
@@ -270,13 +275,15 @@
           if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(shader));
           gl.attachShader(program,shader);gl.deleteShader(shader);
         }
-        attach(gl.VERTEX_SHADER,'attribute vec3 pos,rgb; uniform vec4 anchor; uniform mat4 offsetMatrix; varying vec3 tint; void main(){gl_Position=anchor+offsetMatrix*vec4(pos,0.0);tint=rgb;}');
-        attach(gl.FRAGMENT_SHADER,'precision mediump float; varying vec3 tint; void main(){gl_FragColor=vec4(tint,1.0);}');
+        attach(gl.VERTEX_SHADER,'attribute vec3 pos,rgb,nrm; attribute float emit; uniform vec4 anchor; uniform mat4 offsetMatrix; uniform vec3 sunDir,sunColor,ambient; varying vec3 tint; varying float lampOn; void main(){gl_Position=anchor+offsetMatrix*vec4(pos,0.0);tint=rgb*(ambient+sunColor*max(dot(nrm,sunDir),0.0));lampOn=emit;}');
+        attach(gl.FRAGMENT_SHADER,'precision mediump float; varying vec3 tint; varying float lampOn; uniform float lit; void main(){float on=step(0.001,lampOn)*step(lampOn,lit);gl_FragColor=vec4(mix(tint,vec3(1.0,0.76,0.42)*(0.7+0.5*fract(lampOn*57.3)),0.9*on),1.0);}');
         gl.linkProgram(program);
         if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
-        position=gl.getAttribLocation(program,'pos');color=gl.getAttribLocation(program,'rgb');
+        position=gl.getAttribLocation(program,'pos');color=gl.getAttribLocation(program,'rgb');normal=gl.getAttribLocation(program,'nrm');emitLoc=gl.getAttribLocation(program,'emit');
+        lightLocs=['sunDir','sunColor','ambient','lit'].map(function(k){return gl.getUniformLocation(program,k);});
         matrixLoc=gl.getUniformLocation(program,'offsetMatrix');anchorLoc=gl.getUniformLocation(program,'anchor');
         buffer=gl.createBuffer();
+        try { shadowProgram=shadows.create(gl); } catch (e) { console.warn('3D shadows failed:', e); }
         map.on('move',moved);map.on('resize',resized);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
       },
       render:function(gl,matrix){
@@ -294,7 +301,7 @@
           if (terrain!==currentTerrain) resetGeometry();
           var data = rebuild();
           if (data !== null) {
-            count = data.length / 6;
+            count = data.length / 10;
             gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
           }
           lastBuild=now;dirty=false;terrain=currentTerrain;built=version;
@@ -304,14 +311,18 @@
         var anchor=[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];});
         gl.uniform4fv(anchorLoc,anchor);
         gl.uniformMatrix4fv(matrixLoc,false,Float32Array.from(matrix,function(v){return v*origin.unit;}));
-        gl.enableVertexAttribArray(position);gl.enableVertexAttribArray(color);
-        gl.vertexAttribPointer(position,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(color,3,gl.FLOAT,false,24,12);
+        var light=daylight.lighting();
+        gl.uniform3fv(lightLocs[0],light.dir);gl.uniform3fv(lightLocs[1],light.color);gl.uniform3fv(lightLocs[2],light.ambient);gl.uniform1f(lightLocs[3],light.lit);
+        [position,color,normal,emitLoc].forEach(function(a){gl.enableVertexAttribArray(a);});
+        gl.vertexAttribPointer(position,3,gl.FLOAT,false,40,0);gl.vertexAttribPointer(color,3,gl.FLOAT,false,40,12);
+        gl.vertexAttribPointer(normal,3,gl.FLOAT,false,40,24);gl.vertexAttribPointer(emitLoc,1,gl.FLOAT,false,40,36);
         gl.drawArrays(gl.TRIANGLES,0,count);
-        gl.disableVertexAttribArray(position);gl.disableVertexAttribArray(color);
+        [position,color,normal,emitLoc].forEach(function(a){gl.disableVertexAttribArray(a);});
+        shadows.pass(gl,shadowProgram,map,anchor,Float32Array.from(matrix,function(v){return v*origin.unit;}),40,function(){gl.drawArrays(gl.TRIANGLES,0,count);});
       },
       onRemove:function(owner,gl){
         owner.off('move',moved);owner.off('resize',resized);owner.off('sourcedata',sourceChanged);owner.off('terrain',resetGeometry);
-        gl.deleteBuffer(buffer);gl.deleteProgram(program);
+        gl.deleteBuffer(buffer);gl.deleteProgram(program);if(shadowProgram)gl.deleteProgram(shadowProgram.program);
       }
     };
   }

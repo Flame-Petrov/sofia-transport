@@ -22,7 +22,7 @@ function app(files, globals = {}) {
   });
   const pane = () => ({ style: {}, appendChild: noop });
   const context = vm.createContext({
-    document, Event, performance, setInterval: noop, requestAnimationFrame: noop,
+    document, Event, performance, setInterval: noop, clearInterval: noop, requestAnimationFrame: noop,
     setTimeout, clearTimeout, console,
     map: { createPane: pane, getPane: pane, on: noop, getZoom: () => 16,
       getSize: () => ({ x: 800, y: 600 }), containerPointToLayerPoint: noop },
@@ -31,7 +31,8 @@ function app(files, globals = {}) {
       Canvas: { extend: methods => class { constructor() { Object.assign(this, methods); } } } },
     view3d: { on: false }, ...globals
   });
-  for (const file of files) {
+  // every build has the daylight clock: the 3D layers and the feed read it
+  for (const file of ['shared/map/daylight', 'features/view3d/shadows', ...files]) {
     const filename = path.join(site, 'src', file + '.js');
     vm.runInContext(readFileSync(filename, 'utf8'), context, { filename });
   }

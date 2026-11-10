@@ -1200,6 +1200,7 @@
   #map3d { position: absolute; inset: 0; z-index: 450; opacity: 0; transition: opacity .25s ease; }
   #map3d:not(.ready) { pointer-events: none; }
   #map3d.ready { opacity: 1; }
+  #map3d .v3-sky { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; }
   #map3d.leaving { opacity: 0; pointer-events: none; }
   #map.v3on .leaflet-map-pane { visibility: hidden; }
   .leaflet-container .leaflet-control-3d, .leaflet-control-north .leaflet-bar { border-radius: 50%; }
@@ -1510,6 +1511,11 @@
     </div>
     <!-- v103: hills in the 3D view (off by default: one more download and drawing pass) -->
     <label class="dg-switch" id="v3TerRow" hidden><span>3D view: terrain (Vitosha)</span><input type="checkbox" id="v3Terrain" role="switch"><span class="sw" aria-hidden="true"></span></label>
+    <!-- Day and night cycle: the sun, moon, sky, building and vehicle lighting follow Sofia's real time (off by default) -->
+    <div id="v3DayRow" hidden>
+      <label class="dg-switch"><span>Day and night cycle</span><input type="checkbox" id="v3Daylight" role="switch" aria-describedby="v3DayHint"><span class="sw" aria-hidden="true"></span></label>
+      <div id="v3DayHint" class="pl-hint" hidden>The sun and moon cross the sky at Sofia's real time. Light, sky and map colours follow them, windows and vehicle lamps come on after dark. Off shows a fixed afternoon.</div>
+    </div>
     <div id="v3TextureRow" hidden>
       <label class="dg-switch"><span>3D building textures</span><input type="checkbox" id="v3Textures" role="switch" aria-describedby="v3TextureKey"><span class="sw" aria-hidden="true"></span></label>
       <div id="v3TextureKey" class="pl-hint" hidden>Plaster, panel, brick, glass and stone façades in varied colours, with tiled and flat roofs.</div>
@@ -8734,6 +8740,7 @@
         if (!force && ts && ts === lastHeaderTs) { renderFeedStatus(); return; }
         lastHeaderTs = ts;
         feedTime = ts ? ts * 1000 : Date.now();
+        if (ts) daylight.clockOffset(feedTime);   // a device clock far off the feed's would skew the sun
         var arrived = Date.now();
         // no new data for a long while (tab in the background, computer asleep, feed stalled):
         // this update places every vehicle where it is instead of animating from its old spot
@@ -9234,6 +9241,162 @@
     render(false);
     if (!view3d.on) scheduleViewportPrefetch();
   });
+  // Day and night cycle for the 3D view: where the sun and moon are over Sofia right now, and the
+  // light, sky and lamp levels that follow from it. Pure calculation plus a one-minute clock; the
+  // 3D view and its custom WebGL layers read `lighting()` and `state()`. With the cycle switched
+  // off every reader gets a fixed afternoon sun from the south-west, the look before this feature.
+  var daylight = (function () {
+    var RAD = Math.PI / 180, LAT = 42.6977, LNG = 23.3219;   // Sofia
+    var DAY_MS = 864e5, J1970 = 2440588, J2000 = 2451545, OBLIQUITY = RAD * 23.4397;
+    var enabled = false, offsetMs = 0, previewAt = null, current = null, currentKey = '', timer = 0, listeners = [];
+
+    function clamp(v, lo, hi) { return v < lo ? lo : v > hi ? hi : v; }
+    function smooth(a, b, v) { var t = clamp((v - a) / (b - a), 0, 1); return t * t * (3 - 2 * t); }
+    function mixv(a, b, t) { return a.map(function (v, i) { return v + (b[i] - v) * t; }); }
+    // Piecewise linear lookup: keys[i] is the sun altitude (degrees), table[i] the value there.
+    function ramp(keys, table, x) {
+      if (x <= keys[0]) return table[0];
+      for (var i = 1; i < keys.length; i++) if (x <= keys[i]) return mixv(table[i - 1], table[i], (x - keys[i - 1]) / (keys[i] - keys[i - 1]));
+      return table[table.length - 1];
+    }
+
+    // ---- sun and moon (the standard low-precision series; about a degree for the moon) ----
+    function days(ms) { return ms / DAY_MS - 0.5 + J1970 - J2000; }
+    function rightAscension(l, b) { return Math.atan2(Math.sin(l) * Math.cos(OBLIQUITY) - Math.tan(b) * Math.sin(OBLIQUITY), Math.cos(l)); }
+    function declination(l, b) { return Math.asin(Math.sin(b) * Math.cos(OBLIQUITY) + Math.cos(b) * Math.sin(OBLIQUITY) * Math.sin(l)); }
+    function sunCoords(d) {
+      var M = RAD * (357.5291 + 0.98560028 * d);
+      var C = RAD * (1.9148 * Math.sin(M) + 0.02 * Math.sin(2 * M) + 0.0003 * Math.sin(3 * M));
+      var L = M + C + RAD * 102.9372 + Math.PI;
+      return { dec: declination(L, 0), ra: rightAscension(L, 0) };
+    }
+    function moonCoords(d) {
+      var L = RAD * (218.316 + 13.176396 * d), M = RAD * (134.963 + 13.064993 * d), F = RAD * (93.272 + 13.22935 * d);
+      var l = L + RAD * 6.289 * Math.sin(M), b = RAD * 5.128 * Math.sin(F);
+      return { ra: rightAscension(l, b), dec: declination(l, b), dist: 385001 - 20905 * Math.cos(M) };
+    }
+    // Altitude and azimuth in degrees, azimuth clockwise from north.
+    function horizontal(d, c) {
+      var H = RAD * (280.16 + 360.9856235 * d) - RAD * -LNG - c.ra, phi = RAD * LAT;
+      var alt = Math.asin(Math.sin(phi) * Math.sin(c.dec) + Math.cos(phi) * Math.cos(c.dec) * Math.cos(H));
+      var az = Math.atan2(Math.sin(H), Math.cos(H) * Math.sin(phi) - Math.tan(c.dec) * Math.cos(phi)) + Math.PI;
+      alt += (alt > -0.0087 ? 0.0002967 / Math.tan(alt + 0.00312536 / (alt + 0.08901179)) : 0);   // refraction near the horizon
+      return { alt: alt / RAD, az: ((az / RAD) % 360 + 360) % 360 };
+    }
+    function moonFraction(d) {
+      var s = sunCoords(d), m = moonCoords(d), sdist = 149598000;
+      var phi = Math.acos(Math.sin(s.dec) * Math.sin(m.dec) + Math.cos(s.dec) * Math.cos(m.dec) * Math.cos(s.ra - m.ra));
+      var inc = Math.atan2(sdist * Math.sin(phi), m.dist - sdist * Math.cos(phi));
+      return (1 + Math.cos(inc)) / 2;
+    }
+
+    // ---- Sofia clock ----
+    var parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Sofia', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' });
+    function sofiaParts(ms) {
+      var o = {};
+      parts.formatToParts(new Date(ms)).forEach(function (p) { if (p.type !== 'literal') o[p.type] = +p.value; });
+      return o;
+    }
+    // The instant when Sofia's wall clock shows hh:mm on the date of `ms`.
+    function sofiaTimeOnDay(ms, minutes) {
+      var p = sofiaParts(ms), guess = Date.UTC(p.year, p.month - 1, p.day, 0, 0) + minutes * 6e4;
+      for (var i = 0; i < 2; i++) {
+        var q = sofiaParts(guess);
+        guess += (Date.UTC(p.year, p.month - 1, p.day, 0, 0) + minutes * 6e4) - Date.UTC(q.year, q.month - 1, q.day, q.hour, q.minute);
+      }
+      return guess;
+    }
+    function now() { return previewAt !== null ? previewAt : Date.now() + offsetMs; }
+
+    // ---- light, sky and lamps for a sun altitude ----
+    var SKY_KEYS = [-18, -12, -6, 0, 5, 20];
+    var SKY = [[.02, .03, .08], [.05, .07, .15], [.2, .24, .42], [.45, .52, .75], [.62, .74, .9], [.86, .91, .96]];
+    var HORIZON = [[.05, .07, .15], [.12, .14, .26], [.55, .38, .42], [.98, .62, .4], [.98, .82, .64], [.96, .95, .93]];
+    var LIGHT_KEYS = [-18, -12, -6, -2, 2, 8, 20];
+    var AMBIENT = [[.17, .2, .34], [.2, .24, .4], [.34, .38, .56], [.5, .5, .62], [.62, .6, .64], [.72, .72, .76], [.78, .8, .84]];
+    var SUN_LIGHT = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [.3, .18, .08], [.38, .28, .17], [.3, .28, .24]];
+    var DAY_AMBIENT = [.78, .8, .84];
+    // Share of windows that are lit, by Sofia hour (only while it is dark enough for lamps).
+    var LIT_HOURS = [0, 4, 6, 8, 16, 18, 21, 23, 24], LIT_SHARE = [.15, .12, .4, .3, .3, .6, .6, .35, .15];
+    function litShare(hour) {
+      for (var i = 1; i < LIT_HOURS.length; i++) if (hour <= LIT_HOURS[i]) return LIT_SHARE[i - 1] + (LIT_SHARE[i] - LIT_SHARE[i - 1]) * (hour - LIT_HOURS[i - 1]) / (LIT_HOURS[i] - LIT_HOURS[i - 1]);
+      return LIT_SHARE[LIT_SHARE.length - 1];
+    }
+    function direction(altitude, azimuth) {   // east, south, up: the axes of Mercator coordinates
+      var a = altitude * RAD, z = azimuth * RAD;
+      return [Math.sin(z) * Math.cos(a), -Math.cos(z) * Math.cos(a), Math.sin(a)];
+    }
+    function css(c) { return 'rgb(' + c.map(function (v) { return Math.round(clamp(v, 0, 1) * 255); }).join(',') + ')'; }
+
+    function build(ms) {
+      var d = days(ms), sun = horizontal(d, sunCoords(d)), moon = horizontal(d, moonCoords(d)), fraction = moonFraction(d);
+      var p = sofiaParts(ms), hour = p.hour + p.minute / 60;
+      return fromBodies(sun, moon, fraction, hour);
+    }
+    function fromBodies(sun, moon, fraction, hour) {
+      var a = sun.alt;
+      var ambient = ramp(LIGHT_KEYS, AMBIENT, a), sunLight = ramp(LIGHT_KEYS, SUN_LIGHT, a);
+      var moonLevel = clamp(moon.alt / 10, 0, 1) * fraction * (1 - smooth(-8, 0, a));
+      var moonLight = [.12 * moonLevel, .14 * moonLevel, .2 * moonLevel];
+      var sunWeight = sunLight[0] + sunLight[1] + sunLight[2], moonWeight = moonLight[0] + moonLight[1] + moonLight[2];
+      var sd = direction(sun.alt, sun.az), md = direction(moon.alt, moon.az), w = sunWeight + moonWeight || 1;
+      var dir = [0, 1, 2].map(function (i) { return (sd[i] * sunWeight + md[i] * moonWeight) / w; });
+      if (!sunWeight && !moonWeight) dir = sd;
+      var len = Math.hypot(dir[0], dir[1], dir[2]) || 1;
+      dir = dir.map(function (v) { return v / len; });
+      var lamp = 1 - smooth(-8, 3, a);
+      var grade = [0, 1, 2].map(function (i) { return clamp(ambient[i] / DAY_AMBIENT[i] + sunLight[i] * [.6, .5, .3][i], 0, 1); });
+      // Where MapLibre's own light comes from: the sun, or the moon once the sun is well down.
+      var lit = sunWeight >= moonWeight ? sun : moon;
+      var polar = clamp(90 - (lit.alt > 0 ? lit.alt : 4), 12, 80);
+      var sky = ramp(SKY_KEYS, SKY, a), horizon = ramp(SKY_KEYS, HORIZON, a);
+      return {
+        sunAlt: sun.alt, sunAz: sun.az, moonAlt: moon.alt, moonAz: moon.az, moonFraction: fraction, hour: hour,
+        lighting: { dir: dir, color: [0, 1, 2].map(function (i) { return sunLight[i] + moonLight[i]; }), ambient: ambient, lamp: lamp, lit: lamp * litShare(hour) },
+        grade: grade, night: 1 - smooth(-8, 2, a),
+        sky: { 'sky-color': css(sky), 'horizon-color': css(horizon), 'fog-color': css(horizon),
+               'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.85 },
+        light: { anchor: 'map', position: [1.5, lit.az, polar], color: css(grade), intensity: a > -2 ? 0.35 : 0.25 }
+      };
+    }
+    var STATIC = fromBodies({ alt: 55, az: 225 }, { alt: -30, az: 45 }, 0, 12);
+    STATIC.lighting.ambient = [.74, .75, .78]; STATIC.lighting.color = [.26, .24, .2];
+    STATIC.lighting.lamp = 0; STATIC.lighting.lit = 0; STATIC.night = 0;
+
+    function state() {
+      if (!enabled) return STATIC;
+      var ms = now(), key = previewAt !== null ? 'p' + ms : 't' + Math.floor(ms / 15000);
+      if (key !== currentKey) { current = build(ms); currentKey = key; }
+      return current;
+    }
+    function notify() { var s = state(); listeners.slice().forEach(function (fn) { fn(s); }); }
+    function tick() { currentKey = ''; notify(); }
+    function schedule() {
+      clearInterval(timer); timer = 0;
+      if (enabled && previewAt === null) timer = setInterval(tick, 20000);
+    }
+
+    return {
+      enabled: function () { return enabled; },
+      setEnabled: function (on) { on = !!on; if (on === enabled) return; enabled = on; currentKey = ''; schedule(); notify(); },
+      state: state,
+      refresh: function () { if (enabled) tick(); },
+      lighting: function () { return state().lighting; },
+      subscribe: function (fn) { listeners.push(fn); return function () { listeners = listeners.filter(function (f) { return f !== fn; }); }; },
+      now: now,
+      at: build,
+      // The feed's own clock replaces a device clock that is more than two minutes out.
+      clockOffset: function (feedMs) { var off = feedMs - Date.now(); offsetMs = Math.abs(off) > 12e4 ? off : 0; },
+      // Show Sofia at a fixed time of day (minutes after midnight) on today's date; null returns to live time.
+      preview: function (minutes) {
+        previewAt = minutes === null || minutes === undefined ? null : sofiaTimeOnDay(Date.now() + offsetMs, minutes);
+        currentKey = ''; schedule(); notify();
+      },
+      previewing: function () { return previewAt !== null; },
+      sofiaTimeOnDay: sofiaTimeOnDay,
+      clock: function () { var p = sofiaParts(now()); return ('0' + p.hour).slice(-2) + ':' + ('0' + p.minute).slice(-2); }
+    };
+  })();
   // v91: the live feed failed (most often: the phone/computer was asleep or offline for a while). Instead of the
   // old CORS box in the panel, a popup over everything asks for a reload, which starts the app fresh with the
   // latest data. While the device says it's offline the button waits (reloading then would only show the
@@ -9389,6 +9552,62 @@
   document.getElementById('perfToggle').onchange = function () { setPerf(this.checked); };
   if (store('sofia_perf_overlay') === '1') setPerf(true);
 
+  // Ground shadows for the day and night cycle. MapLibre has none, so each custom layer draws its own
+  // triangles again, flattened onto the ground along the light direction: a point at height h moves
+  // by h * (east, south) / up away from the sun. The stencil keeps overlapping triangles to one layer
+  // of darkness. Only with the cycle on, on flat ground, and only while the sun or moon gives direct light.
+  var shadows = (function () {
+    var VERTEX = 'attribute vec3 pos; uniform vec4 anchor; uniform mat4 offsets; uniform vec3 sunDir;' +
+      'void main(){vec3 p=pos; p.xy-=sunDir.xy/max(sunDir.z,.12)*p.z; gl_Position=anchor+offsets*vec4(p.xy,0.,0.);}';
+    var FRAGMENT = 'precision mediump float; uniform float strength; void main(){gl_FragColor=vec4(0.,0.,0.,strength);}';
+    function strength(map) {
+      if (!daylight.enabled() || (map && map.getTerrain && map.getTerrain())) return 0;
+      var s = daylight.lighting().color[1] * 1.1;
+      return s < 0.02 ? 0 : Math.min(0.42, s);
+    }
+    function compile(gl) {
+      var program = gl.createProgram();
+      [[gl.VERTEX_SHADER, VERTEX], [gl.FRAGMENT_SHADER, FRAGMENT]].forEach(function (pair) {
+        var shader = gl.createShader(pair[0]);
+        gl.shaderSource(shader, pair[1]); gl.compileShader(shader);
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(shader));
+        gl.attachShader(program, shader); gl.deleteShader(shader);
+      });
+      gl.linkProgram(program);
+      if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
+      var loc = { pos: gl.getAttribLocation(program, 'pos') };
+      ['anchor', 'offsets', 'sunDir', 'strength'].forEach(function (k) { loc[k] = gl.getUniformLocation(program, k); });
+      return { program: program, loc: loc };
+    }
+    // Begin and end a shadow pass: blending, a clean stencil, no depth writes.
+    function begin(gl) {
+      gl.enable(gl.BLEND); gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
+      gl.depthMask(false); gl.enable(gl.DEPTH_TEST);
+      gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(1, 1);
+      gl.enable(gl.STENCIL_TEST); gl.stencilMask(0xFF); gl.clearStencil(0); gl.clear(gl.STENCIL_BUFFER_BIT);
+      gl.stencilFunc(gl.EQUAL, 0, 0xFF); gl.stencilOp(gl.KEEP, gl.KEEP, gl.INCR);
+    }
+    function end(gl) {
+      gl.disable(gl.STENCIL_TEST); gl.stencilMask(0xFF); gl.disable(gl.POLYGON_OFFSET_FILL);
+      gl.depthMask(true);
+    }
+    // Draw one layer's buffer (already bound) as shadows. `draw` issues the layer's drawArrays calls.
+    function pass(gl, sp, map, anchor, offsets, stride, draw) {
+      var k = strength(map);
+      if (!k || !sp) return;
+      var light = daylight.lighting();
+      gl.useProgram(sp.program);
+      gl.uniform4fv(sp.loc.anchor, anchor); gl.uniformMatrix4fv(sp.loc.offsets, false, offsets);
+      gl.uniform3fv(sp.loc.sunDir, light.dir); gl.uniform1f(sp.loc.strength, k);
+      begin(gl);
+      gl.enableVertexAttribArray(sp.loc.pos);
+      gl.vertexAttribPointer(sp.loc.pos, 3, gl.FLOAT, false, stride, 0);
+      draw();
+      gl.disableVertexAttribArray(sp.loc.pos);
+      end(gl);
+    }
+    return { create: compile, pass: pass, strength: strength, begin: begin, end: end };
+  })();
   // © OpenStreetMap contributors, ODbL. BBBike Sofia 2026-11-07T00:00:00Z. Generated by tools/prepare_buildings.py.
   var sofiaBuildingTiles = {"9245/6032": "tiles/buildings/14/9245/6032.pbf", "9245/6033": "tiles/buildings/14/9245/6033.pbf", "9245/6034": "tiles/buildings/14/9245/6034.pbf", "9245/6035": "tiles/buildings/14/9245/6035.pbf", "9245/6036": "tiles/buildings/14/9245/6036.pbf", "9245/6037": "tiles/buildings/14/9245/6037.pbf", "9245/6038": "tiles/buildings/14/9245/6038.pbf", "9245/6039": "tiles/buildings/14/9245/6039.pbf", "9245/6040": "tiles/buildings/14/9245/6040.pbf", "9245/6041": "tiles/buildings/14/9245/6041.pbf", "9245/6042": "tiles/buildings/14/9245/6042.pbf", "9245/6043": "tiles/buildings/14/9245/6043.pbf", "9245/6044": "tiles/buildings/14/9245/6044.pbf", "9245/6045": "tiles/buildings/14/9245/6045.pbf", "9245/6046": "tiles/buildings/14/9245/6046.pbf", "9246/6032": "tiles/buildings/14/9246/6032.pbf", "9246/6033": "tiles/buildings/14/9246/6033.pbf", "9246/6034": "tiles/buildings/14/9246/6034.pbf", "9246/6035": "tiles/buildings/14/9246/6035.pbf", "9246/6036": "tiles/buildings/14/9246/6036.pbf", "9246/6037": "tiles/buildings/14/9246/6037.pbf", "9246/6038": "tiles/buildings/14/9246/6038.pbf", "9246/6039": "tiles/buildings/14/9246/6039.pbf", "9246/6040": "tiles/buildings/14/9246/6040.pbf", "9246/6041": "tiles/buildings/14/9246/6041.pbf", "9246/6042": "tiles/buildings/14/9246/6042.pbf", "9246/6043": "tiles/buildings/14/9246/6043.pbf", "9246/6044": "tiles/buildings/14/9246/6044.pbf", "9246/6045": "tiles/buildings/14/9246/6045.pbf", "9246/6046": "tiles/buildings/14/9246/6046.pbf", "9247/6032": "tiles/buildings/14/9247/6032.pbf", "9247/6033": "tiles/buildings/14/9247/6033.pbf", "9247/6034": "tiles/buildings/14/9247/6034.pbf", "9247/6035": "tiles/buildings/14/9247/6035.pbf", "9247/6036": "tiles/buildings/14/9247/6036.pbf", "9247/6037": "tiles/buildings/14/9247/6037.pbf", "9247/6038": "tiles/buildings/14/9247/6038.pbf", "9247/6039": "tiles/buildings/14/9247/6039.pbf", "9247/6040": "tiles/buildings/14/9247/6040.pbf", "9247/6041": "tiles/buildings/14/9247/6041.pbf", "9247/6042": "tiles/buildings/14/9247/6042.pbf", "9247/6043": "tiles/buildings/14/9247/6043.pbf", "9247/6044": "tiles/buildings/14/9247/6044.pbf", "9247/6045": "tiles/buildings/14/9247/6045.pbf", "9247/6046": "tiles/buildings/14/9247/6046.pbf", "9248/6032": "tiles/buildings/14/9248/6032.pbf", "9248/6033": "tiles/buildings/14/9248/6033.pbf", "9248/6034": "tiles/buildings/14/9248/6034.pbf", "9248/6035": "tiles/buildings/14/9248/6035.pbf", "9248/6036": "tiles/buildings/14/9248/6036.pbf", "9248/6037": "tiles/buildings/14/9248/6037.pbf", "9248/6038": "tiles/buildings/14/9248/6038.pbf", "9248/6039": "tiles/buildings/14/9248/6039.pbf", "9248/6040": "tiles/buildings/14/9248/6040.pbf", "9248/6041": "tiles/buildings/14/9248/6041.pbf", "9248/6042": "tiles/buildings/14/9248/6042.pbf", "9248/6043": "tiles/buildings/14/9248/6043.pbf", "9248/6044": "tiles/buildings/14/9248/6044.pbf", "9248/6045": "tiles/buildings/14/9248/6045.pbf", "9248/6046": "tiles/buildings/14/9248/6046.pbf", "9249/6032": "tiles/buildings/14/9249/6032.pbf", "9249/6033": "tiles/buildings/14/9249/6033.pbf", "9249/6034": "tiles/buildings/14/9249/6034.pbf", "9249/6035": "tiles/buildings/14/9249/6035.pbf", "9249/6036": "tiles/buildings/14/9249/6036.pbf", "9249/6037": "tiles/buildings/14/9249/6037.pbf", "9249/6038": "tiles/buildings/14/9249/6038.pbf", "9249/6039": "tiles/buildings/14/9249/6039.pbf", "9249/6040": "tiles/buildings/14/9249/6040.pbf", "9249/6041": "tiles/buildings/14/9249/6041.pbf", "9249/6042": "tiles/buildings/14/9249/6042.pbf", "9249/6043": "tiles/buildings/14/9249/6043.pbf", "9249/6044": "tiles/buildings/14/9249/6044.pbf", "9249/6045": "tiles/buildings/14/9249/6045.pbf", "9249/6046": "tiles/buildings/14/9249/6046.pbf", "9250/6032": "tiles/buildings/14/9250/6032.pbf", "9250/6033": "tiles/buildings/14/9250/6033.pbf", "9250/6034": "tiles/buildings/14/9250/6034.pbf", "9250/6035": "tiles/buildings/14/9250/6035.pbf", "9250/6036": "tiles/buildings/14/9250/6036.pbf", "9250/6037": "tiles/buildings/14/9250/6037.pbf", "9250/6038": "tiles/buildings/14/9250/6038.pbf", "9250/6039": "tiles/buildings/14/9250/6039.pbf", "9250/6040": "tiles/buildings/14/9250/6040.pbf", "9250/6041": "tiles/buildings/14/9250/6041.pbf", "9250/6042": "tiles/buildings/14/9250/6042.pbf", "9250/6043": "tiles/buildings/14/9250/6043.pbf", "9250/6044": "tiles/buildings/14/9250/6044.pbf", "9250/6045": "tiles/buildings/14/9250/6045.pbf", "9250/6046": "tiles/buildings/14/9250/6046.pbf", "9251/6032": "tiles/buildings/14/9251/6032.pbf", "9251/6033": "tiles/buildings/14/9251/6033.pbf", "9251/6034": "tiles/buildings/14/9251/6034.pbf", "9251/6035": "tiles/buildings/14/9251/6035.pbf", "9251/6036": "tiles/buildings/14/9251/6036.pbf", "9251/6037": "tiles/buildings/14/9251/6037.pbf", "9251/6038": "tiles/buildings/14/9251/6038.pbf", "9251/6039": "tiles/buildings/14/9251/6039.pbf", "9251/6040": "tiles/buildings/14/9251/6040.pbf", "9251/6041": "tiles/buildings/14/9251/6041.pbf", "9251/6042": "tiles/buildings/14/9251/6042.pbf", "9251/6043": "tiles/buildings/14/9251/6043.pbf", "9251/6044": "tiles/buildings/14/9251/6044.pbf", "9251/6045": "tiles/buildings/14/9251/6045.pbf", "9251/6046": "tiles/buildings/14/9251/6046.pbf", "9252/6032": "tiles/buildings/14/9252/6032.pbf", "9252/6033": "tiles/buildings/14/9252/6033.pbf", "9252/6034": "tiles/buildings/14/9252/6034.pbf", "9252/6035": "tiles/buildings/14/9252/6035.pbf", "9252/6036": "tiles/buildings/14/9252/6036.pbf", "9252/6037": "tiles/buildings/14/9252/6037.pbf", "9252/6038": "tiles/buildings/14/9252/6038.pbf", "9252/6039": "tiles/buildings/14/9252/6039.pbf", "9252/6040": "tiles/buildings/14/9252/6040.pbf", "9252/6041": "tiles/buildings/14/9252/6041.pbf", "9252/6042": "tiles/buildings/14/9252/6042.pbf", "9252/6043": "tiles/buildings/14/9252/6043.pbf", "9252/6044": "tiles/buildings/14/9252/6044.pbf", "9252/6045": "tiles/buildings/14/9252/6045.pbf", "9252/6046": "tiles/buildings/14/9252/6046.pbf", "9253/6032": "tiles/buildings/14/9253/6032.pbf", "9253/6033": "tiles/buildings/14/9253/6033.pbf", "9253/6034": "tiles/buildings/14/9253/6034.pbf", "9253/6035": "tiles/buildings/14/9253/6035.pbf", "9253/6036": "tiles/buildings/14/9253/6036.pbf", "9253/6037": "tiles/buildings/14/9253/6037.pbf", "9253/6038": "tiles/buildings/14/9253/6038.pbf", "9253/6039": "tiles/buildings/14/9253/6039.pbf", "9253/6040": "tiles/buildings/14/9253/6040.pbf", "9253/6041": "tiles/buildings/14/9253/6041.pbf", "9253/6042": "tiles/buildings/14/9253/6042.pbf", "9253/6043": "tiles/buildings/14/9253/6043.pbf", "9253/6044": "tiles/buildings/14/9253/6044.pbf", "9253/6045": "tiles/buildings/14/9253/6045.pbf", "9253/6046": "tiles/buildings/14/9253/6046.pbf", "9254/6032": "tiles/buildings/14/9254/6032.pbf", "9254/6033": "tiles/buildings/14/9254/6033.pbf", "9254/6034": "tiles/buildings/14/9254/6034.pbf", "9254/6035": "tiles/buildings/14/9254/6035.pbf", "9254/6036": "tiles/buildings/14/9254/6036.pbf", "9254/6037": "tiles/buildings/14/9254/6037.pbf", "9254/6038": "tiles/buildings/14/9254/6038.pbf", "9254/6039": "tiles/buildings/14/9254/6039.pbf", "9254/6040": "tiles/buildings/14/9254/6040.pbf", "9254/6041": "tiles/buildings/14/9254/6041.pbf", "9254/6042": "tiles/buildings/14/9254/6042.pbf", "9254/6043": "tiles/buildings/14/9254/6043.pbf", "9254/6044": "tiles/buildings/14/9254/6044.pbf", "9254/6045": "tiles/buildings/14/9254/6045.pbf", "9254/6046": "tiles/buildings/14/9254/6046.pbf", "9255/6032": "tiles/buildings/14/9255/6032.pbf", "9255/6033": "tiles/buildings/14/9255/6033.pbf", "9255/6034": "tiles/buildings/14/9255/6034.pbf", "9255/6035": "tiles/buildings/14/9255/6035.pbf", "9255/6036": "tiles/buildings/14/9255/6036.pbf", "9255/6037": "tiles/buildings/14/9255/6037.pbf", "9255/6038": "tiles/buildings/14/9255/6038.pbf", "9255/6039": "tiles/buildings/14/9255/6039.pbf", "9255/6040": "tiles/buildings/14/9255/6040.pbf", "9255/6041": "tiles/buildings/14/9255/6041.pbf", "9255/6042": "tiles/buildings/14/9255/6042.pbf", "9255/6043": "tiles/buildings/14/9255/6043.pbf", "9255/6044": "tiles/buildings/14/9255/6044.pbf", "9255/6045": "tiles/buildings/14/9255/6045.pbf", "9255/6046": "tiles/buildings/14/9255/6046.pbf", "9256/6032": "tiles/buildings/14/9256/6032.pbf", "9256/6033": "tiles/buildings/14/9256/6033.pbf", "9256/6034": "tiles/buildings/14/9256/6034.pbf", "9256/6035": "tiles/buildings/14/9256/6035.pbf", "9256/6036": "tiles/buildings/14/9256/6036.pbf", "9256/6037": "tiles/buildings/14/9256/6037.pbf", "9256/6038": "tiles/buildings/14/9256/6038.pbf", "9256/6039": "tiles/buildings/14/9256/6039.pbf", "9256/6040": "tiles/buildings/14/9256/6040.pbf", "9256/6041": "tiles/buildings/14/9256/6041.pbf", "9256/6042": "tiles/buildings/14/9256/6042.pbf", "9256/6043": "tiles/buildings/14/9256/6043.pbf", "9256/6044": "tiles/buildings/14/9256/6044.pbf", "9256/6045": "tiles/buildings/14/9256/6045.pbf", "9256/6046": "tiles/buildings/14/9256/6046.pbf", "9257/6032": "tiles/buildings/14/9257/6032.pbf", "9257/6033": "tiles/buildings/14/9257/6033.pbf", "9257/6034": "tiles/buildings/14/9257/6034.pbf", "9257/6035": "tiles/buildings/14/9257/6035.pbf", "9257/6036": "tiles/buildings/14/9257/6036.pbf", "9257/6037": "tiles/buildings/14/9257/6037.pbf", "9257/6038": "tiles/buildings/14/9257/6038.pbf", "9257/6039": "tiles/buildings/14/9257/6039.pbf", "9257/6040": "tiles/buildings/14/9257/6040.pbf", "9257/6041": "tiles/buildings/14/9257/6041.pbf", "9257/6042": "tiles/buildings/14/9257/6042.pbf", "9257/6043": "tiles/buildings/14/9257/6043.pbf", "9257/6044": "tiles/buildings/14/9257/6044.pbf", "9257/6045": "tiles/buildings/14/9257/6045.pbf", "9257/6046": "tiles/buildings/14/9257/6046.pbf", "9258/6032": "tiles/buildings/14/9258/6032.pbf", "9258/6033": "tiles/buildings/14/9258/6033.pbf", "9258/6034": "tiles/buildings/14/9258/6034.pbf", "9258/6035": "tiles/buildings/14/9258/6035.pbf", "9258/6036": "tiles/buildings/14/9258/6036.pbf", "9258/6037": "tiles/buildings/14/9258/6037.pbf", "9258/6038": "tiles/buildings/14/9258/6038.pbf", "9258/6039": "tiles/buildings/14/9258/6039.pbf", "9258/6040": "tiles/buildings/14/9258/6040.pbf", "9258/6041": "tiles/buildings/14/9258/6041.pbf", "9258/6042": "tiles/buildings/14/9258/6042.pbf", "9258/6043": "tiles/buildings/14/9258/6043.pbf", "9258/6044": "tiles/buildings/14/9258/6044.pbf", "9258/6045": "tiles/buildings/14/9258/6045.pbf", "9258/6046": "tiles/buildings/14/9258/6046.pbf", "9259/6032": "tiles/buildings/14/9259/6032.pbf", "9259/6033": "tiles/buildings/14/9259/6033.pbf", "9259/6034": "tiles/buildings/14/9259/6034.pbf", "9259/6035": "tiles/buildings/14/9259/6035.pbf", "9259/6036": "tiles/buildings/14/9259/6036.pbf", "9259/6037": "tiles/buildings/14/9259/6037.pbf", "9259/6038": "tiles/buildings/14/9259/6038.pbf", "9259/6039": "tiles/buildings/14/9259/6039.pbf", "9259/6040": "tiles/buildings/14/9259/6040.pbf", "9259/6041": "tiles/buildings/14/9259/6041.pbf", "9259/6042": "tiles/buildings/14/9259/6042.pbf", "9259/6043": "tiles/buildings/14/9259/6043.pbf", "9259/6044": "tiles/buildings/14/9259/6044.pbf", "9259/6045": "tiles/buildings/14/9259/6045.pbf", "9259/6046": "tiles/buildings/14/9259/6046.pbf", "9260/6032": "tiles/buildings/14/9260/6032.pbf", "9260/6033": "tiles/buildings/14/9260/6033.pbf", "9260/6034": "tiles/buildings/14/9260/6034.pbf", "9260/6035": "tiles/buildings/14/9260/6035.pbf", "9260/6036": "tiles/buildings/14/9260/6036.pbf", "9260/6037": "tiles/buildings/14/9260/6037.pbf", "9260/6038": "tiles/buildings/14/9260/6038.pbf", "9260/6039": "tiles/buildings/14/9260/6039.pbf", "9260/6040": "tiles/buildings/14/9260/6040.pbf", "9260/6041": "tiles/buildings/14/9260/6041.pbf", "9260/6042": "tiles/buildings/14/9260/6042.pbf", "9260/6043": "tiles/buildings/14/9260/6043.pbf", "9260/6044": "tiles/buildings/14/9260/6044.pbf", "9260/6045": "tiles/buildings/14/9260/6045.pbf", "9260/6046": "tiles/buildings/14/9260/6046.pbf", "9261/6032": "tiles/buildings/14/9261/6032.pbf", "9261/6033": "tiles/buildings/14/9261/6033.pbf", "9261/6034": "tiles/buildings/14/9261/6034.pbf", "9261/6035": "tiles/buildings/14/9261/6035.pbf", "9261/6036": "tiles/buildings/14/9261/6036.pbf", "9261/6037": "tiles/buildings/14/9261/6037.pbf", "9261/6038": "tiles/buildings/14/9261/6038.pbf", "9261/6039": "tiles/buildings/14/9261/6039.pbf", "9261/6040": "tiles/buildings/14/9261/6040.pbf", "9261/6041": "tiles/buildings/14/9261/6041.pbf", "9261/6042": "tiles/buildings/14/9261/6042.pbf", "9261/6043": "tiles/buildings/14/9261/6043.pbf", "9261/6044": "tiles/buildings/14/9261/6044.pbf", "9261/6045": "tiles/buildings/14/9261/6045.pbf", "9261/6046": "tiles/buildings/14/9261/6046.pbf"};
   // One padded building query per map and layer, shared by the wall and house batches.
@@ -9505,7 +9724,9 @@
     var vertices = [], facets = 16;
     var concrete = [.62,.59,.54], frame = [.35,.34,.32], underside = [.45,.43,.40];
     function quad(a,b,c,d,color) {
-      for (var point of [a,b,c,a,c,d]) vertices.push(...point,...color);
+      var u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+      var n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]], m=(Math.hypot(n[0],n[1],n[2])||1)*(n[2]<0 ? -1 : 1);
+      for (var point of [a,b,c,a,c,d]) vertices.push(...point,...color,n[0]/m,n[1]/m,n[2]/m,0);
     }
     function mix(a,b,t) { return a.map(function (v,i) { return v+(b[i]-v)*t; }); }
     function ground(ll) {
@@ -9636,10 +9857,15 @@
       var p=corners[i], d=Math.hypot(p[0]-center[0],p[1]-center[1]);
       return [p[0]+extra*(p[0]-center[0])/d,p[1]+extra*(p[1]-center[1])/d,z];
     }
+    // Corner: position, colour, outward normal and a window-light draw (0 for anything that is not glass).
     function tri(a,b,c,color,shade) {
+      var u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+      var n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]], m=Math.hypot(n[0],n[1],n[2])||1;
+      var out=(a[0]-center[0])*n[0]+(a[1]-center[1])*n[1]+(a[2]-height/2)*n[2]<0 ? -1/m : 1/m;
+      var h=Math.sin(a[0]*12.9898+a[1]*78.233+a[2]*37.719)*43758.5453, emit=color===glass ? 0.02+0.96*(h-Math.floor(h)) : 0;
       [a,b,c].forEach(function(p) {
         vertices.push((site.x-origin.x+p[0]*unit)/origin.unit,(site.y-origin.y+p[1]*unit)/origin.unit,
-          (p[2]+elevation)*unit/origin.unit,color[0]*shade,color[1]*shade,color[2]*shade);
+          (p[2]+elevation)*unit/origin.unit,color[0]*shade,color[1]*shade,color[2]*shade,n[0]*out,n[1]*out,n[2]*out,emit);
       });
     }
     function quad(a,b,c,d,color,shade) {tri(a,b,c,color,shade);tri(a,c,d,color,shade);}
@@ -9788,7 +10014,7 @@
   }
 
   function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
-    var map, program, buffer, matrixLoc, anchorLoc, position, color, origin;
+    var map, program, buffer, matrixLoc, anchorLoc, position, color, normal, emitLoc, lightLocs, shadowProgram, origin;
     var dirty=true, count=0, lastBuild=0, terrain, view, built=-1, asleep=false;
     var previousKeys = null, meshCache = new Map();
     function moved(){ if (canopy) dirty=true; else view.cameraMoved(); }
@@ -9845,13 +10071,15 @@
           if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(shader));
           gl.attachShader(program,shader);gl.deleteShader(shader);
         }
-        attach(gl.VERTEX_SHADER,'attribute vec3 pos,rgb; uniform vec4 anchor; uniform mat4 offsetMatrix; varying vec3 tint; void main(){gl_Position=anchor+offsetMatrix*vec4(pos,0.0);tint=rgb;}');
-        attach(gl.FRAGMENT_SHADER,'precision mediump float; varying vec3 tint; void main(){gl_FragColor=vec4(tint,1.0);}');
+        attach(gl.VERTEX_SHADER,'attribute vec3 pos,rgb,nrm; attribute float emit; uniform vec4 anchor; uniform mat4 offsetMatrix; uniform vec3 sunDir,sunColor,ambient; varying vec3 tint; varying float lampOn; void main(){gl_Position=anchor+offsetMatrix*vec4(pos,0.0);tint=rgb*(ambient+sunColor*max(dot(nrm,sunDir),0.0));lampOn=emit;}');
+        attach(gl.FRAGMENT_SHADER,'precision mediump float; varying vec3 tint; varying float lampOn; uniform float lit; void main(){float on=step(0.001,lampOn)*step(lampOn,lit);gl_FragColor=vec4(mix(tint,vec3(1.0,0.76,0.42)*(0.7+0.5*fract(lampOn*57.3)),0.9*on),1.0);}');
         gl.linkProgram(program);
         if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
-        position=gl.getAttribLocation(program,'pos');color=gl.getAttribLocation(program,'rgb');
+        position=gl.getAttribLocation(program,'pos');color=gl.getAttribLocation(program,'rgb');normal=gl.getAttribLocation(program,'nrm');emitLoc=gl.getAttribLocation(program,'emit');
+        lightLocs=['sunDir','sunColor','ambient','lit'].map(function(k){return gl.getUniformLocation(program,k);});
         matrixLoc=gl.getUniformLocation(program,'offsetMatrix');anchorLoc=gl.getUniformLocation(program,'anchor');
         buffer=gl.createBuffer();
+        try { shadowProgram=shadows.create(gl); } catch (e) { console.warn('3D shadows failed:', e); }
         map.on('move',moved);map.on('resize',resized);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
       },
       render:function(gl,matrix){
@@ -9869,7 +10097,7 @@
           if (terrain!==currentTerrain) resetGeometry();
           var data = rebuild();
           if (data !== null) {
-            count = data.length / 6;
+            count = data.length / 10;
             gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
           }
           lastBuild=now;dirty=false;terrain=currentTerrain;built=version;
@@ -9879,14 +10107,18 @@
         var anchor=[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];});
         gl.uniform4fv(anchorLoc,anchor);
         gl.uniformMatrix4fv(matrixLoc,false,Float32Array.from(matrix,function(v){return v*origin.unit;}));
-        gl.enableVertexAttribArray(position);gl.enableVertexAttribArray(color);
-        gl.vertexAttribPointer(position,3,gl.FLOAT,false,24,0);gl.vertexAttribPointer(color,3,gl.FLOAT,false,24,12);
+        var light=daylight.lighting();
+        gl.uniform3fv(lightLocs[0],light.dir);gl.uniform3fv(lightLocs[1],light.color);gl.uniform3fv(lightLocs[2],light.ambient);gl.uniform1f(lightLocs[3],light.lit);
+        [position,color,normal,emitLoc].forEach(function(a){gl.enableVertexAttribArray(a);});
+        gl.vertexAttribPointer(position,3,gl.FLOAT,false,40,0);gl.vertexAttribPointer(color,3,gl.FLOAT,false,40,12);
+        gl.vertexAttribPointer(normal,3,gl.FLOAT,false,40,24);gl.vertexAttribPointer(emitLoc,1,gl.FLOAT,false,40,36);
         gl.drawArrays(gl.TRIANGLES,0,count);
-        gl.disableVertexAttribArray(position);gl.disableVertexAttribArray(color);
+        [position,color,normal,emitLoc].forEach(function(a){gl.disableVertexAttribArray(a);});
+        shadows.pass(gl,shadowProgram,map,anchor,Float32Array.from(matrix,function(v){return v*origin.unit;}),40,function(){gl.drawArrays(gl.TRIANGLES,0,count);});
       },
       onRemove:function(owner,gl){
         owner.off('move',moved);owner.off('resize',resized);owner.off('sourcedata',sourceChanged);owner.off('terrain',resetGeometry);
-        gl.deleteBuffer(buffer);gl.deleteProgram(program);
+        gl.deleteBuffer(buffer);gl.deleteProgram(program);if(shadowProgram)gl.deleteProgram(shadowProgram.program);
       }
     };
   }
@@ -10357,15 +10589,19 @@
   // Each wall carries a whole number of window bays and floors from facade-styles.js, so no
   // window is cut at a corner or roofline and camera zoom never changes the repeat.
   var FACADE_VERTEX = 'attribute vec3 pos, surface; attribute vec2 paint; uniform vec4 anchor; uniform mat4 offsets;' +
-    'varying vec2 uv; varying vec4 wall; varying vec3 band;' +
+    'uniform vec3 sunDir, sunColor, ambient;' +
+    'varying vec2 uv; varying vec4 wall; varying vec3 band, shade;' +
     'void main(){gl_Position=anchor+offsets*vec4(pos,0.);uv=surface.xy;' +
     // surface.z is the floor count plus 100 for a ground floor or 200 for a windowless wall.
     'float kind=floor(surface.z/100.+.001);band=vec3(surface.z-kind*100.,kind,floor(paint.y));' +
-    // paint.x packs the wall colour, paint.y the building seed plus the face shading.
+    // paint.x packs the wall colour, paint.y the building seed plus the direction the wall faces.
     'float r=floor(paint.x/65536.),g=floor((paint.x-r*65536.)/256.);' +
-    'wall=vec4(vec3(r,g,paint.x-r*65536.-g*256.)/255.,fract(paint.y));}';
+    'wall=vec4(vec3(r,g,paint.x-r*65536.-g*256.)/255.,1.);' +
+    // The fraction of paint.y is the wall normal's angle in the east/south plane. Light is ambient plus the sun or moon.
+    'float ang=(fract(paint.y)-.005)/.99*6.2831853-3.1415927;' +
+    'shade=ambient+sunColor*max(cos(ang)*sunDir.x+sin(ang)*sunDir.y,0.);}';
   var FACADE_FRAGMENT = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' +
-    'varying vec2 uv; varying vec4 wall; varying vec3 band; uniform sampler2D ground, middle, crown;' +
+    'varying vec2 uv; varying vec4 wall; varying vec3 band, shade; uniform sampler2D ground, middle, crown; uniform float lit;' +
     'void main(){float level=min(floor(uv.y),band.x-1.);' +
     // All three sheets are read with continuous coordinates, which keeps mipmapping seamless.
     'vec4 low=texture2D(ground,vec2(uv.x*.5,uv.y)),mid=texture2D(middle,uv*.5),top=texture2D(crown,vec2(uv.x*.5,uv.y-band.x+1.));' +
@@ -10378,11 +10614,15 @@
     'float dim=1.-smoothstep(.3,.55,dot(t.rgb,vec3(.3,.6,.1)));' +
     'own=mix(own,vec3(.86,.8,.66),.6*step(.88,n)*dim);' +
     'vec3 c=mix(own,t.rgb*wall.rgb,t.a);' +
-    'gl_FragColor=vec4(c*wall.a*(1.-.14*(1.-smoothstep(0.,.4,uv.y))),1.);}';
+    'c*=shade*(1.-.14*(1.-smoothstep(0.,.4,uv.y)));' +
+    // After dark some windows are lit: the dark glass of the sheet takes a warm or, now and then, a cool light.
+    'float glow=dim*step(n,lit);' +
+    'vec3 lamp=mix(vec3(1.,.76,.42),vec3(.75,.86,1.),step(.93,fract(n*91.7)))*(.65+.6*fract(n*37.1));' +
+    'gl_FragColor=vec4(mix(c,lamp,.9*glow),1.);}';
 
   function solidFacadeLayer(materialId, sourceId, classified) {
     var map, program, buffer, textures = [], batches = [], origin;
-    var attrs, uniforms, dirty = true, lastBuild = -Infinity, view, built = -1, asleep = false;
+    var attrs, uniforms, shadowProgram, dirty = true, lastBuild = -Infinity, view, built = -1, asleep = false;
     var STRIDE = 8;   // floats per corner: position, then u, v, bands, colour and seed with shade
     var meshCache = new Map(), previousKeys = null;
     function terrainChanged() { previousKeys=null; meshCache.clear(); dirty = true; }
@@ -10410,6 +10650,9 @@
       }
       rings.forEach(function (ring) {
         var px = mercatorX(ring[0][0]), py = mercatorY(ring[0][1]);
+        var area=0;
+        for (var k=1; k<ring.length; k++) area+=ring[k-1][0]*ring[k][1]-ring[k][0]*ring[k-1][1];
+        var sgn=area<=0 ? 1 : -1;   // longitude/latitude winding is the reverse of Mercator's
         for (var j=1; j<ring.length; j++) {
           var qx = mercatorX(ring[j][0]), qy = mercatorY(ring[j][1]);
           var dx = qx-px, dy = qy-py, len = Math.hypot(dx,dy);
@@ -10420,7 +10663,8 @@
           // Stub walls stay plain. Longer ones start on either bay of the two-bay sheets.
           var plain=metres<2.2 || bays<1, u0=plain ? 0 : (edge+look.seed)&1, u=u0+(plain ? 1 : bays);
           bands=floors+(plain ? 200 : base>0 ? 0 : 100);
-          paint=look.seed+0.88+0.11*(dx-dy)/len/Math.SQRT2;
+          // The wall's outward normal in the east/south plane, from the ring's winding, packed into the fraction of the seed.
+          paint=look.seed+0.005+0.99*(Math.atan2(-sgn*dx/len,sgn*dy/len)+Math.PI)/(2*Math.PI);
           corner(x,y,bottom,u0,0); corner(nx,ny,bottom,u,0); corner(nx,ny,roof,u,floors);
           corner(x,y,bottom,u0,0); corner(nx,ny,roof,u,floors); corner(x,y,roof,u0,floors);
           px=qx; py=qy; edge++;
@@ -10482,8 +10726,9 @@
         gl.linkProgram(program);
         if (!gl.getProgramParameter(program,gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
         attrs=['pos','surface','paint'].map(function(k){return gl.getAttribLocation(program,k);});
-        uniforms=['anchor','offsets','ground','middle','crown'].map(function(k){return gl.getUniformLocation(program,k);});
+        uniforms=['anchor','offsets','ground','middle','crown','sunDir','sunColor','ambient','lit'].map(function(k){return gl.getUniformLocation(program,k);});
         buffer=gl.createBuffer();
+        try { shadowProgram=shadows.create(gl); } catch (e) { console.warn('3D shadows failed:', e); }
         var sharp=gl.getExtension('EXT_texture_filter_anisotropic');
         // Three sheets per style: ground floor, repeating floors and the top floor.
         textures=facadeStyles.names.map(function(_,index){
@@ -10517,9 +10762,12 @@
         } else if (due) map.triggerRepaint();
         if (!origin) return;
         gl.useProgram(program);
-        gl.uniform4fv(uniforms[0],[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];}));
-        gl.uniformMatrix4fv(uniforms[1],false,Float32Array.from(matrix,function(v){return v*origin.unit;}));
+        var anchor=[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];});
+        var offsets=Float32Array.from(matrix,function(v){return v*origin.unit;});
+        gl.uniform4fv(uniforms[0],anchor); gl.uniformMatrix4fv(uniforms[1],false,offsets);
         [0,1,2].forEach(function(unit){gl.uniform1i(uniforms[2+unit],unit);});
+        var light=daylight.lighting();
+        gl.uniform3fv(uniforms[5],light.dir); gl.uniform3fv(uniforms[6],light.color); gl.uniform3fv(uniforms[7],light.ambient); gl.uniform1f(uniforms[8],light.lit);
         gl.disable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
         gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1,-1);
         attrs.forEach(function(a,i){gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,i<2 ? 3 : 2,gl.FLOAT,false,STRIDE*4,i*12);});
@@ -10531,12 +10779,15 @@
         gl.activeTexture(gl.TEXTURE0);
         attrs.forEach(function(a){gl.disableVertexAttribArray(a);});
         gl.disable(gl.POLYGON_OFFSET_FILL);
+        shadows.pass(gl,shadowProgram,map,anchor,offsets,STRIDE*4,function(){
+          batches.forEach(function(b){ if (b.count) gl.drawArrays(gl.TRIANGLES,b.start,b.count); });
+        });
       },
       onRemove:function(owner,gl) {
         owner.off('move',moved); owner.off('resize',resized); owner.off('terrain',terrainChanged);
         owner.off('sourcedata',sourceChanged);
         textures.forEach(function(set){set.forEach(function(t){gl.deleteTexture(t);});});
-        gl.deleteBuffer(buffer); gl.deleteProgram(program);
+        gl.deleteBuffer(buffer); gl.deleteProgram(program); if (shadowProgram) gl.deleteProgram(shadowProgram.program);
       }
     };
   }
@@ -10715,7 +10966,7 @@
         }
         shader(gl.VERTEX_SHADER, [
           'attribute vec3 pos, normal; attribute float tone; uniform mat4 matrix; uniform vec4 anchor;',
-          'uniform vec2 heading; uniform vec4 endHeadings; uniform float scale; varying float light;',
+          'uniform vec2 heading; uniform vec4 endHeadings; uniform float scale; uniform vec3 sunDir, sunColor, ambient; uniform float lamp, shadow; varying vec3 light, glow; varying float onGround;',
           'vec3 orient(vec3 p, vec2 heading){ return vec3(dot(p.xz,heading),dot(p.xz,vec2(heading.y,-heading.x)),p.y); }',
           'void main(){',
           '  float pivot = sign(pos.z)*3.6;',
@@ -10723,19 +10974,28 @@
           '  vec2 axis = normalize(mix(heading,outer,smoothstep(3.3,3.9,abs(pos.z))));',
           '  vec3 hinge = vec3(0.0,0.0,pivot);',
           '  vec3 world = orient(hinge,heading)+orient(pos-hinge,axis);',
+          // Shadow pass: flatten the model onto the ground along the light.
+          '  onGround = shadow; if (shadow > 0.5) { world.xy -= sunDir.xy/max(sunDir.z,0.12)*world.z; world.z = 0.0; }',
           '  gl_Position=anchor+matrix*vec4(world*scale,0.0);',
-          '  light=tone*(0.78+0.22*dot(orient(normal,axis),normalize(vec3(-0.4,-0.5,0.8)))); }'
+          '  vec3 facing = orient(normal,axis);',
+          '  light = tone*(ambient+sunColor*max(dot(facing,sunDir),0.0));',
+          // After dark: lit cabin windows (the mesh's mid-grey glass), white headlights and red tail lights.
+          '  float glass = 1.0-step(0.03,abs(tone-0.455)), side = 1.0-step(0.6,abs(normal.y));',
+          '  float lamps = step(0.3,pos.y)*step(pos.y,1.15)*step(0.45,abs(pos.x))*step(0.5,tone);',
+          '  glow = lamp*(glass*side*vec3(0.95,0.78,0.5)*0.8 + lamps*(step(0.6,normal.z)*vec3(1.0,0.95,0.8)*1.2 + step(normal.z,-0.6)*vec3(1.0,0.1,0.08)*0.9)); }'
         ].join('\n'));
-        shader(gl.FRAGMENT_SHADER, 'precision mediump float; uniform vec4 color; varying float light; void main(){ gl_FragColor=vec4(color.rgb*light*color.a,color.a); }');
+        shader(gl.FRAGMENT_SHADER, 'precision mediump float; uniform vec4 color; uniform float strength; varying vec3 light, glow; varying float onGround; void main(){ gl_FragColor=onGround>0.5 ? vec4(0.0,0.0,0.0,strength*color.a) : vec4((color.rgb*light+glow)*color.a,color.a); }');
         gl.linkProgram(program);
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
-        ['matrix','anchor','heading','endHeadings','scale','color'].forEach(function (k) { loc[k] = gl.getUniformLocation(program,k); });
+        ['matrix','anchor','heading','endHeadings','scale','color','sunDir','sunColor','ambient','lamp','shadow','strength'].forEach(function (k) { loc[k] = gl.getUniformLocation(program,k); });
         ['pos','normal','tone'].forEach(function (k) { loc[k] = gl.getAttribLocation(program,k); });
       },
       render: function (gl, matrix) {
         if (map.getZoom() < vehicleModelZoom) return;
         gl.useProgram(program); gl.disable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
         gl.uniformMatrix4fv(loc.matrix,false,matrix);
+        var daylit = daylight.lighting();
+        gl.uniform3fv(loc.sunDir,daylit.dir); gl.uniform3fv(loc.sunColor,daylit.color); gl.uniform3fv(loc.ambient,daylit.ambient); gl.uniform1f(loc.lamp,daylit.lamp);
         gl.enableVertexAttribArray(loc.tone); gl.enableVertexAttribArray(loc.pos); gl.enableVertexAttribArray(loc.normal);
         points().forEach(function (f) {
           if (!f.model) return;
@@ -10760,6 +11020,12 @@
           gl.bindBuffer(gl.ARRAY_BUFFER,mesh.buf);
           gl.vertexAttribPointer(loc.pos,3,gl.FLOAT,false,28,0); gl.vertexAttribPointer(loc.normal,3,gl.FLOAT,false,28,12);
           gl.vertexAttribPointer(loc.tone,1,gl.FLOAT,false,28,24);
+          var cast = shadows.strength(map);
+          if (cast) {
+            gl.uniform1f(loc.shadow,1); gl.uniform1f(loc.strength,cast);
+            shadows.begin(gl); gl.drawArrays(gl.TRIANGLES,0,mesh.count); shadows.end(gl);
+            gl.uniform1f(loc.shadow,0);
+          }
           gl.drawArrays(gl.TRIANGLES,0,mesh.count);
         });
         gl.disableVertexAttribArray(loc.tone); gl.disableVertexAttribArray(loc.pos); gl.disableVertexAttribArray(loc.normal);
@@ -10770,6 +11036,199 @@
       }
     };
   }
+  // The 3D map's half of the day and night cycle: sky, map light, the basemap's night colours and
+  // the sun, moon and stars drawn over the sky. The numbers come from `daylight` (shared/map);
+  // the custom building and vehicle layers read the same state in their own shaders.
+  var daylightMap = (function () {
+    var RAD = Math.PI / 180, TAN_HALF_FOV = 1 / 3;   // MapLibre's default 36.87° vertical field of view
+    var PAINT = {
+      background: [['background-color', 'area']],
+      fill: [['fill-color', 'area'], ['fill-outline-color', 'area']],
+      line: [['line-color', 'area']],
+      circle: [['circle-color', 'area'], ['circle-stroke-color', 'area']],
+      symbol: [['text-color', 'text'], ['text-halo-color', 'halo'], ['icon-color', 'text'], ['icon-halo-color', 'halo']]
+    };
+    var map = null, jobs = [], overlay = null, ctx = null, unsubscribe = null, queue = [], frame = 0;
+    var appliedKey = '', appliedSky = '', appliedLight = '', stars = [];
+    (function () {   // a fixed scatter of stars, by azimuth and altitude
+      var seed = 7;
+      function next() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
+      for (var i = 0; i < 90; i++) stars.push({ az: next() * 360, alt: 3 + Math.acos(1 - next() * 0.97) * 90 / Math.PI * 0.98, a: 0.35 + next() * 0.65, r: next() < 0.12 ? 1.4 : 0.8 });
+    })();
+
+    // ---- colours ----
+    function parseColor(text) {
+      var m;
+      if ((m = /^#([0-9a-f]{3,8})$/i.exec(text))) {
+        var h = m[1];
+        if (h.length === 3 || h.length === 4) h = h.replace(/./g, '$&$&');
+        if (h.length !== 6 && h.length !== 8) return null;
+        return [parseInt(h.slice(0, 2), 16) / 255, parseInt(h.slice(2, 4), 16) / 255, parseInt(h.slice(4, 6), 16) / 255, h.length === 8 ? parseInt(h.slice(6, 8), 16) / 255 : 1];
+      }
+      if ((m = /^rgba?\(\s*([\d.]+)\s*,\s*([\d.]+)\s*,\s*([\d.]+)\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(text))) return [m[1] / 255, m[2] / 255, m[3] / 255, m[4] === undefined ? 1 : +m[4]];
+      if ((m = /^hsla?\(\s*([\d.]+)\s*,\s*([\d.]+)%\s*,\s*([\d.]+)%\s*(?:,\s*([\d.]+)\s*)?\)$/i.exec(text))) {
+        var hue = (m[1] % 360) / 360, s = m[2] / 100, l = m[3] / 100, q = l < 0.5 ? l * (1 + s) : l + s - l * s, p = 2 * l - q;
+        var channel = function (t) { t = (t + 1) % 1; return t < 1 / 6 ? p + (q - p) * 6 * t : t < 1 / 2 ? q : t < 2 / 3 ? p + (q - p) * (2 / 3 - t) * 6 : p; };
+        return [channel(hue + 1 / 3), channel(hue), channel(hue - 1 / 3), m[4] === undefined ? 1 : +m[4]];
+      }
+      return null;
+    }
+    function shift(c, kind, grade, night) {
+      var out;
+      if (kind === 'text') out = [0, 1, 2].map(function (i) { return c[i] * grade[i] + ([0.88, 0.9, 0.95][i] - c[i] * grade[i]) * night * 0.9; });
+      else if (kind === 'halo') out = [0, 1, 2].map(function (i) { return c[i] * grade[i] + ([0.06, 0.08, 0.14][i] - c[i] * grade[i]) * night; });
+      else out = [0, 1, 2].map(function (i) { return c[i] * grade[i] + 0.02 * night; });
+      return 'rgba(' + out.map(function (v) { return Math.round(Math.max(0, Math.min(1, v)) * 255); }).join(',') + ',' + c[3] + ')';
+    }
+    // Colours may sit inside zoom or data expressions; every literal colour in the value moves.
+    function recolor(value, kind, grade, night) {
+      if (typeof value === 'string') { var c = parseColor(value); return c ? shift(c, kind, grade, night) : value; }
+      if (Array.isArray(value)) return value.map(function (v) { return recolor(v, kind, grade, night); });
+      return value;
+    }
+
+    // ---- the basemap's colours, a few layers a frame ----
+    function capture() {
+      jobs = [];
+      map.getStyle().layers.forEach(function (layer) {
+        if (/^v3-/.test(layer.id) || !PAINT[layer.type]) return;
+        PAINT[layer.type].forEach(function (pair) {
+          var original = map.getPaintProperty(layer.id, pair[0]);
+          if (original !== undefined && original !== null) jobs.push({ id: layer.id, prop: pair[0], kind: pair[1], original: original });
+        });
+      });
+    }
+    function pump() {
+      frame = 0;
+      if (!map) return;
+      for (var n = 0; n < 14 && queue.length; n++) {
+        var job = queue.shift();
+        try { map.setPaintProperty(job.id, job.prop, job.value); } catch (e) {}
+      }
+      if (queue.length) frame = requestAnimationFrame(pump);
+      else map.triggerRepaint();
+    }
+    function basemap(state) {
+      var plain = state.night === 0 && state.grade.every(function (v) { return v >= 0.995; });
+      var key = plain ? 'plain' : state.grade.map(function (v) { return Math.round(v * 20); }).join(',') + '/' + Math.round(state.night * 10);
+      if (key === appliedKey) return;
+      appliedKey = key;
+      queue = jobs.map(function (job) {
+        return { id: job.id, prop: job.prop, value: plain ? job.original : recolor(job.original, job.kind, state.grade, state.night) };
+      });
+      if (!frame) frame = requestAnimationFrame(pump);
+    }
+
+    // ---- sun, moon and stars over the sky ----
+    function resize() {
+      if (!overlay || !map) return;
+      var box = map.getContainer(), ratio = Math.min(2, window.devicePixelRatio || 1);
+      overlay.width = Math.round(box.clientWidth * ratio); overlay.height = Math.round(box.clientHeight * ratio);
+      ctx.setTransform(ratio, 0, 0, ratio, 0, 0);
+      draw();
+    }
+    function project(basis, altitude, azimuth, width, height) {
+      var a = altitude * RAD, z = azimuth * RAD, d = [Math.sin(z) * Math.cos(a), Math.cos(z) * Math.cos(a), Math.sin(a)];
+      var dot = function (v) { return d[0] * v[0] + d[1] * v[1] + d[2] * v[2]; };
+      var depth = dot(basis.forward);
+      if (depth < 0.05) return null;
+      return { x: width / 2 + dot(basis.right) / depth / TAN_HALF_FOV * (height / 2), y: height / 2 - dot(basis.up) / depth / TAN_HALF_FOV * (height / 2), d: d, sx: dot(basis.right), sy: dot(basis.up) };
+    }
+    function draw() {
+      if (!overlay || !map) return;
+      var box = map.getContainer(), w = box.clientWidth, h = box.clientHeight;
+      ctx.clearRect(0, 0, w, h);
+      if (!daylight.enabled()) return;
+      var s = daylight.state(), pitch = map.getPitch() * RAD, bearing = map.getBearing() * RAD;
+      var basis = {
+        forward: [Math.sin(bearing) * Math.sin(pitch), Math.cos(bearing) * Math.sin(pitch), -Math.cos(pitch)],
+        right: [Math.cos(bearing), -Math.sin(bearing), 0],
+        up: [Math.sin(bearing) * Math.cos(pitch), Math.cos(bearing) * Math.cos(pitch), Math.sin(pitch)]
+      };
+      if (pitch < 8 * RAD) return;   // looking down at the map: no sky in view
+      var dark = s.night * s.night, i, p;
+      if (dark > 0.02) {
+        var turn = (daylight.now() / 86164091) * 360;   // the sky turns once a sidereal day
+        ctx.fillStyle = '#fff';
+        for (i = 0; i < stars.length; i++) {
+          p = project(basis, stars[i].alt, stars[i].az + turn, w, h);
+          if (!p || p.y < -2 || p.y > h || p.x < -2 || p.x > w) continue;
+          ctx.globalAlpha = dark * stars[i].a;
+          ctx.beginPath(); ctx.arc(p.x, p.y, stars[i].r, 0, 6.2832); ctx.fill();
+        }
+      }
+      var sun = s.sunAlt > -3 && project(basis, s.sunAlt, s.sunAz, w, h);
+      if (sun && sun.y > -60 && sun.y < h + 60) {
+        var warm = 1 - Math.min(1, Math.max(0, s.sunAlt / 25)), fade = Math.min(1, (s.sunAlt + 3) / 3);
+        var glow = ctx.createRadialGradient(sun.x, sun.y, 4, sun.x, sun.y, 90);
+        glow.addColorStop(0, 'rgba(255,' + Math.round(235 - 90 * warm) + ',' + Math.round(190 - 120 * warm) + ',' + (0.6 * fade) + ')');
+        glow.addColorStop(1, 'rgba(255,200,140,0)');
+        ctx.globalAlpha = 1; ctx.fillStyle = glow; ctx.fillRect(sun.x - 90, sun.y - 90, 180, 180);
+        ctx.globalAlpha = fade; ctx.fillStyle = 'rgb(255,' + Math.round(246 - 70 * warm) + ',' + Math.round(220 - 110 * warm) + ')';
+        ctx.beginPath(); ctx.arc(sun.x, sun.y, 13, 0, 6.2832); ctx.fill();
+      }
+      var moon = s.moonAlt > -1 && project(basis, s.moonAlt, s.moonAz, w, h);
+      if (moon && moon.y > -40 && moon.y < h + 40) {
+        var sd = [Math.sin(s.sunAz * RAD) * Math.cos(s.sunAlt * RAD), Math.cos(s.sunAz * RAD) * Math.cos(s.sunAlt * RAD), Math.sin(s.sunAlt * RAD)];
+        var towardX = sd[0] * basis.right[0] + sd[1] * basis.right[1] - moon.sx;
+        var towardY = sd[0] * basis.up[0] + sd[1] * basis.up[1] + sd[2] * basis.up[2] - moon.sy;
+        var r = 12, k = s.moonFraction, rx = Math.abs(2 * k - 1) * r;
+        ctx.save();
+        ctx.globalAlpha = Math.min(1, (s.moonAlt + 1) / 3) * (0.3 + 0.7 * s.night);
+        ctx.translate(moon.x, moon.y);
+        var halo = ctx.createRadialGradient(0, 0, r, 0, 0, r * 4);
+        halo.addColorStop(0, 'rgba(210,220,255,' + (0.25 * k) + ')'); halo.addColorStop(1, 'rgba(210,220,255,0)');
+        ctx.fillStyle = halo; ctx.fillRect(-r * 4, -r * 4, r * 8, r * 8);
+        ctx.rotate(Math.atan2(-towardY, towardX));   // the lit side faces the sun
+        ctx.fillStyle = 'rgba(44,54,80,0.9)'; ctx.beginPath(); ctx.arc(0, 0, r, 0, 6.2832); ctx.fill();
+        ctx.fillStyle = '#f3f1e6'; ctx.beginPath();
+        ctx.arc(0, 0, r, -Math.PI / 2, Math.PI / 2, false);
+        if (k > 0.5) ctx.ellipse(0, 0, rx, r, 0, Math.PI / 2, Math.PI * 1.5, false);
+        else ctx.ellipse(0, 0, rx, r, 0, Math.PI / 2, -Math.PI / 2, true);
+        ctx.fill();
+        ctx.restore();
+      }
+      ctx.globalAlpha = 1;
+    }
+
+    function apply(state) {
+      if (!map) return;
+      var sky = JSON.stringify(state.sky), light = JSON.stringify(state.light);
+      try {
+        if (sky !== appliedSky) { appliedSky = sky; map.setSky(state.sky); }
+        if (light !== appliedLight) { appliedLight = light; map.setLight(state.light, { duration: 0 }); }
+      } catch (e) { console.warn('3D daylight failed:', e); }
+      basemap(state);
+      draw();
+      map.triggerRepaint();
+    }
+
+    return {
+      attach: function (owner) {
+        this.detach();
+        map = owner; appliedKey = appliedSky = appliedLight = '';
+        capture();
+        overlay = document.createElement('canvas');
+        overlay.className = 'v3-sky';
+        overlay.setAttribute('aria-hidden', 'true');
+        ctx = overlay.getContext('2d');
+        map.getContainer().appendChild(overlay);
+        map.on('move', draw); map.on('resize', resize);
+        unsubscribe = daylight.subscribe(apply);
+        resize();
+        if (daylight.enabled()) apply(daylight.state());
+      },
+      detach: function () {
+        if (unsubscribe) unsubscribe();
+        unsubscribe = null;
+        cancelAnimationFrame(frame); frame = 0; queue = [];
+        if (map) { try { map.off('move', draw); map.off('resize', resize); } catch (e) {} }
+        if (overlay) overlay.remove();
+        overlay = ctx = map = null;
+      },
+      draw: draw
+    };
+  })();
   // ---------- v100: 3D view ----------
   // The 3D button (bottom right, only on the vector map) opens a second, native MapLibre map (#map3d) over the 2D one,
   // at the same place, which then tilts so Sofia's buildings stand up (reports/3D city map - plan.md). Leaflet can't
@@ -10800,6 +11259,7 @@
     var stopsDrawn = [], terrainOn = store('sofia_3d_terrain') === null ? VIEW3D_TERRAIN : store('sofia_3d_terrain') === '1', demAttr = false;   // v103
     var textureBox = document.getElementById('v3Textures');
     var houseBox = document.getElementById('v3HouseDesigns');
+    var dayBox = document.getElementById('v3Daylight');
     var controlsHelp = document.getElementById('v3Help');
     controlsHelp.querySelector('button').onclick = function () {
       controlsHelp.close();
@@ -10850,6 +11310,7 @@
       a.setAttribute('aria-pressed', view3d.on ? 'true' : 'false');
       document.getElementById('v3TerRow').hidden = !/^vector/.test(mapMode);   // v103
       document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream;
+      document.getElementById('v3DayRow').hidden = !show;
       document.getElementById('v3TextureKey').hidden = !textureBox.checked;
       document.getElementById('v3HouseHint').hidden = !houseBox.checked;
       var m = memo(), bx = document.getElementById('v3Box');
@@ -10995,6 +11456,7 @@
     function onLoad() {
       if (!m3 || m3.getSource('v3-me-acc')) return;
       var sym = firstOf('symbol');
+      daylightMap.attach(m3);
       m3.addSource('v3-me-acc', { type: 'geojson', data: EMPTY });
       m3.addLayer({ id: 'v3-me-acc', type: 'fill', source: 'v3-me-acc',
         paint: { 'fill-color': '#1A73E8', 'fill-opacity': 0.12, 'fill-outline-color': 'rgba(26,115,232,.45)' } }, sym);
@@ -11862,6 +12324,7 @@
         try { if (mm) { c = mm.getCenter(); z = mm.getZoom() + 1; } } catch (e) {}
         scheduleViewportPrefetch();
         view3d.on = false; closing = false; ready = false; camBusy = false;
+        daylightMap.detach();
         m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
         numberPoses = []; modelPoses.clear(); railNeighbors.clear(); railSegments = []; trkMk = null; stopMks = {}; stopsDrawn = []; shown = []; drawn = []; farDrawn = []; labelsBy = null; rtMks = {}; rtSig = ''; fc.off = lc.off = null; userMoving = pointerDown = false;
@@ -12246,6 +12709,16 @@
       refresh();
       applyBuildingTextures();
     };
+
+    // Day and night cycle: the clock and its subscribers live in shared/map/daylight.js and view3d/daylight-map.js.
+    dayBox.checked = store('sofia_3d_daylight') === '1';
+    daylight.setEnabled(dayBox.checked);
+    dayBox.onchange = function () { store('sofia_3d_daylight', this.checked ? '1' : '0'); daylight.setEnabled(this.checked); };
+    var timeParam = /[?&]daytime=(\d{1,2}):(\d{2})/.exec(location.search);
+    if (timeParam) daylight.preview(+timeParam[1] * 60 + +timeParam[2]);   // test aid: pin Sofia's clock
+    daylight.subscribe(function () { if (m3) m3.triggerRepaint(); });
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) daylight.refresh(); });
+    view3d.daylight = daylight;
 
     view3d.open = open;
     view3d.close = close;

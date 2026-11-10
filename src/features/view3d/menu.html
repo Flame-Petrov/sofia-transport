@@ -5,6 +5,11 @@
     </div>
     <!-- v103: hills in the 3D view (off by default: one more download and drawing pass) -->
     <label class="dg-switch" id="v3TerRow" hidden><span>3D view: terrain (Vitosha)</span><input type="checkbox" id="v3Terrain" role="switch"><span class="sw" aria-hidden="true"></span></label>
+    <!-- Day and night cycle: the sun, moon, sky, building and vehicle lighting follow Sofia's real time (off by default) -->
+    <div id="v3DayRow" hidden>
+      <label class="dg-switch"><span>Day and night cycle</span><input type="checkbox" id="v3Daylight" role="switch" aria-describedby="v3DayHint"><span class="sw" aria-hidden="true"></span></label>
+      <div id="v3DayHint" class="pl-hint" hidden>The sun and moon cross the sky at Sofia's real time. Light, sky and map colours follow them, windows and vehicle lamps come on after dark. Off shows a fixed afternoon.</div>
+    </div>
     <div id="v3TextureRow" hidden>
       <label class="dg-switch"><span>3D building textures</span><input type="checkbox" id="v3Textures" role="switch" aria-describedby="v3TextureKey"><span class="sw" aria-hidden="true"></span></label>
       <div id="v3TextureKey" class="pl-hint" hidden>Plaster, panel, brick, glass and stone façades in varied colours, with tiled and flat roofs.</div>

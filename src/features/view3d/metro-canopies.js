@@ -25,7 +25,9 @@
     var vertices = [], facets = 16;
     var concrete = [.62,.59,.54], frame = [.35,.34,.32], underside = [.45,.43,.40];
     function quad(a,b,c,d,color) {
-      for (var point of [a,b,c,a,c,d]) vertices.push(...point,...color);
+      var u=[b[0]-a[0],b[1]-a[1],b[2]-a[2]], v=[c[0]-a[0],c[1]-a[1],c[2]-a[2]];
+      var n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]], m=(Math.hypot(n[0],n[1],n[2])||1)*(n[2]<0 ? -1 : 1);
+      for (var point of [a,b,c,a,c,d]) vertices.push(...point,...color,n[0]/m,n[1]/m,n[2]/m,0);
     }
     function mix(a,b,t) { return a.map(function (v,i) { return v+(b[i]-v)*t; }); }
     function ground(ll) {

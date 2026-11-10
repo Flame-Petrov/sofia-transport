@@ -1,15 +1,19 @@
   // Each wall carries a whole number of window bays and floors from facade-styles.js, so no
   // window is cut at a corner or roofline and camera zoom never changes the repeat.
   var FACADE_VERTEX = 'attribute vec3 pos, surface; attribute vec2 paint; uniform vec4 anchor; uniform mat4 offsets;' +
-    'varying vec2 uv; varying vec4 wall; varying vec3 band;' +
+    'uniform vec3 sunDir, sunColor, ambient;' +
+    'varying vec2 uv; varying vec4 wall; varying vec3 band, shade;' +
     'void main(){gl_Position=anchor+offsets*vec4(pos,0.);uv=surface.xy;' +
     // surface.z is the floor count plus 100 for a ground floor or 200 for a windowless wall.
     'float kind=floor(surface.z/100.+.001);band=vec3(surface.z-kind*100.,kind,floor(paint.y));' +
-    // paint.x packs the wall colour, paint.y the building seed plus the face shading.
+    // paint.x packs the wall colour, paint.y the building seed plus the direction the wall faces.
     'float r=floor(paint.x/65536.),g=floor((paint.x-r*65536.)/256.);' +
-    'wall=vec4(vec3(r,g,paint.x-r*65536.-g*256.)/255.,fract(paint.y));}';
+    'wall=vec4(vec3(r,g,paint.x-r*65536.-g*256.)/255.,1.);' +
+    // The fraction of paint.y is the wall normal's angle in the east/south plane. Light is ambient plus the sun or moon.
+    'float ang=(fract(paint.y)-.005)/.99*6.2831853-3.1415927;' +
+    'shade=ambient+sunColor*max(cos(ang)*sunDir.x+sin(ang)*sunDir.y,0.);}';
   var FACADE_FRAGMENT = '#ifdef GL_FRAGMENT_PRECISION_HIGH\nprecision highp float;\n#else\nprecision mediump float;\n#endif\n' +
-    'varying vec2 uv; varying vec4 wall; varying vec3 band; uniform sampler2D ground, middle, crown;' +
+    'varying vec2 uv; varying vec4 wall; varying vec3 band, shade; uniform sampler2D ground, middle, crown; uniform float lit;' +
     'void main(){float level=min(floor(uv.y),band.x-1.);' +
     // All three sheets are read with continuous coordinates, which keeps mipmapping seamless.
     'vec4 low=texture2D(ground,vec2(uv.x*.5,uv.y)),mid=texture2D(middle,uv*.5),top=texture2D(crown,vec2(uv.x*.5,uv.y-band.x+1.));' +
@@ -22,11 +26,15 @@
     'float dim=1.-smoothstep(.3,.55,dot(t.rgb,vec3(.3,.6,.1)));' +
     'own=mix(own,vec3(.86,.8,.66),.6*step(.88,n)*dim);' +
     'vec3 c=mix(own,t.rgb*wall.rgb,t.a);' +
-    'gl_FragColor=vec4(c*wall.a*(1.-.14*(1.-smoothstep(0.,.4,uv.y))),1.);}';
+    'c*=shade*(1.-.14*(1.-smoothstep(0.,.4,uv.y)));' +
+    // After dark some windows are lit: the dark glass of the sheet takes a warm or, now and then, a cool light.
+    'float glow=dim*step(n,lit);' +
+    'vec3 lamp=mix(vec3(1.,.76,.42),vec3(.75,.86,1.),step(.93,fract(n*91.7)))*(.65+.6*fract(n*37.1));' +
+    'gl_FragColor=vec4(mix(c,lamp,.9*glow),1.);}';
 
   function solidFacadeLayer(materialId, sourceId, classified) {
     var map, program, buffer, textures = [], batches = [], origin;
-    var attrs, uniforms, dirty = true, lastBuild = -Infinity, view, built = -1, asleep = false;
+    var attrs, uniforms, shadowProgram, dirty = true, lastBuild = -Infinity, view, built = -1, asleep = false;
     var STRIDE = 8;   // floats per corner: position, then u, v, bands, colour and seed with shade
     var meshCache = new Map(), previousKeys = null;
     function terrainChanged() { previousKeys=null; meshCache.clear(); dirty = true; }
@@ -54,6 +62,9 @@
       }
       rings.forEach(function (ring) {
         var px = mercatorX(ring[0][0]), py = mercatorY(ring[0][1]);
+        var area=0;
+        for (var k=1; k<ring.length; k++) area+=ring[k-1][0]*ring[k][1]-ring[k][0]*ring[k-1][1];
+        var sgn=area<=0 ? 1 : -1;   // longitude/latitude winding is the reverse of Mercator's
         for (var j=1; j<ring.length; j++) {
           var qx = mercatorX(ring[j][0]), qy = mercatorY(ring[j][1]);
           var dx = qx-px, dy = qy-py, len = Math.hypot(dx,dy);
@@ -64,7 +75,8 @@
           // Stub walls stay plain. Longer ones start on either bay of the two-bay sheets.
           var plain=metres<2.2 || bays<1, u0=plain ? 0 : (edge+look.seed)&1, u=u0+(plain ? 1 : bays);
           bands=floors+(plain ? 200 : base>0 ? 0 : 100);
-          paint=look.seed+0.88+0.11*(dx-dy)/len/Math.SQRT2;
+          // The wall's outward normal in the east/south plane, from the ring's winding, packed into the fraction of the seed.
+          paint=look.seed+0.005+0.99*(Math.atan2(-sgn*dx/len,sgn*dy/len)+Math.PI)/(2*Math.PI);
           corner(x,y,bottom,u0,0); corner(nx,ny,bottom,u,0); corner(nx,ny,roof,u,floors);
           corner(x,y,bottom,u0,0); corner(nx,ny,roof,u,floors); corner(x,y,roof,u0,floors);
           px=qx; py=qy; edge++;
@@ -126,8 +138,9 @@
         gl.linkProgram(program);
         if (!gl.getProgramParameter(program,gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
         attrs=['pos','surface','paint'].map(function(k){return gl.getAttribLocation(program,k);});
-        uniforms=['anchor','offsets','ground','middle','crown'].map(function(k){return gl.getUniformLocation(program,k);});
+        uniforms=['anchor','offsets','ground','middle','crown','sunDir','sunColor','ambient','lit'].map(function(k){return gl.getUniformLocation(program,k);});
         buffer=gl.createBuffer();
+        try { shadowProgram=shadows.create(gl); } catch (e) { console.warn('3D shadows failed:', e); }
         var sharp=gl.getExtension('EXT_texture_filter_anisotropic');
         // Three sheets per style: ground floor, repeating floors and the top floor.
         textures=facadeStyles.names.map(function(_,index){
@@ -161,9 +174,12 @@
         } else if (due) map.triggerRepaint();
         if (!origin) return;
         gl.useProgram(program);
-        gl.uniform4fv(uniforms[0],[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];}));
-        gl.uniformMatrix4fv(uniforms[1],false,Float32Array.from(matrix,function(v){return v*origin.unit;}));
+        var anchor=[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];});
+        var offsets=Float32Array.from(matrix,function(v){return v*origin.unit;});
+        gl.uniform4fv(uniforms[0],anchor); gl.uniformMatrix4fv(uniforms[1],false,offsets);
         [0,1,2].forEach(function(unit){gl.uniform1i(uniforms[2+unit],unit);});
+        var light=daylight.lighting();
+        gl.uniform3fv(uniforms[5],light.dir); gl.uniform3fv(uniforms[6],light.color); gl.uniform3fv(uniforms[7],light.ambient); gl.uniform1f(uniforms[8],light.lit);
         gl.disable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
         gl.enable(gl.POLYGON_OFFSET_FILL); gl.polygonOffset(-1,-1);
         attrs.forEach(function(a,i){gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,i<2 ? 3 : 2,gl.FLOAT,false,STRIDE*4,i*12);});
@@ -175,12 +191,15 @@
         gl.activeTexture(gl.TEXTURE0);
         attrs.forEach(function(a){gl.disableVertexAttribArray(a);});
         gl.disable(gl.POLYGON_OFFSET_FILL);
+        shadows.pass(gl,shadowProgram,map,anchor,offsets,STRIDE*4,function(){
+          batches.forEach(function(b){ if (b.count) gl.drawArrays(gl.TRIANGLES,b.start,b.count); });
+        });
       },
       onRemove:function(owner,gl) {
         owner.off('move',moved); owner.off('resize',resized); owner.off('terrain',terrainChanged);
         owner.off('sourcedata',sourceChanged);
         textures.forEach(function(set){set.forEach(function(t){gl.deleteTexture(t);});});
-        gl.deleteBuffer(buffer); gl.deleteProgram(program);
+        gl.deleteBuffer(buffer); gl.deleteProgram(program); if (shadowProgram) gl.deleteProgram(shadowProgram.program);
       }
     };
   }
