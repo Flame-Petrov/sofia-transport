@@ -9316,6 +9316,7 @@
     var AMBIENT = [[.17, .2, .34], [.2, .24, .4], [.34, .38, .56], [.5, .5, .62], [.62, .6, .64], [.72, .72, .76], [.78, .8, .84]];
     var SUN_LIGHT = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [.3, .18, .08], [.38, .28, .17], [.3, .28, .24]];
     var DAY_AMBIENT = [.78, .8, .84];
+    var DUSK_AMBIENT = .16, DUSK_SUN = .3;   // how much dusk takes off the ambient and the direct light
     // Share of windows that are lit, by Sofia hour (only while it is dark enough for lamps).
     var LIT_HOURS = [0, 4, 6, 8, 16, 18, 21, 23, 24], LIT_SHARE = [.15, .12, .4, .3, .3, .6, .6, .35, .15];
     function litShare(hour) {
@@ -9336,6 +9337,11 @@
     function fromBodies(sun, moon, fraction, hour) {
       var a = sun.alt;
       var ambient = ramp(LIGHT_KEYS, AMBIENT, a), sunLight = ramp(LIGHT_KEYS, SUN_LIGHT, a);
+      // Dusk (and dawn): the sun is low or just down. Full between about +3° and -4°, gone by +12° and -10°,
+      // where day and night take over. It dims the whole scene a little.
+      var dusk = smooth(12, 3, a) * (1 - smooth(-4, -10, a));
+      ambient = ambient.map(function (v) { return v * (1 - DUSK_AMBIENT * dusk); });
+      sunLight = sunLight.map(function (v) { return v * (1 - DUSK_SUN * dusk); });
       var moonLevel = clamp(moon.alt / 10, 0, 1) * fraction * (1 - smooth(-8, 0, a));
       var moonLight = [.12 * moonLevel, .14 * moonLevel, .2 * moonLevel];
       var sunWeight = sunLight[0] + sunLight[1] + sunLight[2], moonWeight = moonLight[0] + moonLight[1] + moonLight[2];
@@ -9353,7 +9359,7 @@
       return {
         sunAlt: sun.alt, sunAz: sun.az, moonAlt: moon.alt, moonAz: moon.az, moonFraction: fraction, hour: hour,
         lighting: { dir: dir, color: [0, 1, 2].map(function (i) { return sunLight[i] + moonLight[i]; }), ambient: ambient, lamp: lamp, lit: lamp * litShare(hour) },
-        grade: grade, night: 1 - smooth(-8, 2, a),
+        grade: grade, night: 1 - smooth(-8, 2, a), dusk: dusk,
         sky: { 'sky-color': css(sky), 'horizon-color': css(horizon), 'fog-color': css(horizon),
                'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.85 },
         light: { anchor: 'map', position: [1.5, lit.az, polar], color: css(grade), intensity: a > -2 ? 0.35 : 0.25 }
@@ -9554,16 +9560,26 @@
 
   // Ground shadows for the day and night cycle. MapLibre has none, so each custom layer draws its own
   // triangles again, flattened onto the ground along the light direction: a point at height h moves
-  // by h * (east, south) / up away from the sun. The stencil keeps overlapping triangles to one layer
-  // of darkness. Only with the cycle on, on flat ground, and only while the sun or moon gives direct light.
+  // by h * reach away from the sun. The reach is the true shadow length (1 / tan altitude) up to 1.5
+  // heights and eases toward 3 heights below that, so a low sun does not smear shadows across the map.
+  // The stencil keeps overlapping triangles to one layer of darkness. Only with the cycle on, on flat ground, and only while the sun or moon gives direct light.
   var shadows = (function () {
-    var VERTEX = 'attribute vec3 pos; uniform vec4 anchor; uniform mat4 offsets; uniform vec3 sunDir;' +
-      'void main(){vec3 p=pos; p.xy-=sunDir.xy/max(sunDir.z,.12)*p.z; gl_Position=anchor+offsets*vec4(p.xy,0.,0.);}';
+    var VERTEX = 'attribute vec3 pos; uniform vec4 anchor; uniform mat4 offsets; uniform vec2 reach;' +
+      'void main(){vec3 p=pos; p.xy-=reach*p.z; gl_Position=anchor+offsets*vec4(p.xy,0.,0.);}';
     var FRAGMENT = 'precision mediump float; uniform float strength; void main(){gl_FragColor=vec4(0.,0.,0.,strength);}';
     function strength(map) {
       if (!daylight.enabled() || (map && map.getTerrain && map.getTerrain())) return 0;
       var s = daylight.lighting().color[1] * 1.1;
       return s < 0.02 ? 0 : Math.min(0.42, s);
+    }
+    // East and south ground offset per unit of height, away from the light.
+    var KNEE = 1.5, LIMIT = 3;
+    function reach() {
+      var d = daylight.lighting().dir, flat = Math.hypot(d[0], d[1]);
+      if (!flat) return [0, 0];
+      var raw = flat / Math.max(d[2], 1e-3);
+      var len = raw <= KNEE ? raw : KNEE + (LIMIT - KNEE) * (1 - Math.exp(-(raw - KNEE) / (LIMIT - KNEE)));
+      return [d[0] / flat * len, d[1] / flat * len];
     }
     function compile(gl) {
       var program = gl.createProgram();
@@ -9576,7 +9592,7 @@
       gl.linkProgram(program);
       if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
       var loc = { pos: gl.getAttribLocation(program, 'pos') };
-      ['anchor', 'offsets', 'sunDir', 'strength'].forEach(function (k) { loc[k] = gl.getUniformLocation(program, k); });
+      ['anchor', 'offsets', 'reach', 'strength'].forEach(function (k) { loc[k] = gl.getUniformLocation(program, k); });
       return { program: program, loc: loc };
     }
     // Begin and end a shadow pass: blending, a clean stencil, no depth writes.
@@ -9595,10 +9611,9 @@
     function pass(gl, sp, map, anchor, offsets, stride, draw) {
       var k = strength(map);
       if (!k || !sp) return;
-      var light = daylight.lighting();
       gl.useProgram(sp.program);
       gl.uniform4fv(sp.loc.anchor, anchor); gl.uniformMatrix4fv(sp.loc.offsets, false, offsets);
-      gl.uniform3fv(sp.loc.sunDir, light.dir); gl.uniform1f(sp.loc.strength, k);
+      gl.uniform2fv(sp.loc.reach, reach()); gl.uniform1f(sp.loc.strength, k);
       begin(gl);
       gl.enableVertexAttribArray(sp.loc.pos);
       gl.vertexAttribPointer(sp.loc.pos, 3, gl.FLOAT, false, stride, 0);
@@ -9606,7 +9621,7 @@
       gl.disableVertexAttribArray(sp.loc.pos);
       end(gl);
     }
-    return { create: compile, pass: pass, strength: strength, begin: begin, end: end };
+    return { create: compile, pass: pass, strength: strength, reach: reach, begin: begin, end: end };
   })();
   // © OpenStreetMap contributors, ODbL. BBBike Sofia 2026-11-07T00:00:00Z. Generated by tools/prepare_buildings.py.
   var sofiaBuildingTiles = {"9245/6032": "tiles/buildings/14/9245/6032.pbf", "9245/6033": "tiles/buildings/14/9245/6033.pbf", "9245/6034": "tiles/buildings/14/9245/6034.pbf", "9245/6035": "tiles/buildings/14/9245/6035.pbf", "9245/6036": "tiles/buildings/14/9245/6036.pbf", "9245/6037": "tiles/buildings/14/9245/6037.pbf", "9245/6038": "tiles/buildings/14/9245/6038.pbf", "9245/6039": "tiles/buildings/14/9245/6039.pbf", "9245/6040": "tiles/buildings/14/9245/6040.pbf", "9245/6041": "tiles/buildings/14/9245/6041.pbf", "9245/6042": "tiles/buildings/14/9245/6042.pbf", "9245/6043": "tiles/buildings/14/9245/6043.pbf", "9245/6044": "tiles/buildings/14/9245/6044.pbf", "9245/6045": "tiles/buildings/14/9245/6045.pbf", "9245/6046": "tiles/buildings/14/9245/6046.pbf", "9246/6032": "tiles/buildings/14/9246/6032.pbf", "9246/6033": "tiles/buildings/14/9246/6033.pbf", "9246/6034": "tiles/buildings/14/9246/6034.pbf", "9246/6035": "tiles/buildings/14/9246/6035.pbf", "9246/6036": "tiles/buildings/14/9246/6036.pbf", "9246/6037": "tiles/buildings/14/9246/6037.pbf", "9246/6038": "tiles/buildings/14/9246/6038.pbf", "9246/6039": "tiles/buildings/14/9246/6039.pbf", "9246/6040": "tiles/buildings/14/9246/6040.pbf", "9246/6041": "tiles/buildings/14/9246/6041.pbf", "9246/6042": "tiles/buildings/14/9246/6042.pbf", "9246/6043": "tiles/buildings/14/9246/6043.pbf", "9246/6044": "tiles/buildings/14/9246/6044.pbf", "9246/6045": "tiles/buildings/14/9246/6045.pbf", "9246/6046": "tiles/buildings/14/9246/6046.pbf", "9247/6032": "tiles/buildings/14/9247/6032.pbf", "9247/6033": "tiles/buildings/14/9247/6033.pbf", "9247/6034": "tiles/buildings/14/9247/6034.pbf", "9247/6035": "tiles/buildings/14/9247/6035.pbf", "9247/6036": "tiles/buildings/14/9247/6036.pbf", "9247/6037": "tiles/buildings/14/9247/6037.pbf", "9247/6038": "tiles/buildings/14/9247/6038.pbf", "9247/6039": "tiles/buildings/14/9247/6039.pbf", "9247/6040": "tiles/buildings/14/9247/6040.pbf", "9247/6041": "tiles/buildings/14/9247/6041.pbf", "9247/6042": "tiles/buildings/14/9247/6042.pbf", "9247/6043": "tiles/buildings/14/9247/6043.pbf", "9247/6044": "tiles/buildings/14/9247/6044.pbf", "9247/6045": "tiles/buildings/14/9247/6045.pbf", "9247/6046": "tiles/buildings/14/9247/6046.pbf", "9248/6032": "tiles/buildings/14/9248/6032.pbf", "9248/6033": "tiles/buildings/14/9248/6033.pbf", "9248/6034": "tiles/buildings/14/9248/6034.pbf", "9248/6035": "tiles/buildings/14/9248/6035.pbf", "9248/6036": "tiles/buildings/14/9248/6036.pbf", "9248/6037": "tiles/buildings/14/9248/6037.pbf", "9248/6038": "tiles/buildings/14/9248/6038.pbf", "9248/6039": "tiles/buildings/14/9248/6039.pbf", "9248/6040": "tiles/buildings/14/9248/6040.pbf", "9248/6041": "tiles/buildings/14/9248/6041.pbf", "9248/6042": "tiles/buildings/14/9248/6042.pbf", "9248/6043": "tiles/buildings/14/9248/6043.pbf", "9248/6044": "tiles/buildings/14/9248/6044.pbf", "9248/6045": "tiles/buildings/14/9248/6045.pbf", "9248/6046": "tiles/buildings/14/9248/6046.pbf", "9249/6032": "tiles/buildings/14/9249/6032.pbf", "9249/6033": "tiles/buildings/14/9249/6033.pbf", "9249/6034": "tiles/buildings/14/9249/6034.pbf", "9249/6035": "tiles/buildings/14/9249/6035.pbf", "9249/6036": "tiles/buildings/14/9249/6036.pbf", "9249/6037": "tiles/buildings/14/9249/6037.pbf", "9249/6038": "tiles/buildings/14/9249/6038.pbf", "9249/6039": "tiles/buildings/14/9249/6039.pbf", "9249/6040": "tiles/buildings/14/9249/6040.pbf", "9249/6041": "tiles/buildings/14/9249/6041.pbf", "9249/6042": "tiles/buildings/14/9249/6042.pbf", "9249/6043": "tiles/buildings/14/9249/6043.pbf", "9249/6044": "tiles/buildings/14/9249/6044.pbf", "9249/6045": "tiles/buildings/14/9249/6045.pbf", "9249/6046": "tiles/buildings/14/9249/6046.pbf", "9250/6032": "tiles/buildings/14/9250/6032.pbf", "9250/6033": "tiles/buildings/14/9250/6033.pbf", "9250/6034": "tiles/buildings/14/9250/6034.pbf", "9250/6035": "tiles/buildings/14/9250/6035.pbf", "9250/6036": "tiles/buildings/14/9250/6036.pbf", "9250/6037": "tiles/buildings/14/9250/6037.pbf", "9250/6038": "tiles/buildings/14/9250/6038.pbf", "9250/6039": "tiles/buildings/14/9250/6039.pbf", "9250/6040": "tiles/buildings/14/9250/6040.pbf", "9250/6041": "tiles/buildings/14/9250/6041.pbf", "9250/6042": "tiles/buildings/14/9250/6042.pbf", "9250/6043": "tiles/buildings/14/9250/6043.pbf", "9250/6044": "tiles/buildings/14/9250/6044.pbf", "9250/6045": "tiles/buildings/14/9250/6045.pbf", "9250/6046": "tiles/buildings/14/9250/6046.pbf", "9251/6032": "tiles/buildings/14/9251/6032.pbf", "9251/6033": "tiles/buildings/14/9251/6033.pbf", "9251/6034": "tiles/buildings/14/9251/6034.pbf", "9251/6035": "tiles/buildings/14/9251/6035.pbf", "9251/6036": "tiles/buildings/14/9251/6036.pbf", "9251/6037": "tiles/buildings/14/9251/6037.pbf", "9251/6038": "tiles/buildings/14/9251/6038.pbf", "9251/6039": "tiles/buildings/14/9251/6039.pbf", "9251/6040": "tiles/buildings/14/9251/6040.pbf", "9251/6041": "tiles/buildings/14/9251/6041.pbf", "9251/6042": "tiles/buildings/14/9251/6042.pbf", "9251/6043": "tiles/buildings/14/9251/6043.pbf", "9251/6044": "tiles/buildings/14/9251/6044.pbf", "9251/6045": "tiles/buildings/14/9251/6045.pbf", "9251/6046": "tiles/buildings/14/9251/6046.pbf", "9252/6032": "tiles/buildings/14/9252/6032.pbf", "9252/6033": "tiles/buildings/14/9252/6033.pbf", "9252/6034": "tiles/buildings/14/9252/6034.pbf", "9252/6035": "tiles/buildings/14/9252/6035.pbf", "9252/6036": "tiles/buildings/14/9252/6036.pbf", "9252/6037": "tiles/buildings/14/9252/6037.pbf", "9252/6038": "tiles/buildings/14/9252/6038.pbf", "9252/6039": "tiles/buildings/14/9252/6039.pbf", "9252/6040": "tiles/buildings/14/9252/6040.pbf", "9252/6041": "tiles/buildings/14/9252/6041.pbf", "9252/6042": "tiles/buildings/14/9252/6042.pbf", "9252/6043": "tiles/buildings/14/9252/6043.pbf", "9252/6044": "tiles/buildings/14/9252/6044.pbf", "9252/6045": "tiles/buildings/14/9252/6045.pbf", "9252/6046": "tiles/buildings/14/9252/6046.pbf", "9253/6032": "tiles/buildings/14/9253/6032.pbf", "9253/6033": "tiles/buildings/14/9253/6033.pbf", "9253/6034": "tiles/buildings/14/9253/6034.pbf", "9253/6035": "tiles/buildings/14/9253/6035.pbf", "9253/6036": "tiles/buildings/14/9253/6036.pbf", "9253/6037": "tiles/buildings/14/9253/6037.pbf", "9253/6038": "tiles/buildings/14/9253/6038.pbf", "9253/6039": "tiles/buildings/14/9253/6039.pbf", "9253/6040": "tiles/buildings/14/9253/6040.pbf", "9253/6041": "tiles/buildings/14/9253/6041.pbf", "9253/6042": "tiles/buildings/14/9253/6042.pbf", "9253/6043": "tiles/buildings/14/9253/6043.pbf", "9253/6044": "tiles/buildings/14/9253/6044.pbf", "9253/6045": "tiles/buildings/14/9253/6045.pbf", "9253/6046": "tiles/buildings/14/9253/6046.pbf", "9254/6032": "tiles/buildings/14/9254/6032.pbf", "9254/6033": "tiles/buildings/14/9254/6033.pbf", "9254/6034": "tiles/buildings/14/9254/6034.pbf", "9254/6035": "tiles/buildings/14/9254/6035.pbf", "9254/6036": "tiles/buildings/14/9254/6036.pbf", "9254/6037": "tiles/buildings/14/9254/6037.pbf", "9254/6038": "tiles/buildings/14/9254/6038.pbf", "9254/6039": "tiles/buildings/14/9254/6039.pbf", "9254/6040": "tiles/buildings/14/9254/6040.pbf", "9254/6041": "tiles/buildings/14/9254/6041.pbf", "9254/6042": "tiles/buildings/14/9254/6042.pbf", "9254/6043": "tiles/buildings/14/9254/6043.pbf", "9254/6044": "tiles/buildings/14/9254/6044.pbf", "9254/6045": "tiles/buildings/14/9254/6045.pbf", "9254/6046": "tiles/buildings/14/9254/6046.pbf", "9255/6032": "tiles/buildings/14/9255/6032.pbf", "9255/6033": "tiles/buildings/14/9255/6033.pbf", "9255/6034": "tiles/buildings/14/9255/6034.pbf", "9255/6035": "tiles/buildings/14/9255/6035.pbf", "9255/6036": "tiles/buildings/14/9255/6036.pbf", "9255/6037": "tiles/buildings/14/9255/6037.pbf", "9255/6038": "tiles/buildings/14/9255/6038.pbf", "9255/6039": "tiles/buildings/14/9255/6039.pbf", "9255/6040": "tiles/buildings/14/9255/6040.pbf", "9255/6041": "tiles/buildings/14/9255/6041.pbf", "9255/6042": "tiles/buildings/14/9255/6042.pbf", "9255/6043": "tiles/buildings/14/9255/6043.pbf", "9255/6044": "tiles/buildings/14/9255/6044.pbf", "9255/6045": "tiles/buildings/14/9255/6045.pbf", "9255/6046": "tiles/buildings/14/9255/6046.pbf", "9256/6032": "tiles/buildings/14/9256/6032.pbf", "9256/6033": "tiles/buildings/14/9256/6033.pbf", "9256/6034": "tiles/buildings/14/9256/6034.pbf", "9256/6035": "tiles/buildings/14/9256/6035.pbf", "9256/6036": "tiles/buildings/14/9256/6036.pbf", "9256/6037": "tiles/buildings/14/9256/6037.pbf", "9256/6038": "tiles/buildings/14/9256/6038.pbf", "9256/6039": "tiles/buildings/14/9256/6039.pbf", "9256/6040": "tiles/buildings/14/9256/6040.pbf", "9256/6041": "tiles/buildings/14/9256/6041.pbf", "9256/6042": "tiles/buildings/14/9256/6042.pbf", "9256/6043": "tiles/buildings/14/9256/6043.pbf", "9256/6044": "tiles/buildings/14/9256/6044.pbf", "9256/6045": "tiles/buildings/14/9256/6045.pbf", "9256/6046": "tiles/buildings/14/9256/6046.pbf", "9257/6032": "tiles/buildings/14/9257/6032.pbf", "9257/6033": "tiles/buildings/14/9257/6033.pbf", "9257/6034": "tiles/buildings/14/9257/6034.pbf", "9257/6035": "tiles/buildings/14/9257/6035.pbf", "9257/6036": "tiles/buildings/14/9257/6036.pbf", "9257/6037": "tiles/buildings/14/9257/6037.pbf", "9257/6038": "tiles/buildings/14/9257/6038.pbf", "9257/6039": "tiles/buildings/14/9257/6039.pbf", "9257/6040": "tiles/buildings/14/9257/6040.pbf", "9257/6041": "tiles/buildings/14/9257/6041.pbf", "9257/6042": "tiles/buildings/14/9257/6042.pbf", "9257/6043": "tiles/buildings/14/9257/6043.pbf", "9257/6044": "tiles/buildings/14/9257/6044.pbf", "9257/6045": "tiles/buildings/14/9257/6045.pbf", "9257/6046": "tiles/buildings/14/9257/6046.pbf", "9258/6032": "tiles/buildings/14/9258/6032.pbf", "9258/6033": "tiles/buildings/14/9258/6033.pbf", "9258/6034": "tiles/buildings/14/9258/6034.pbf", "9258/6035": "tiles/buildings/14/9258/6035.pbf", "9258/6036": "tiles/buildings/14/9258/6036.pbf", "9258/6037": "tiles/buildings/14/9258/6037.pbf", "9258/6038": "tiles/buildings/14/9258/6038.pbf", "9258/6039": "tiles/buildings/14/9258/6039.pbf", "9258/6040": "tiles/buildings/14/9258/6040.pbf", "9258/6041": "tiles/buildings/14/9258/6041.pbf", "9258/6042": "tiles/buildings/14/9258/6042.pbf", "9258/6043": "tiles/buildings/14/9258/6043.pbf", "9258/6044": "tiles/buildings/14/9258/6044.pbf", "9258/6045": "tiles/buildings/14/9258/6045.pbf", "9258/6046": "tiles/buildings/14/9258/6046.pbf", "9259/6032": "tiles/buildings/14/9259/6032.pbf", "9259/6033": "tiles/buildings/14/9259/6033.pbf", "9259/6034": "tiles/buildings/14/9259/6034.pbf", "9259/6035": "tiles/buildings/14/9259/6035.pbf", "9259/6036": "tiles/buildings/14/9259/6036.pbf", "9259/6037": "tiles/buildings/14/9259/6037.pbf", "9259/6038": "tiles/buildings/14/9259/6038.pbf", "9259/6039": "tiles/buildings/14/9259/6039.pbf", "9259/6040": "tiles/buildings/14/9259/6040.pbf", "9259/6041": "tiles/buildings/14/9259/6041.pbf", "9259/6042": "tiles/buildings/14/9259/6042.pbf", "9259/6043": "tiles/buildings/14/9259/6043.pbf", "9259/6044": "tiles/buildings/14/9259/6044.pbf", "9259/6045": "tiles/buildings/14/9259/6045.pbf", "9259/6046": "tiles/buildings/14/9259/6046.pbf", "9260/6032": "tiles/buildings/14/9260/6032.pbf", "9260/6033": "tiles/buildings/14/9260/6033.pbf", "9260/6034": "tiles/buildings/14/9260/6034.pbf", "9260/6035": "tiles/buildings/14/9260/6035.pbf", "9260/6036": "tiles/buildings/14/9260/6036.pbf", "9260/6037": "tiles/buildings/14/9260/6037.pbf", "9260/6038": "tiles/buildings/14/9260/6038.pbf", "9260/6039": "tiles/buildings/14/9260/6039.pbf", "9260/6040": "tiles/buildings/14/9260/6040.pbf", "9260/6041": "tiles/buildings/14/9260/6041.pbf", "9260/6042": "tiles/buildings/14/9260/6042.pbf", "9260/6043": "tiles/buildings/14/9260/6043.pbf", "9260/6044": "tiles/buildings/14/9260/6044.pbf", "9260/6045": "tiles/buildings/14/9260/6045.pbf", "9260/6046": "tiles/buildings/14/9260/6046.pbf", "9261/6032": "tiles/buildings/14/9261/6032.pbf", "9261/6033": "tiles/buildings/14/9261/6033.pbf", "9261/6034": "tiles/buildings/14/9261/6034.pbf", "9261/6035": "tiles/buildings/14/9261/6035.pbf", "9261/6036": "tiles/buildings/14/9261/6036.pbf", "9261/6037": "tiles/buildings/14/9261/6037.pbf", "9261/6038": "tiles/buildings/14/9261/6038.pbf", "9261/6039": "tiles/buildings/14/9261/6039.pbf", "9261/6040": "tiles/buildings/14/9261/6040.pbf", "9261/6041": "tiles/buildings/14/9261/6041.pbf", "9261/6042": "tiles/buildings/14/9261/6042.pbf", "9261/6043": "tiles/buildings/14/9261/6043.pbf", "9261/6044": "tiles/buildings/14/9261/6044.pbf", "9261/6045": "tiles/buildings/14/9261/6045.pbf", "9261/6046": "tiles/buildings/14/9261/6046.pbf"};
@@ -10966,7 +10981,7 @@
         }
         shader(gl.VERTEX_SHADER, [
           'attribute vec3 pos, normal; attribute float tone; uniform mat4 matrix; uniform vec4 anchor;',
-          'uniform vec2 heading; uniform vec4 endHeadings; uniform float scale; uniform vec3 sunDir, sunColor, ambient; uniform float lamp, shadow; varying vec3 light, glow; varying float onGround;',
+          'uniform vec2 heading; uniform vec4 endHeadings; uniform float scale; uniform vec3 sunDir, sunColor, ambient; uniform float lamp, shadow; uniform vec2 reach; varying vec3 light, glow; varying float onGround;',
           'vec3 orient(vec3 p, vec2 heading){ return vec3(dot(p.xz,heading),dot(p.xz,vec2(heading.y,-heading.x)),p.y); }',
           'void main(){',
           '  float pivot = sign(pos.z)*3.6;',
@@ -10975,7 +10990,7 @@
           '  vec3 hinge = vec3(0.0,0.0,pivot);',
           '  vec3 world = orient(hinge,heading)+orient(pos-hinge,axis);',
           // Shadow pass: flatten the model onto the ground along the light.
-          '  onGround = shadow; if (shadow > 0.5) { world.xy -= sunDir.xy/max(sunDir.z,0.12)*world.z; world.z = 0.0; }',
+          '  onGround = shadow; if (shadow > 0.5) { world.xy -= reach*world.z; world.z = 0.0; }',
           '  gl_Position=anchor+matrix*vec4(world*scale,0.0);',
           '  vec3 facing = orient(normal,axis);',
           '  light = tone*(ambient+sunColor*max(dot(facing,sunDir),0.0));',
@@ -10987,7 +11002,7 @@
         shader(gl.FRAGMENT_SHADER, 'precision mediump float; uniform vec4 color; uniform float strength; varying vec3 light, glow; varying float onGround; void main(){ gl_FragColor=onGround>0.5 ? vec4(0.0,0.0,0.0,strength*color.a) : vec4((color.rgb*light+glow)*color.a,color.a); }');
         gl.linkProgram(program);
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
-        ['matrix','anchor','heading','endHeadings','scale','color','sunDir','sunColor','ambient','lamp','shadow','strength'].forEach(function (k) { loc[k] = gl.getUniformLocation(program,k); });
+        ['matrix','anchor','heading','endHeadings','scale','color','sunDir','sunColor','ambient','lamp','shadow','reach','strength'].forEach(function (k) { loc[k] = gl.getUniformLocation(program,k); });
         ['pos','normal','tone'].forEach(function (k) { loc[k] = gl.getAttribLocation(program,k); });
       },
       render: function (gl, matrix) {
@@ -10995,7 +11010,7 @@
         gl.useProgram(program); gl.disable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
         gl.uniformMatrix4fv(loc.matrix,false,matrix);
         var daylit = daylight.lighting();
-        gl.uniform3fv(loc.sunDir,daylit.dir); gl.uniform3fv(loc.sunColor,daylit.color); gl.uniform3fv(loc.ambient,daylit.ambient); gl.uniform1f(loc.lamp,daylit.lamp);
+        gl.uniform3fv(loc.sunDir,daylit.dir); gl.uniform3fv(loc.sunColor,daylit.color); gl.uniform3fv(loc.ambient,daylit.ambient); gl.uniform1f(loc.lamp,daylit.lamp); gl.uniform2fv(loc.reach,shadows.reach());
         gl.enableVertexAttribArray(loc.tone); gl.enableVertexAttribArray(loc.pos); gl.enableVertexAttribArray(loc.normal);
         points().forEach(function (f) {
           if (!f.model) return;

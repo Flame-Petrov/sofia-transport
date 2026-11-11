@@ -14,7 +14,8 @@ The **Day and night cycle** switch in the 3D menu makes the tilted map follow So
 | Textured façades | The wall's direction is packed in the fraction of the paint attribute; the shader lights it from the sun or moon. After dark a share of windows (by Sofia hour) glows warm, a few cool. | `solid-facades.js` |
 | Bulgarian houses and metro roofs | Vertices carry a normal and a window-light draw. Glass panels light up after dark. | `bulgarian-houses.js`, `metro-canopies.js` |
 | Vehicles | Lit from the same light. After dark the cabin glass glows, headlights are white and tail lights red. | `vehicle-models.js` |
-| Ground shadows | Each custom layer redraws its triangles flattened onto the ground away from the sun (a point at height h moves by h·(east, south)/up, with the up component floored at 0.12). A stencil keeps overlaps to one layer of darkness. Strength follows the direct light: about 0.3 by day, none at twilight, faint by a bright moon. | `src/features/view3d/shadows.js`, drawn from `solid-facades.js`, `bulgarian-houses.js`, `vehicle-models.js` |
+| Dusk and dawn | `state().dusk` is 1 while the sun is between about +3° and −4°, and fades to 0 by +12° and −10°. It takes up to 16% off the ambient light and 30% off the direct light, which dims the buildings, vehicles, basemap and shadows together. | `daylight.js` (`DUSK_AMBIENT`, `DUSK_SUN`) |
+| Ground shadows | Each custom layer redraws its triangles flattened onto the ground away from the sun (a point at height h moves by h × reach). The reach is the true shadow length, 1/tan(altitude), up to 1.5 heights and eases toward a limit of 3 heights below that (`shadows.reach()`), so a low sun does not stretch shadows across the map. A stencil keeps overlaps to one layer of darkness. Strength follows the direct light: about 0.3 by day, none at twilight, faint by a bright moon. | `src/features/view3d/shadows.js`, drawn from `solid-facades.js`, `bulgarian-houses.js`, `vehicle-models.js` |
 
 Shadows fall on flat ground only: they are skipped while the terrain switch is on. Plain extruded buildings (textures off) cast none, because their geometry belongs to MapLibre. They darken through the map light and have no lit windows.
 
@@ -24,7 +25,7 @@ Shadows fall on flat ground only: they are skipped while the terrain switch is o
 
 ## Verify
 
-- `node --test tests/*.test.cjs` — `tests/daylight.test.cjs` checks solstice noon altitudes, sunrise and sunset on 10 November, azimuths, new and full moon, lamps, the off preset and when shadows exist.
+- `node --test tests/*.test.cjs` — `tests/daylight.test.cjs` checks solstice noon altitudes, sunrise and sunset on 10 November, azimuths, new and full moon, lamps, the off preset, dusk dimming, the shadow length limit and when shadows exist.
 - `tests/daylight-browser.py OUTPUT_DIR` (the Python 3.12 venv in `old/osm-work`) screenshots two cameras at 12:00, 16:30, 17:30, 00:00 and 06:50 with the cycle on, and off before and after. Add `--standalone` for the numbered release and `--phone` for 390 × 844 at DPR 3.
 - To pin the clock by hand, open the page with `?daytime=HH:MM` (Sofia time).
 - Physical-phone frame time and appearance after dark remain open.

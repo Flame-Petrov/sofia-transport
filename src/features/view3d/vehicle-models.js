@@ -58,7 +58,7 @@
         }
         shader(gl.VERTEX_SHADER, [
           'attribute vec3 pos, normal; attribute float tone; uniform mat4 matrix; uniform vec4 anchor;',
-          'uniform vec2 heading; uniform vec4 endHeadings; uniform float scale; uniform vec3 sunDir, sunColor, ambient; uniform float lamp, shadow; varying vec3 light, glow; varying float onGround;',
+          'uniform vec2 heading; uniform vec4 endHeadings; uniform float scale; uniform vec3 sunDir, sunColor, ambient; uniform float lamp, shadow; uniform vec2 reach; varying vec3 light, glow; varying float onGround;',
           'vec3 orient(vec3 p, vec2 heading){ return vec3(dot(p.xz,heading),dot(p.xz,vec2(heading.y,-heading.x)),p.y); }',
           'void main(){',
           '  float pivot = sign(pos.z)*3.6;',
@@ -67,7 +67,7 @@
           '  vec3 hinge = vec3(0.0,0.0,pivot);',
           '  vec3 world = orient(hinge,heading)+orient(pos-hinge,axis);',
           // Shadow pass: flatten the model onto the ground along the light.
-          '  onGround = shadow; if (shadow > 0.5) { world.xy -= sunDir.xy/max(sunDir.z,0.12)*world.z; world.z = 0.0; }',
+          '  onGround = shadow; if (shadow > 0.5) { world.xy -= reach*world.z; world.z = 0.0; }',
           '  gl_Position=anchor+matrix*vec4(world*scale,0.0);',
           '  vec3 facing = orient(normal,axis);',
           '  light = tone*(ambient+sunColor*max(dot(facing,sunDir),0.0));',
@@ -79,7 +79,7 @@
         shader(gl.FRAGMENT_SHADER, 'precision mediump float; uniform vec4 color; uniform float strength; varying vec3 light, glow; varying float onGround; void main(){ gl_FragColor=onGround>0.5 ? vec4(0.0,0.0,0.0,strength*color.a) : vec4((color.rgb*light+glow)*color.a,color.a); }');
         gl.linkProgram(program);
         if (!gl.getProgramParameter(program, gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
-        ['matrix','anchor','heading','endHeadings','scale','color','sunDir','sunColor','ambient','lamp','shadow','strength'].forEach(function (k) { loc[k] = gl.getUniformLocation(program,k); });
+        ['matrix','anchor','heading','endHeadings','scale','color','sunDir','sunColor','ambient','lamp','shadow','reach','strength'].forEach(function (k) { loc[k] = gl.getUniformLocation(program,k); });
         ['pos','normal','tone'].forEach(function (k) { loc[k] = gl.getAttribLocation(program,k); });
       },
       render: function (gl, matrix) {
@@ -87,7 +87,7 @@
         gl.useProgram(program); gl.disable(gl.CULL_FACE); gl.enable(gl.DEPTH_TEST); gl.depthMask(true);
         gl.uniformMatrix4fv(loc.matrix,false,matrix);
         var daylit = daylight.lighting();
-        gl.uniform3fv(loc.sunDir,daylit.dir); gl.uniform3fv(loc.sunColor,daylit.color); gl.uniform3fv(loc.ambient,daylit.ambient); gl.uniform1f(loc.lamp,daylit.lamp);
+        gl.uniform3fv(loc.sunDir,daylit.dir); gl.uniform3fv(loc.sunColor,daylit.color); gl.uniform3fv(loc.ambient,daylit.ambient); gl.uniform1f(loc.lamp,daylit.lamp); gl.uniform2fv(loc.reach,shadows.reach());
         gl.enableVertexAttribArray(loc.tone); gl.enableVertexAttribArray(loc.pos); gl.enableVertexAttribArray(loc.normal);
         points().forEach(function (f) {
           if (!f.model) return;

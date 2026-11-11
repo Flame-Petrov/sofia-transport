@@ -80,6 +80,33 @@ test('previewing a Sofia time pins the clock to it', () => {
   daylight.setEnabled(false);
 });
 
+test('dusk dims the scene around sunset and is absent at noon and deep night', () => {
+  const noon = at('2026-11-10T10:00:00Z'), sunset = at('2026-11-10T15:00:00Z'), night = at('2026-11-10T22:00:00Z');
+  assert.equal(noon.dusk, 0);
+  assert.equal(night.dusk, 0);
+  assert.ok(sunset.dusk > 0.9, 'dusk ' + sunset.dusk);
+  assert.ok(sunset.lighting.ambient[0] < 0.55 && sunset.lighting.ambient[0] > night.lighting.ambient[0]);
+  let last = 1;
+  for (let m = 12 * 60; m <= 18 * 60; m += 5) {   // brightness only falls through the afternoon and evening
+    const s = at(`2026-11-10T${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}:00Z`);
+    assert.ok(s.lighting.ambient[1] <= last + 1e-9, 'ambient rose at ' + m);
+    last = s.lighting.ambient[1];
+  }
+});
+
+test('a low sun stretches shadows to at most three heights', () => {
+  const { daylight: clock, shadows } = app(['shared/map/daylight', 'features/view3d/shadows'], { clearInterval() {} });
+  clock.setEnabled(true);
+  clock.preview(12 * 60);
+  const s = clock.state(), noon = Math.hypot(...shadows.reach()), real = 1 / Math.tan(s.sunAlt * Math.PI / 180);
+  assert.ok(noon <= real + 1e-9 && noon > 1.2, 'noon reach ' + noon);
+  let longest = 0;
+  for (let m = 6 * 60; m <= 18 * 60; m += 10) { clock.preview(m); longest = Math.max(longest, Math.hypot(...shadows.reach())); }
+  assert.ok(longest > 2.5 && longest <= 3 + 1e-9, 'longest reach ' + longest);
+  clock.preview(null);
+  clock.setEnabled(false);
+});
+
 test('ground shadows exist only with the cycle on, in direct light and on flat ground', () => {
   const { daylight: clock, shadows } = app(['shared/map/daylight', 'features/view3d/shadows'], { clearInterval() {} });
   assert.equal(shadows.strength(null), 0);

@@ -73,6 +73,7 @@
     var AMBIENT = [[.17, .2, .34], [.2, .24, .4], [.34, .38, .56], [.5, .5, .62], [.62, .6, .64], [.72, .72, .76], [.78, .8, .84]];
     var SUN_LIGHT = [[0, 0, 0], [0, 0, 0], [0, 0, 0], [0, 0, 0], [.3, .18, .08], [.38, .28, .17], [.3, .28, .24]];
     var DAY_AMBIENT = [.78, .8, .84];
+    var DUSK_AMBIENT = .16, DUSK_SUN = .3;   // how much dusk takes off the ambient and the direct light
     // Share of windows that are lit, by Sofia hour (only while it is dark enough for lamps).
     var LIT_HOURS = [0, 4, 6, 8, 16, 18, 21, 23, 24], LIT_SHARE = [.15, .12, .4, .3, .3, .6, .6, .35, .15];
     function litShare(hour) {
@@ -93,6 +94,11 @@
     function fromBodies(sun, moon, fraction, hour) {
       var a = sun.alt;
       var ambient = ramp(LIGHT_KEYS, AMBIENT, a), sunLight = ramp(LIGHT_KEYS, SUN_LIGHT, a);
+      // Dusk (and dawn): the sun is low or just down. Full between about +3° and -4°, gone by +12° and -10°,
+      // where day and night take over. It dims the whole scene a little.
+      var dusk = smooth(12, 3, a) * (1 - smooth(-4, -10, a));
+      ambient = ambient.map(function (v) { return v * (1 - DUSK_AMBIENT * dusk); });
+      sunLight = sunLight.map(function (v) { return v * (1 - DUSK_SUN * dusk); });
       var moonLevel = clamp(moon.alt / 10, 0, 1) * fraction * (1 - smooth(-8, 0, a));
       var moonLight = [.12 * moonLevel, .14 * moonLevel, .2 * moonLevel];
       var sunWeight = sunLight[0] + sunLight[1] + sunLight[2], moonWeight = moonLight[0] + moonLight[1] + moonLight[2];
@@ -110,7 +116,7 @@
       return {
         sunAlt: sun.alt, sunAz: sun.az, moonAlt: moon.alt, moonAz: moon.az, moonFraction: fraction, hour: hour,
         lighting: { dir: dir, color: [0, 1, 2].map(function (i) { return sunLight[i] + moonLight[i]; }), ambient: ambient, lamp: lamp, lit: lamp * litShare(hour) },
-        grade: grade, night: 1 - smooth(-8, 2, a),
+        grade: grade, night: 1 - smooth(-8, 2, a), dusk: dusk,
         sky: { 'sky-color': css(sky), 'horizon-color': css(horizon), 'fog-color': css(horizon),
                'sky-horizon-blend': 0.6, 'horizon-fog-blend': 0.6, 'fog-ground-blend': 0.85 },
         light: { anchor: 'map', position: [1.5, lit.az, polar], color: css(grade), intensity: a > -2 ? 0.35 : 0.25 }
