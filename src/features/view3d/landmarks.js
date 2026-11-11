@@ -363,6 +363,161 @@
         k.tube(0, 0, 1.6, 1.0, 3.9, 12, 4, GRANITE, { turn: Math.PI / 4 }); k.tube(0, 0, 1.0, 0, 12, 13, 4, GRANITE, { turn: Math.PI / 4 });
         k.windowsV(1.72, -0.7, 0.7, 1.6, 3.1, 1, 1, 1, BRONZE);
       },
+      // A football ground from its mapped outline: a striped pitch with markings and goals, a running track where
+      // there is one, a bowl of seating tiers in the club's colours that rises to the outline, a lit concourse
+      // band on the outer wall, a cantilevered roof over the stands where the ground has one and floodlight masts.
+      stadium: function (k, ring, site) {
+        var grounds = {
+          'Vasil Levski National Stadium': { h: 24, track: true, roof: 0.42, seats: [[0.78, 0.16, 0.16], [0.92, 0.92, 0.90], [0.16, 0.52, 0.30]], masts: false },
+          'Bulgarian Army Stadium': { h: 13, seats: [[0.72, 0.10, 0.12], [0.84, 0.84, 0.82]], roof: 0.3, masts: true },
+          'Georgi Asparuhov Stadium': { h: 19, seats: [[0.10, 0.28, 0.66], [0.90, 0.90, 0.92]], roof: 0.5, masts: true },
+          'Lokomotiv Stadium': { h: 14, track: true, seats: [[0.70, 0.12, 0.12], [0.16, 0.16, 0.17]], masts: true },
+          'Slavia Stadium': { h: 12, seats: [[0.92, 0.92, 0.90], [0.20, 0.20, 0.22]], masts: true }
+        };
+        var g = grounds[site.n] || { h: 14, seats: [[0.6, 0.6, 0.62], [0.8, 0.8, 0.8]], masts: true };
+        var concrete = [0.74, 0.73, 0.70], apron = [0.58, 0.58, 0.56], grass = [0.27, 0.55, 0.24], mown = [0.31, 0.62, 0.27];
+        var white = [0.95, 0.95, 0.93], track = [0.72, 0.30, 0.22], membrane = [0.90, 0.91, 0.92], H = g.h;
+        var us = ring.map(function (p) { return p[0]; }), vs = ring.map(function (p) { return p[1]; });
+        var spanU = Math.min(-Math.min.apply(null, us), Math.max.apply(null, us)), spanV = Math.min(-Math.min.apply(null, vs), Math.max.apply(null, vs));
+        // The bowl's inner edge sits just outside the pitch (or the track).
+        var pu = Math.min(52.5, spanU * 0.5), pv = Math.min(34, spanV * 0.5);
+        var need = g.track ? [pu + 12, pv + 12] : [pu + 6, pv + 6];
+        var shrink = Math.min(0.8, Math.max(need[0] / spanU, need[1] / spanV, 0.45));
+        var inner = scaled(ring, shrink);
+        k.prism(ring, 0, 0.15, apron, apron);
+        if (g.track) k.prism(scaled(ring, shrink * 0.99), 0.15, 0.25, track, track);
+        for (var band = 0; band < 10; band++) {
+          var b0 = -pu - 3 + (2 * pu + 6) * band / 10, b1 = -pu - 3 + (2 * pu + 6) * (band + 1) / 10;
+          k.box(b0, b1, -pv - 3, pv + 3, 0.25, 0.32, band % 2 ? grass : mown);
+        }
+        function line(u0, u1, v0, v1) { k.box(u0, u1, v0, v1, 0.32, 0.34, white); }
+        line(-pu, pu, -pv, -pv + 0.15); line(-pu, pu, pv - 0.15, pv); line(-pu, -pu + 0.15, -pv, pv); line(pu - 0.15, pu, -pv, pv);
+        line(-0.08, 0.08, -pv, pv);
+        k.tube(0, 0, 9.15, 9.15, 0.32, 0.34, 24, white); k.tube(0, 0, 9.0, 9.0, 0.32, 0.345, 24, grass, { cap: true });
+        [-1, 1].forEach(function (s) {
+          var goal = s * pu, box = s * (pu - 16.5), six = s * (pu - 5.5), back = goal + s * 1.6;
+          line(Math.min(goal, box), Math.max(goal, box), -20.15, -20); line(Math.min(goal, box), Math.max(goal, box), 20, 20.15);
+          line(box - 0.08, box + 0.08, -20.15, 20.15);
+          line(Math.min(goal, six), Math.max(goal, six), -9.16, -9.01); line(Math.min(goal, six), Math.max(goal, six), 9.01, 9.16);
+          line(six - 0.08, six + 0.08, -9.16, 9.16);
+          k.box(Math.min(goal, back), Math.max(goal, back), -3.75, -3.6, 0.32, 2.44, white); k.box(Math.min(goal, back), Math.max(goal, back), 3.6, 3.75, 0.32, 2.44, white);
+          k.box(goal - 0.07, goal + 0.07, -3.75, 3.75, 2.3, 2.44, white);
+        });
+        // Seating tiers between the inner edge and the outline, alternating the club's colours, with a concrete aisle ring.
+        var tiers = Math.max(6, Math.round(H / 2.2));
+        function at(p, q, s, z) { return [q[0] + (p[0] - q[0]) * s, q[1] + (p[1] - q[1]) * s, z]; }
+        ring.forEach(function (a, i) {
+          var b = ring[(i + 1) % ring.length], ai = inner[i], bi = inner[(i + 1) % ring.length], from = [a[0] * 3, a[1] * 3, -80];
+          for (var t = 0; t < tiers; t++) {
+            var s0 = t / tiers, s1 = (t + 1) / tiers, z0 = 1.2 + (H - 1.2) * s0, z1 = 1.2 + (H - 1.2) * s1;
+            var color = t === Math.floor(tiers / 2) ? concrete : g.seats[t % g.seats.length];
+            k.quad(at(a, ai, s0, z0), at(b, bi, s0, z0), at(b, bi, s1, z1), at(a, ai, s1, z1), color, from);
+          }
+        });
+        k.prism(inner, 0.15, 1.2, concrete);
+        k.prism(ring, 0, 1, DARK);
+        k.prism(ring, 1, 4.2, GLASS, null, true);
+        k.prism(ring, 4.2, H - 0.8, concrete);
+        k.prism(ring, H - 0.8, H, g.seats[0]);
+        // A cantilevered roof from the outer rim, reaching part of the way over the tiers.
+        if (g.roof) {
+          var lip = scaled(ring, 1 - (1 - shrink) * g.roof);
+          ring.forEach(function (a, i) {
+            var b = ring[(i + 1) % ring.length], c = lip[(i + 1) % ring.length], d = lip[i];
+            k.quad([a[0], a[1], H + 6], [b[0], b[1], H + 6], [c[0], c[1], H + 4.5], [d[0], d[1], H + 4.5], membrane, [0, 0, -100]);
+            k.quad([a[0], a[1], H + 5.6], [b[0], b[1], H + 5.6], [c[0], c[1], H + 4.1], [d[0], d[1], H + 4.1], [0.45, 0.46, 0.48], [0, 0, 200]);
+            if (i % 2 === 0) k.tube(a[0], a[1], 0.5, 0.5, H, H + 6, 6, concrete);
+          });
+          k.prism(lip, H + 4.1, H + 4.5, [0.60, 0.61, 0.62]);
+        }
+        // Four floodlight masts at the corners of the bowl, their lamp banks facing the pitch.
+        if (g.masts) [[1, 1], [1, -1], [-1, 1], [-1, -1]].forEach(function (c) {
+          var best = ring[0], score = -1e9;
+          ring.forEach(function (p) { var d = p[0] * c[0] / spanU + p[1] * c[1] / spanV; if (d > score) { score = d; best = p; } });
+          var m = [best[0] * 0.97, best[1] * 0.97], top = H + 26, len = Math.hypot(m[0], m[1]), along = [-m[1] / len, m[0] / len];
+          k.tube(m[0], m[1], 0.9, 0.5, 0, top, 8, [0.55, 0.56, 0.58]);
+          k.turned([m[0] - m[0] / len * 0.8, m[1] - m[1] / len * 0.8], along, 3, 0.5, top, top + 3.2, GLASS, true);
+          k.turned([m[0], m[1]], along, 3.2, 0.4, top - 0.3, top, [0.4, 0.4, 0.42]);
+        });
+      },
+      // A university building from its mapped outline. Sofia University and the Academy of Arts are stone, with a
+      // granite plinth, rows of tall windows, a cornice, a columned portico with a pediment on the longest side and
+      // the rectorate's copper dome. The newer campuses are banded concrete and glass with roof plant and a glass
+      // entrance, and the UACEG slab rises from its podium. Every one flies the flag over its entrance.
+      university: function (k, ring, site) {
+        var classic = /Sofia University|Academy of Arts/.test(site.n);
+        var levels = Math.min(classic ? 4 : 5, site.l || 4), floor = classic ? 5 : 3.7, H = levels * floor + (classic ? 1.5 : 0);
+        var stone = /Sofia/.test(site.n) ? [0.90, 0.82, 0.60] : [0.88, 0.85, 0.78], roof = [0.50, 0.52, 0.52], trim = [0.96, 0.95, 0.91];
+        var edges = ring.map(function (a, i) {
+          var b = ring[(i + 1) % ring.length], l = Math.hypot(b[0] - a[0], b[1] - a[1]) || 1;
+          return { a: a, l: l, along: [(b[0] - a[0]) / l, (b[1] - a[1]) / l], out: [(b[1] - a[1]) / l, -(b[0] - a[0]) / l] };
+        });
+        var front = edges.reduce(function (x, y) { return y.l > x.l ? y : x; });
+        function point(e, t, d, z) { return [e.a[0] + e.along[0] * t + e.out[0] * d, e.a[1] + e.along[1] * t + e.out[1] * d, z]; }
+        var mid = front.l / 2, half = Math.min(classic ? 12 : 8, front.l * 0.25), flag, fz;
+        if (classic) {
+          k.prism(ring, 0, 1.5, GRANITE);
+          k.prism(ring, 1.5, H, stone);
+          k.prism(scaled(ring, 1.006), H - 0.9, H, trim);
+          k.prism(ring, H, H + 1, stone, roof);
+          edges.forEach(function (e) {
+            var count = Math.floor(e.l / 4.2);
+            for (var w = 0; w < count; w++) for (var f = 0; f < levels; f++) {
+              var t0 = (e.l - count * 4.2) / 2 + w * 4.2 + 1.1, z0 = 1.5 + f * floor + 1, z1 = z0 + floor * 0.55;
+              k.quad(point(e, t0, 0.06, z0), point(e, t0 + 2, 0.06, z0), point(e, t0 + 2, 0.06, z1), point(e, t0, 0.06, z1), GLASS, point(e, t0 + 1, -1, z0), true);
+            }
+          });
+          // The portico: a granite step, six columns, the entablature and a pediment under a pitched roof.
+          var depth = 5, ht = H - 1;
+          k.turned(point(front, mid, depth / 2, 0), front.along, half + 1, depth / 2 + 0.6, 0, 1.2, GRANITE);
+          for (var c = 0; c < 6; c++) {
+            var cp = point(front, mid - half + 2 * half * c / 5, depth - 0.8, 0);
+            k.tube(cp[0], cp[1], 0.75, 0.62, 1.2, ht, 10, trim);
+          }
+          k.turned(point(front, mid, depth / 2, 0), front.along, half + 0.8, depth / 2 + 0.4, ht, ht + 1.6, trim);
+          var z0 = ht + 1.6, rise = 4.5, from = point(front, mid, depth / 2, z0 - 3);
+          var l0 = point(front, mid - half - 0.8, depth + 0.4, z0), l1 = point(front, mid - half - 0.8, -0.4, z0);
+          var r0 = point(front, mid + half + 0.8, depth + 0.4, z0), r1 = point(front, mid + half + 0.8, -0.4, z0);
+          var t0 = point(front, mid, depth + 0.4, z0 + rise), t1 = point(front, mid, -0.4, z0 + rise);
+          k.tri(l0, r0, t0, trim, from); k.tri(l1, r1, t1, trim, from);
+          k.quad(l0, t0, t1, l1, roof, from); k.quad(r0, t0, t1, r1, roof, from);
+          k.quad(point(front, mid - 2, 0.07, 1.2), point(front, mid + 2, 0.07, 1.2), point(front, mid + 2, 0.07, 6), point(front, mid - 2, 0.07, 6), [0.28, 0.19, 0.13], point(front, mid, -1, 3));
+          if (/Sofia/.test(site.n)) {
+            var dc = point(front, mid, -14, 0);
+            if (inside(ring, dc[0], dc[1])) {
+              k.tube(dc[0], dc[1], 7, 7, H + 1, H + 5, 16, stone, { windows: true });
+              k.dome(dc[0], dc[1], 7.3, H + 5, 6, 16, COPPER); k.tube(dc[0], dc[1], 1, 0.8, H + 11, H + 13, 8, stone, { cap: true });
+            }
+          }
+          flag = point(front, mid, depth / 2, 0); fz = z0 + rise;
+        } else {
+          k.floors(ring, 0, H, floor, [0.86, 0.85, 0.82], [0.30, 0.38, 0.44], roof);
+          k.prism(ring, H, H + 1, [0.80, 0.79, 0.76], roof);
+          if (site.l > 8) {
+            var tu = Math.min(24, front.l * 0.2), tv = 8, tc = point(front, mid, -tv - 10, 0), crown = site.l * 3.4;
+            if (inside(ring, tc[0], tc[1])) {
+              for (var z = H + 1; z < crown; z += 3.4) {
+                k.turned(tc, front.along, tu, tv, z, z + 1.1, [0.86, 0.85, 0.82]);
+                k.turned(tc, front.along, tu, tv, z + 1.1, Math.min(crown, z + 3.4), [0.30, 0.38, 0.44], true);
+              }
+              k.turned(tc, front.along, tu, tv, crown, crown + 1.5, [0.80, 0.79, 0.76]);
+            }
+          }
+          for (var unit = 0; unit < 6; unit++) {
+            var p = point(front, front.l * (0.15 + 0.14 * unit), -8 - (unit % 2) * 6, 0);
+            if (inside(ring, p[0], p[1])) k.turned(p, front.along, 2.2, 1.5, H + 1, H + 2.8, [0.66, 0.67, 0.68]);
+          }
+          k.turned(point(front, mid, 3, 0), front.along, half, 3, 3.6, 4.1, [0.80, 0.79, 0.76]);
+          k.turned(point(front, mid, 0.5, 0), front.along, half * 0.6, 0.5, 0, 3.6, GLASS, true);
+          flag = point(front, mid, 5.5, 0); fz = 0;
+        }
+        // The Bulgarian flag on a pole over the entrance.
+        k.tube(flag[0], flag[1], 0.09, 0.07, fz, fz + 8, 6, [0.85, 0.85, 0.85]);
+        [[0.96, 0.96, 0.96], [0.0, 0.59, 0.43], [0.84, 0.15, 0.12]].forEach(function (color, n) {
+          var a = [flag[0] + front.along[0] * 1.3, flag[1] + front.along[1] * 1.3];
+          k.turned(a, front.along, 1.2, 0.03, fz + 7.6 - (n + 1) * 0.55, fz + 7.6 - n * 0.55, color);
+        });
+      },
       // A mall from its mapped outline: glazed shopfronts, panelled walls under a colour band, a glass entrance on the
       // longest side, a skylight and roof plant where they fit. Colours vary from site to site.
       mall: function (k, ring, site) {

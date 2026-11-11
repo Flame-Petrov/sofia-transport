@@ -35,6 +35,16 @@ LANDMARKS = [
     ("tsar", "way", 310482763, "Monument to the Tsar Liberator"),
     ("sofia", "way", 1473691885, "Statue of Sveta Sofia"),
     ("levski", "node", 212950297, "Monument to Vasil Levski"),
+    ("stadium", "way", 341968882, "Vasil Levski National Stadium"),
+    ("stadium", "way", 1331127486, "Bulgarian Army Stadium"),
+    ("stadium", "way", 292953722, "Georgi Asparuhov Stadium"),
+    ("stadium", "way", 292960618, "Lokomotiv Stadium"),
+    ("stadium", "way", 292949229, "Slavia Stadium"),
+    ("university", "rel", 17925652, "Sofia University (Rectorate)"),
+    ("university", "rel", 16731924, "Technical University, Block 1"),
+    ("university", "rel", 2294688, "UACEG, new building"),
+    ("university", "rel", 2232264, "New Bulgarian University, Building 3"),
+    ("university", "way", 680883918, "National Academy of Arts"),
 ]
 MALL_MIN_AREA = 2000  # m2
 
@@ -47,13 +57,14 @@ def tile_xy(lon, lat, z=14):
 def main():
     sys.stdout.reconfigure(encoding="utf-8")
     wanted = {(t, i): (kind, name) for kind, t, i, name in LANDMARKS}
+    rank = {(t, i): n for n, (kind, t, i, name) in enumerate(LANDMARKS)}
     factory = osmium.geom.WKBFactory()
     found = []
     for o in osmium.FileProcessor(sys.argv[1]).with_areas().with_locations():
         if o.is_node():
             hit = wanted.get(("node", o.id))
             if hit:
-                found.append((hit[0], hit[1], Point(o.location.lon, o.location.lat).buffer(0.00002), dict(o.tags), o.id))
+                found.append((hit[0], hit[1], Point(o.location.lon, o.location.lat).buffer(0.00002), dict(o.tags), rank[("node", o.id)]))
             continue
         if not o.is_area():
             continue
@@ -65,7 +76,7 @@ def main():
             continue
         geometry = wkb.loads(factory.create_multipolygon(o), hex=True)
         if hit:
-            found.append((hit[0], hit[1], geometry, dict(tags), key[1]))
+            found.append((hit[0], hit[1], geometry, dict(tags), rank[key]))
         elif geometry.area * 111320 * 111320 * 0.735 >= MALL_MIN_AREA and key not in wanted:
             found.append(("mall", tags.get("name:en") or tags.get("name") or "Mall", geometry, dict(tags), key[1]))
 
@@ -95,7 +106,7 @@ def main():
 
     sites = []
     order = {kind: n for n, (kind, *_rest) in enumerate(LANDMARKS)}
-    for kind, name, geometry, tags, osm_id in sorted(found, key=lambda row: (order.get(row[0], 99), row[4])):
+    for kind, name, geometry, tags, osm_id in sorted(found, key=lambda row: (99 if row[0] == "mall" else 0, row[4])):
         c = geometry.centroid
         kx, ky = 111320 * math.cos(math.radians(c.y)), 110574
         local = affine_transform(geometry, [kx, 0, 0, ky, -c.x * kx, -c.y * ky])
