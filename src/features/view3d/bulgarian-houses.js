@@ -217,6 +217,7 @@
     return true;
   }
 
+  // `canopy` is a fixed-model source (metro roofs, landmarks): { suffix, minZoom, visible(bounds), vertices(map, origin, visible) }.
   function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
     var map, program, buffer, matrixLoc, anchorLoc, position, color, normal, emitLoc, lightLocs, shadowProgram, origin;
     var dirty=true, count=0, lastBuild=0, terrain, view, built=-1, asleep=false;
@@ -237,10 +238,10 @@
         resetGeometry();
       }
       if (canopy) {
-        var sections = visibleMetroRoofSegments(map.getBounds());
+        var sections = canopy.visible(map.getBounds());
         if (sameBuildingKeys(previousKeys, sections)) return null;
         previousKeys=sections;
-        return metroCanopyVertices(map, origin, sections);
+        return canopy.vertices(map, origin, sections);
       }
       var seen=new Set(), usedIds=new Set(), meshes=[], size=0;
       view.features.forEach(function(f){
@@ -264,7 +265,7 @@
       return data;
     }
     return {
-      id:materialLayer+(canopy ? '-metro-roofs' : '-houses'),type:'custom',renderingMode:'3d',
+      id:materialLayer+(canopy ? canopy.suffix : '-houses'),type:'custom',renderingMode:'3d',
       onAdd:function(owner,gl){
         map=owner;
         if (!canopy) { view=buildingView(map,materialLayer); view.invalidate(); }
@@ -287,7 +288,7 @@
         map.on('move',moved);map.on('resize',resized);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
       },
       render:function(gl,matrix){
-        if(map.getZoom()<(canopy ? 13 : 15) /* app zoom 16 */ || map.getLayoutProperty(materialLayer,'visibility')==='none'){
+        if(map.getZoom()<(canopy ? canopy.minZoom : 15) /* app zoom 16 */ || map.getLayoutProperty(materialLayer,'visibility')==='none'){
           asleep=true;return;
         }
         if (asleep) { asleep=false; dirty=true; if (view) view.invalidate(); }

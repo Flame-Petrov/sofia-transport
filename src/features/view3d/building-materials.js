@@ -71,8 +71,10 @@
       var copy = JSON.parse(JSON.stringify(layer));
       copy.id += '-material';
       copy.source = sourceId;
+      copy.filter = landmarks.filter(copy.filter);   // landmark and mall models replace these buildings
       map3.addLayer(copy, layer.id);
-      map3.addLayer(bulgarianHouseLayer(copy.id, sourceId, true), layer.id);
+      map3.addLayer(bulgarianHouseLayer(copy.id, sourceId, metroCanopies), layer.id);
+      map3.addLayer(bulgarianHouseLayer(copy.id, sourceId, landmarks), layer.id);
 
     }
 

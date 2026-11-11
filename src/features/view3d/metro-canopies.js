@@ -95,3 +95,5 @@
     });
     return new Float32Array(vertices);
   }
+  // The fixed-model source the layer in bulgarian-houses.js draws.
+  var metroCanopies = { suffix: '-metro-roofs', minZoom: 13, visible: visibleMetroRoofSegments, vertices: metroCanopyVertices };

@@ -114,6 +114,11 @@ test('ground shadows exist only with the cycle on, in direct light and on flat g
   clock.preview(12 * 60);
   assert.ok(shadows.strength(null) > 0.2);
   assert.equal(shadows.strength({ getTerrain: () => ({}) }), 0);
+  shadows.setEnabled(false);   // the Shadows switch alone
+  assert.equal(shadows.strength(null), 0);
+  assert.ok(clock.state().lighting.color[1] > 0.2);
+  shadows.setEnabled(true);
+  assert.ok(shadows.enabled() && shadows.strength(null) > 0.2);
   clock.preview(0);
   assert.ok(shadows.strength(null) < 0.12);
   clock.preview(17 * 60 + 40);   // after sunset, before the moon matters

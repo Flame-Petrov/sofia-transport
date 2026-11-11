@@ -1,6 +1,6 @@
 # 3D map controls
 
-Each time the 3D button opens the tilted map, an illustrated guide appears. Okay dismisses it and focuses the map. With the map focused, Ctrl+Left/Right turns the camera by 10° and Ctrl+Up/Down adjusts tilt by 5° within the map's pitch limits. The shortcuts belong to the 3D canvas so they leave search and the flat map alone.
+Each time the 3D button opens the tilted map, an illustrated guide appears. Okay dismisses it and focuses the map. With the map focused, a tap of Ctrl+Left/Right turns the camera by 10° and Ctrl+Up/Down adjusts tilt by 5° within the map's pitch limits. Holding the key for more than 0.22 s keeps turning at 100° a second (tilting at 45°). The camera eases into and out of every move: `keyTurnFrame` in `view.js` pays out a share of the turn still owed on each frame, and releasing the key or Ctrl, or leaving the canvas, stops adding to it. The shortcuts belong to the 3D canvas so they leave search and the flat map alone.
 
 The dialog and its city drawing live in `src/features/view3d/controls-dialog.html`, included from `src/page.html`. The feature's `view.css` styles it and `view.js` handles opening, dismissal and keyboard input.
 

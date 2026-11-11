@@ -2,13 +2,14 @@
   // triangles again, flattened onto the ground along the light direction: a point at height h moves
   // by h * reach away from the sun. The reach is the true shadow length (1 / tan altitude) up to 1.5
   // heights and eases toward 3 heights below that, so a low sun does not smear shadows across the map.
-  // The stencil keeps overlapping triangles to one layer of darkness. Only with the cycle on, on flat ground, and only while the sun or moon gives direct light.
+  // The stencil keeps overlapping triangles to one layer of darkness. Only with the cycle and the Shadows switch on, on flat ground, and only while the sun or moon gives direct light.
   var shadows = (function () {
     var VERTEX = 'attribute vec3 pos; uniform vec4 anchor; uniform mat4 offsets; uniform vec2 reach;' +
       'void main(){vec3 p=pos; p.xy-=reach*p.z; gl_Position=anchor+offsets*vec4(p.xy,0.,0.);}';
     var FRAGMENT = 'precision mediump float; uniform float strength; void main(){gl_FragColor=vec4(0.,0.,0.,strength);}';
+    var on = true;   // the Shadows switch in the 3D menu
     function strength(map) {
-      if (!daylight.enabled() || (map && map.getTerrain && map.getTerrain())) return 0;
+      if (!on || !daylight.enabled() || (map && map.getTerrain && map.getTerrain())) return 0;
       var s = daylight.lighting().color[1] * 1.1;
       return s < 0.02 ? 0 : Math.min(0.42, s);
     }
@@ -61,5 +62,6 @@
       gl.disableVertexAttribArray(sp.loc.pos);
       end(gl);
     }
-    return { create: compile, pass: pass, strength: strength, reach: reach, begin: begin, end: end };
+    return { create: compile, pass: pass, strength: strength, reach: reach, begin: begin, end: end,
+      enabled: function () { return on; }, setEnabled: function (value) { on = !!value; } };
   })();

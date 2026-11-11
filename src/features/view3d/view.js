@@ -35,16 +35,42 @@
       if (m3 && !closing) m3.getCanvas().focus({ preventScroll: true });
     };
     controlsHelp.addEventListener('cancel', function (event) { event.preventDefault(); });
+    // Ctrl+arrows. A tap turns 10° or tilts 5°; a key held past KEY_HOLD_MS keeps going at a steady rate. The turn still owed is
+    // paid out a share each frame, so the camera eases into and out of every move instead of stepping.
+    var KEY_TURN_DEG_S = 100, KEY_TILT_DEG_S = 45, KEY_EASE_MS = 90, KEY_HOLD_MS = 220;
+    var keyTurn = { held: {}, bearing: 0, pitch: 0, at: 0, frame: 0 };
+    function keyTurnFrame(now) {
+      keyTurn.frame = 0;
+      if (!m3 || !ready || closing) { keyTurn.held = {}; keyTurn.bearing = keyTurn.pitch = 0; return; }
+      var dt = Math.max(0, Math.min(250, now - keyTurn.at)), held = keyTurn.held;   // slow frames still turn at the same rate
+      keyTurn.at = now;
+      function down(key) { return held[key] && now - held[key] > KEY_HOLD_MS ? 1 : 0; }
+      keyTurn.bearing += (down('ArrowRight') - down('ArrowLeft')) * KEY_TURN_DEG_S * dt / 1000;
+      keyTurn.pitch += (down('ArrowUp') - down('ArrowDown')) * KEY_TILT_DEG_S * dt / 1000;
+      var share = 1 - Math.exp(-dt / KEY_EASE_MS), turn = keyTurn.bearing * share, tilt = keyTurn.pitch * share;
+      keyTurn.bearing -= turn; keyTurn.pitch -= tilt;
+      var pitch = Math.max(0, Math.min(VIEW3D_MAX_PITCH, m3.getPitch() + tilt));
+      if (pitch !== m3.getPitch() + tilt) keyTurn.pitch = 0;   // at a tilt limit: nothing more is owed
+      if (turn || tilt) m3.jumpTo({ bearing: m3.getBearing() + turn, pitch: pitch });
+      if (Object.keys(held).length || Math.abs(keyTurn.bearing) > 0.02 || Math.abs(keyTurn.pitch) > 0.02) keyTurn.frame = requestAnimationFrame(keyTurnFrame);
+      else keyTurn.bearing = keyTurn.pitch = 0;
+    }
     function keyboardCamera(event) {
       if (!ready || closing || controlsHelp.open || !event.ctrlKey || event.shiftKey || event.altKey || event.metaKey) return;
-      var key = event.key, move;
-      if (key === 'ArrowLeft' || key === 'ArrowRight') move = { bearing: m3.getBearing() + (key === 'ArrowLeft' ? -10 : 10) };
-      else if (key === 'ArrowUp' || key === 'ArrowDown') move = { pitch: Math.max(0, Math.min(VIEW3D_MAX_PITCH, m3.getPitch() + (key === 'ArrowUp' ? 5 : -5))) };
-      else return;
+      var key = event.key;
+      if (key !== 'ArrowLeft' && key !== 'ArrowRight' && key !== 'ArrowUp' && key !== 'ArrowDown') return;
       event.preventDefault();
       event.stopImmediatePropagation();
-      if (move.bearing !== undefined) rotateVehicleCamera();
-      m3.jumpTo(move);
+      if (key === 'ArrowLeft' || key === 'ArrowRight') rotateVehicleCamera();
+      if (event.repeat || keyTurn.held[key]) return;
+      keyTurn.held[key] = performance.now();
+      if (key === 'ArrowLeft' || key === 'ArrowRight') keyTurn.bearing += key === 'ArrowLeft' ? -10 : 10;
+      else keyTurn.pitch += key === 'ArrowUp' ? 5 : -5;
+      if (!keyTurn.frame) { keyTurn.at = performance.now(); keyTurn.frame = requestAnimationFrame(keyTurnFrame); }
+    }
+    function keyboardCameraRelease(event) {
+      if (!event || event.type === 'blur' || event.key === 'Control') keyTurn.held = {};
+      else delete keyTurn.held[event.key];
     }
     textureBox.checked = store('sofia_3d_building_textures') === '1';
     houseBox.checked = store('sofia_3d_house_designs') === '1';
@@ -152,6 +178,8 @@
       }
       view3d.on = true; ready = false; closing = false;
       m3.getCanvas().addEventListener('keydown', keyboardCamera, true);
+      m3.getCanvas().addEventListener('keyup', keyboardCameraRelease, true);
+      m3.getCanvas().addEventListener('blur', keyboardCameraRelease);
       controlsHelp.showModal();
       viewBounds01 = null;
       function invalidateBounds() { viewBounds01 = null; fleetDirty=true; farPending=true; }
@@ -372,6 +400,34 @@
       setSrc(id, { type: 'FeatureCollection', features: features });
       pointSnapshots[id] = { features: features, at: performance.now() };
     }
+    // The heading of a vehicle's body on its trip shape: the chord between points 5 m behind and ahead of its
+    // middle, so the body swings through a corner instead of snapping at each vertex of the shape.
+    function shapeHeading(route, s) {
+      var back = pointAt(route, Math.max(0, s - 5)), ahead = pointAt(route, Math.min(route.total, s + 5));
+      if (!(route.total > 0) || (back.ll[0] === ahead.ll[0] && back.ll[1] === ahead.ll[1])) return pointAt(route, s).deg;
+      return bearingDeg(back.ll, ahead.ll);
+    }
+    // Drawn headings ease toward their targets (one for a bus, three for an articulated model), so a new GPS
+    // report or a junction turns the model over about half a second. Reversals and long gaps snap.
+    var MODEL_TURN_MS = 260;
+    function easedHeadings(v, targets, now) {
+      var state = v.turn;
+      if (!state || state.h.length !== targets.length || now - state.at > 1500) {
+        v.turn = { h: targets.slice(), at: now, moving: false };
+        return targets;
+      }
+      var share = 1 - Math.exp(-Math.max(0, now - state.at) / MODEL_TURN_MS);
+      state.at = now; state.moving = false;
+      for (var i = 0; i < targets.length; i++) {
+        var d = ((targets[i] - state.h[i]) % 360 + 540) % 360 - 180;
+        if (!Number.isFinite(d) || Math.abs(d) > 120) state.h[i] = targets[i];
+        else {
+          state.h[i] = (state.h[i] + d * share + 360) % 360;
+          if (Math.abs(d) > 0.3) state.moving = true;
+        }
+      }
+      return state.h.slice();
+    }
     function modelBearing(v) {
       var motion = v.mo, bearing = v.d.bearing;
       var roadVehicle = v.d.type === 3 || v.d.type === 11;
@@ -381,12 +437,12 @@
         // A trip shape is ordered in the direction of service, even at a stop.
         var route = routeMetaFor(v.d);
         if (route && motion && motion.m === route) {
-          bearing = pointAt(route, Number.isFinite(v.along) ? v.along : motion.s0).deg;
+          bearing = shapeHeading(route, Number.isFinite(v.along) ? v.along : motion.s0);
         } else if (route) {
           // While waiting for a route motion plan, project once per GPS report.
           if (v.modelReport !== v.d || v.modelRoute !== route) {
             var projection = projectAlong(route, v.d.lat, v.d.lon, bearing, v.along);
-            v.modelTangent = projection && projection.dist < 60 ? pointAt(route, projection.s).deg : null;
+            v.modelTangent = projection && projection.dist < 60 ? shapeHeading(route, projection.s) : null;
             v.modelReport = v.d;
             v.modelRoute = route;
           }
@@ -619,7 +675,7 @@
         var v = pose.vehicle;
         if (!pose.animate || !movingVehicles.has(v)) return;
         var pos = posAt(v, frameTime);
-        if (pos[0] === pose.lat && pos[1] === pose.lon) return;
+        if (pos[0] === pose.lat && pos[1] === pose.lon && !(v.turn && v.turn.moving)) return;
         pose.lat = pos[0]; pose.lon = pos[1];
         var heading = pose.model ? modelBearing(v) : null;
         if (pose.rail) {
@@ -634,6 +690,10 @@
           if (pose.model && v.d.metroPlan) pose.sections = metroHeadings(v);
           pose.bearing = pose.sections ? pose.sections[1] : heading;
           pose.c = pose.model && v.d.metroPlan ? coveredMetroPosition(pose.lon, pose.lat, pose.bearing) : [pose.lon, pose.lat];
+        }
+        if (pose.model && Number.isFinite(pose.bearing)) {
+          var eased = easedHeadings(v, pose.sections || [pose.bearing], performance.now());
+          if (pose.sections) { pose.sections = eased; pose.bearing = eased[1]; } else pose.bearing = eased[0];
         }
         repaint = true;
       });
@@ -691,6 +751,10 @@
           heading = sections[1];
           var covered = coveredMetroPosition(lo, la, heading);
           lo = covered[0]; la = covered[1];
+        }
+        if (model) {
+          var eased = easedHeadings(v, sections || [heading], now);
+          if (sections) { sections = eased; heading = eased[1]; } else heading = eased[0];
         }
         var ink = inkOf[d.color] || (inkOf[d.color] = lineTones(d.color).ink);
         var pose = { k: d.key, c: [lo, la], m: !!rv, type: d.type, color: d.color, bearing: heading, sections: sections, model: model, opacity: (dimNow && !rv && v !== selected ? 0.35 : 1) * (v.parked ? 0.6 : 1) };
@@ -1482,7 +1546,20 @@
     // Day and night cycle: the clock and its subscribers live in shared/map/daylight.js and view3d/daylight-map.js.
     dayBox.checked = store('sofia_3d_daylight') === '1';
     daylight.setEnabled(dayBox.checked);
-    dayBox.onchange = function () { store('sofia_3d_daylight', this.checked ? '1' : '0'); daylight.setEnabled(this.checked); };
+    var shadowBox = document.getElementById('v3Shadows'), shadowRow = document.getElementById('v3ShadowRow');
+    shadowBox.checked = store('sofia_3d_shadows') !== '0';
+    shadows.setEnabled(shadowBox.checked);
+    shadowRow.hidden = !dayBox.checked;
+    shadowBox.onchange = function () {
+      store('sofia_3d_shadows', this.checked ? '1' : '0');
+      shadows.setEnabled(this.checked);
+      if (m3) m3.triggerRepaint();
+    };
+    dayBox.onchange = function () {
+      store('sofia_3d_daylight', this.checked ? '1' : '0');
+      daylight.setEnabled(this.checked);
+      shadowRow.hidden = !this.checked;
+    };
     var timeParam = /[?&]daytime=(\d{1,2}):(\d{2})/.exec(location.search);
     if (timeParam) daylight.preview(+timeParam[1] * 60 + +timeParam[2]);   // test aid: pin Sofia's clock
     daylight.subscribe(function () { if (m3) m3.triggerRepaint(); });
