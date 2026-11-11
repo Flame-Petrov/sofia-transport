@@ -15,8 +15,19 @@
     });
 
     // The extrusion layer's filter with the replaced buildings taken out, in the filter's own syntax.
+    // Legacy filters name a property as a plain string after ==, in, has and the like; anything else is an expression.
+    function isExpression(f) {
+      if (!Array.isArray(f)) return false;
+      var op = f[0], nested = f.slice(1).some(Array.isArray);
+      if (op === 'all' || op === 'any') return f.slice(1).some(isExpression);
+      if (op === 'none' || op === '!in' || op === '!has') return false;
+      if (op === 'has') return nested;
+      if (op === 'in') return typeof f[1] !== 'string' || (f.length === 3 && Array.isArray(f[2]));
+      if (['==', '!=', '<', '>', '<=', '>='].indexOf(op) >= 0) return nested;
+      return true;
+    }
     function filter(existing) {
-      var expression = existing && /\["(get|id|literal|geometry-type|to-number|case|match|coalesce)"/.test(JSON.stringify(existing));
+      var expression = isExpression(existing);
       var mine = expression ? ['!', ['in', ['id'], ['literal', hidden]]] : ['!in', '$id'].concat(hidden);
       return existing ? ['all', existing, mine] : mine;
     }

@@ -59,6 +59,17 @@ test('the replaced buildings are filtered out in the layer filter\'s own syntax'
   assert.equal(expression[2][0], '!');
   assert.ok(expression[2][1][2][1].includes(id));
   assert.deepEqual(plain(landmarks.filter(undefined)).slice(0, 2), ['!in', '$id']);
+  // The live style's own filter is an expression without get or literal.
+  const live = plain(landmarks.filter(['!', ['has', 'hide_3d']]));
+  assert.deepEqual(live.slice(0, 2), ['all', ['!', ['has', 'hide_3d']]]);
+  assert.deepEqual(live[2].slice(0, 1), ['!']);
+  assert.deepEqual(live[2][1].slice(0, 2), ['in', ['id']]);
+  for (const legacyFilter of [['has', 'x'], ['==', 'kind', 'a'], ['in', 'kind', 'a', 'b'], ['all', ['!has', 'x'], ['==', '$type', 'Polygon']]]) {
+    assert.deepEqual(plain(landmarks.filter(legacyFilter))[2].slice(0, 2), ['!in', '$id'], JSON.stringify(legacyFilter));
+  }
+  for (const expressionFilter of [['==', ['get', 'a'], 1], ['all', ['!', ['has', 'x']], ['has', 'y']], ['in', ['get', 'a'], ['literal', [1]]]]) {
+    assert.equal(plain(landmarks.filter(expressionFilter))[2][0], '!', JSON.stringify(expressionFilter));
+  }
 });
 
 test('only sites near the view are drawn', () => {

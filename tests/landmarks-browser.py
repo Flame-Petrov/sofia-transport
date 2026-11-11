@@ -36,7 +36,7 @@ style = {'version': 8, 'glyphs': 'ofm://fixture.example/fonts/{fontstack}/{range
                            'tiles': ['ofm://fixture.example/14mock/{z}/{x}/{y}.pbf']}},
     'layers': [{'id': 'background', 'type': 'background', 'paint': {'background-color': '#e9ebe6'}},
         {'id': 'city', 'type': 'fill', 'source': 'street', 'source-layer': 'building', 'paint': {'fill-color': 'hsl(40,20%,80%)'}},
-        {'id': 'blocks', 'type': 'fill-extrusion', 'source': 'street', 'source-layer': 'building',
+        {'id': 'blocks', 'type': 'fill-extrusion', 'source': 'street', 'source-layer': 'building', 'filter': ['!', ['has', 'hide_3d']],   # as in the live style
          'paint': {'fill-extrusion-height': ['get', 'render_height']}}]}
 
 with sync_playwright() as pw:
@@ -107,6 +107,7 @@ with sync_playwright() as pw:
     hold = page.evaluate('({ by: ((qaStart - qaMap.getBearing()) % 360 + 360) % 360, steps: qaBearings.length })')
     print('keyboard hold', hold, flush=True)
     assert 60 < hold['by'] < 110 and hold['steps'] >= 10, hold
+    assert page.evaluate('qaMap.queryRenderedFeatures({layers:["blocks-material"]}).length') > 50, 'buildings are drawn'
     assert not errors, errors
     browser.close()
 server.shutdown()
