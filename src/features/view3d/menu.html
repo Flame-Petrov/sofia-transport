@@ -12,6 +12,12 @@
       <label class="dg-switch" id="v3ShadowRow" hidden><span>Shadows</span><input type="checkbox" id="v3Shadows" role="switch"><span class="sw" aria-hidden="true"></span></label>
       <div id="v3DayHint" class="pl-hint" hidden>The sun and moon cross the sky at Sofia's real time. Light, sky and map colours follow them, windows and vehicle lamps come on after dark. Off shows a fixed afternoon.</div>
     </div>
+    <!-- What the 3D view draws: each saved on its own (on unless '0'). Buildings off with landmarks on leaves the monuments and vehicles. -->
+    <div id="v3ShowRow" hidden>
+      <label class="dg-switch"><span>3D vehicle models</span><input type="checkbox" id="v3VehicleModels" role="switch"><span class="sw" aria-hidden="true"></span></label>
+      <label class="dg-switch"><span>3D buildings</span><input type="checkbox" id="v3Buildings" role="switch"><span class="sw" aria-hidden="true"></span></label>
+      <label class="dg-switch" id="v3LandmarkRow"><span>Landmarks and monuments</span><input type="checkbox" id="v3Landmarks" role="switch"><span class="sw" aria-hidden="true"></span></label>
+    </div>
     <div id="v3TextureRow" hidden>
       <label class="dg-switch"><span>3D building textures</span><input type="checkbox" id="v3Textures" role="switch" aria-describedby="v3TextureKey"><span class="sw" aria-hidden="true"></span></label>
       <div id="v3TextureKey" class="pl-hint" hidden>Plaster, panel, brick, glass and stone façades in varied colours, with tiled and flat roofs.</div>

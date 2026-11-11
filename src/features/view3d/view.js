@@ -73,6 +73,10 @@
       else delete keyTurn.held[event.key];
     }
     textureBox.checked = store('sofia_3d_building_textures') === '1';
+    var vehicleModelBox = document.getElementById('v3VehicleModels'), buildingBox = document.getElementById('v3Buildings'), landmarkBox = document.getElementById('v3Landmarks');
+    vehicleModelBox.checked = store('sofia_3d_vehicle_models') !== '0';
+    buildingBox.checked = store('sofia_3d_buildings') !== '0';
+    landmarkBox.checked = store('sofia_3d_landmarks') !== '0';
     houseBox.checked = store('sofia_3d_house_designs') === '1';
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
     var HANDLERS = ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'];
@@ -104,7 +108,9 @@
       if (a.title !== t) { a.title = t; a.setAttribute('aria-label', t); }
       a.setAttribute('aria-pressed', view3d.on ? 'true' : 'false');
       document.getElementById('v3TerRow').hidden = !/^vector/.test(mapMode);   // v103
-      document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream;
+      document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream || !buildingBox.checked;
+      document.getElementById('v3ShowRow').hidden = !show;
+      document.getElementById('v3LandmarkRow').hidden = !window.DecompressionStream;
       document.getElementById('v3DayRow').hidden = !show;
       document.getElementById('v3TextureKey').hidden = !textureBox.checked;
       document.getElementById('v3HouseHint').hidden = !houseBox.checked;
@@ -706,7 +712,7 @@
       var fs = b.getSouth(), fn = b.getNorth(), fw = b.getWest(), fe = b.getEast();
       drawn = []; numberPoses = []; nearMoving = false;
       if (doFar) { farDue = now + 500; farPending=false; farDrawn = []; }
-      var close = m3.getZoom() >= vehicleModelZoom;
+      var close = vehicleModelBox.checked && m3.getZoom() >= vehicleModelZoom;
       var previousPoses = modelPoses, repaint = false;
       modelPoses = new Map();
 
@@ -1530,8 +1536,25 @@
     view3d.terrain = function () { return { on: terrainOn, set: !!(m3 && m3.getTerrain && m3.getTerrain()) }; };
 
     function applyBuildingTextures() {
-      if (m3 && m3.getSource('v3-me-acc') && window.DecompressionStream) buildingMaterials.apply(m3, textureBox.checked, houseBox.checked);
+      if (!m3 || !m3.getSource('v3-me-acc')) return;
+      buildingMaterials.apply(m3, textureBox.checked, houseBox.checked, { buildings: buildingBox.checked, landmarks: landmarkBox.checked }, !!window.DecompressionStream);
+      m3.triggerRepaint();
     }
+    // What the view draws: vehicle models, the city's buildings, and the landmark and monument models.
+    vehicleModelBox.onchange = function () {
+      store('sofia_3d_vehicle_models', this.checked ? '1' : '0');
+      view3d.vehicleSceneChanged();
+      if (m3) m3.triggerRepaint();
+    };
+    buildingBox.onchange = function () {
+      store('sofia_3d_buildings', this.checked ? '1' : '0');
+      refresh();
+      applyBuildingTextures();
+    };
+    landmarkBox.onchange = function () {
+      store('sofia_3d_landmarks', this.checked ? '1' : '0');
+      applyBuildingTextures();
+    };
     textureBox.onchange = function () {
       store('sofia_3d_building_textures', this.checked ? '1' : '0');
       refresh();

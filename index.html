@@ -1518,6 +1518,12 @@
       <label class="dg-switch" id="v3ShadowRow" hidden><span>Shadows</span><input type="checkbox" id="v3Shadows" role="switch"><span class="sw" aria-hidden="true"></span></label>
       <div id="v3DayHint" class="pl-hint" hidden>The sun and moon cross the sky at Sofia's real time. Light, sky and map colours follow them, windows and vehicle lamps come on after dark. Off shows a fixed afternoon.</div>
     </div>
+    <!-- What the 3D view draws: each saved on its own (on unless '0'). Buildings off with landmarks on leaves the monuments and vehicles. -->
+    <div id="v3ShowRow" hidden>
+      <label class="dg-switch"><span>3D vehicle models</span><input type="checkbox" id="v3VehicleModels" role="switch"><span class="sw" aria-hidden="true"></span></label>
+      <label class="dg-switch"><span>3D buildings</span><input type="checkbox" id="v3Buildings" role="switch"><span class="sw" aria-hidden="true"></span></label>
+      <label class="dg-switch" id="v3LandmarkRow"><span>Landmarks and monuments</span><input type="checkbox" id="v3Landmarks" role="switch"><span class="sw" aria-hidden="true"></span></label>
+    </div>
     <div id="v3TextureRow" hidden>
       <label class="dg-switch"><span>3D building textures</span><input type="checkbox" id="v3Textures" role="switch" aria-describedby="v3TextureKey"><span class="sw" aria-hidden="true"></span></label>
       <div id="v3TextureKey" class="pl-hint" hidden>Plaster, panel, brick, glass and stone façades in varied colours, with tiled and flat roofs.</div>
@@ -9858,9 +9864,11 @@
   var landmarks = (function () {
     var GLASS = [0.20, 0.30, 0.36], GOLD = [0.86, 0.68, 0.22], COPPER = [0.42, 0.60, 0.52], LEAD = [0.46, 0.49, 0.52];
     var STONE = [0.90, 0.87, 0.78], GRANITE = [0.62, 0.62, 0.60], DARK = [0.27, 0.26, 0.26], BRONZE = [0.33, 0.36, 0.28];
-    var hidden = [];
+    // Which models are drawn: the landmark buildings and monuments, and the malls (which follow the Buildings switch).
+    var shown = { landmarks: true, malls: true };
+    function drawn(site) { return site.k === 'mall' ? shown.malls : shown.landmarks; }
+    function setShown(landmarksOn, mallsOn) { shown.landmarks = !!landmarksOn; shown.malls = !!mallsOn; }
     landmarkSites.forEach(function (site) {
-      site.ids.forEach(function (id) { hidden.push(id); });
       site.reach = 0;
       for (var i = 0; i < site.p.length; i += 2) site.reach = Math.max(site.reach, Math.hypot(site.p[i], site.p[i + 1]));
     });
@@ -9877,7 +9885,11 @@
       if (['==', '!=', '<', '>', '<=', '>='].indexOf(op) >= 0) return nested;
       return true;
     }
+    // Only the buildings under a drawn model are taken out, so a model that is switched off leaves its plain building.
     function filter(existing) {
+      var hidden = [];
+      landmarkSites.forEach(function (site) { if (drawn(site)) site.ids.forEach(function (id) { hidden.push(id); }); });
+      if (!hidden.length) return existing;
       var expression = isExpression(existing);
       var mine = expression ? ['!', ['in', ['id'], ['literal', hidden]]] : ['!in', '$id'].concat(hidden);
       return existing ? ['all', existing, mine] : mine;
@@ -10274,6 +10286,7 @@
     function visible(bounds) {
       var seen = new Set(), west = bounds.getWest(), east = bounds.getEast(), south = bounds.getSouth(), north = bounds.getNorth();
       landmarkSites.forEach(function (site, i) {
+        if (!drawn(site)) return;
         var dLat = (site.reach + 120) / 110574, dLon = dLat / Math.cos(site.at[1] * Math.PI / 180);
         if (site.at[0] + dLon >= west && site.at[0] - dLon <= east && site.at[1] + dLat >= south && site.at[1] - dLat <= north) seen.add(i);
       });
@@ -10293,7 +10306,8 @@
       parts.forEach(function (part) { all.set(part, offset); offset += part.length; });
       return all;
     }
-    return { suffix: '-landmarks', minZoom: 12, visible: visible, vertices: vertices, filter: filter, mesh: mesh, sites: landmarkSites };
+    return { suffix: '-landmarks', minZoom: 12, visible: visible, vertices: vertices, filter: filter, mesh: mesh, sites: landmarkSites,
+      setShown: setShown, awake: function () { return shown.landmarks || shown.malls; } };
   })();
   // Close-range Sofia houses. Build the mesh in local metres around the mapped
   // footprint so a rotated street frontage keeps its original alignment.
@@ -10515,6 +10529,7 @@
   }
 
   // `canopy` is a fixed-model source (metro roofs, landmarks): { suffix, minZoom, visible(bounds), vertices(map, origin, visible) }.
+  // A source with awake() decides for itself whether it is drawn; the others follow the building layer's visibility.
   function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
     var map, program, buffer, matrixLoc, anchorLoc, position, color, normal, emitLoc, lightLocs, shadowProgram, origin;
     var dirty=true, count=0, lastBuild=0, terrain, view, built=-1, asleep=false;
@@ -10563,6 +10578,7 @@
     }
     return {
       id:materialLayer+(canopy ? canopy.suffix : '-houses'),type:'custom',renderingMode:'3d',
+      refresh:function(){dirty=true;},   // the fixed-model source changed what it shows
       onAdd:function(owner,gl){
         map=owner;
         if (!canopy) { view=buildingView(map,materialLayer); view.invalidate(); }
@@ -10585,7 +10601,7 @@
         map.on('move',moved);map.on('resize',resized);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
       },
       render:function(gl,matrix){
-        if(map.getZoom()<(canopy ? canopy.minZoom : 15) /* app zoom 16 */ || map.getLayoutProperty(materialLayer,'visibility')==='none'){
+        if(map.getZoom()<(canopy ? canopy.minZoom : 15) /* app zoom 16 */ || (canopy && canopy.awake ? !canopy.awake() : map.getLayoutProperty(materialLayer,'visibility')==='none')){
           asleep=true;return;
         }
         if (asleep) { asleep=false; dirty=true; if (view) view.invalidate(); }
@@ -11252,7 +11268,7 @@
       },
       render:function(gl,matrix) {
         var layer=map.getLayer(materialId);
-        if (!layer || map.getZoom()<(layer.minzoom || 0)) { asleep=true; return; }
+        if (!layer || map.getZoom()<(layer.minzoom || 0) || map.getLayoutProperty(materialId,'visibility')==='none') { asleep=true; return; }
         if (asleep) { asleep=false; dirty=true; view.invalidate(); }
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
         // The shared query decides when the visible buildings may have changed.
@@ -11295,7 +11311,7 @@
   }
   var buildingMaterials = (function () {
     var scheme = 'sofia-buildings', registered = false;
-    var facadeLayers = new WeakMap();
+    var facadeLayers = new WeakMap(), landmarkLayers = new WeakMap(), styleHidden = new WeakMap();
     // Roof caps by style and seed: clay tiles and sheet metal on older and smaller buildings,
     // felt, gravel and membrane on flat-roofed blocks. A mapped roof colour wins.
     var tiled = ['#a8644c','#93543f','#b4735a','#8a5a4c','#7d7f82'];
@@ -11365,25 +11381,44 @@
       }
       var copy = JSON.parse(JSON.stringify(layer));
       copy.id += '-material';
+      copy.metadata = { v3Material: true };
       copy.source = sourceId;
       copy.filter = landmarks.filter(copy.filter);   // landmark and mall models replace these buildings
       map3.addLayer(copy, layer.id);
       map3.addLayer(bulgarianHouseLayer(copy.id, sourceId, metroCanopies), layer.id);
-      map3.addLayer(bulgarianHouseLayer(copy.id, sourceId, landmarks), layer.id);
+      var models = bulgarianHouseLayer(copy.id, sourceId, landmarks);
+      map3.addLayer(models, layer.id);
+      if (!landmarkLayers.has(map3)) landmarkLayers.set(map3, []);
+      landmarkLayers.get(map3).push(models);
 
     }
 
-    function apply(map3, enabled, houses) {
+    // `show.buildings` draws the city's buildings (with the metro roofs and malls); `show.landmarks` draws
+    // the landmark and monument models, with or without the buildings around them. `prepared` is false
+    // where the bundled tiles cannot be read: only the plain extrusions exist there.
+    function apply(map3, enabled, houses, show, prepared) {
       var style = map3.getStyle();
+      var visibility = show.buildings ? 'visible' : 'none';
+      landmarks.setShown(show.landmarks, show.buildings);
+      (landmarkLayers.get(map3) || []).forEach(function (models) { models.refresh(); });
       style.layers.forEach(function (layer) {
         if (layer.type !== 'fill-extrusion' || layer['source-layer'] !== 'building') return;
-        var source = style.sources[layer.source];
-        if (!source.tiles || !source.tiles.every(function (url) { return /^ofm:\/\//.test(url); })) return;
-        if (!map3.getLayer(layer.id + '-material')) {
-          if (layer.layout && layer.layout.visibility === 'none') return;
-          install(map3, layer, source);
-        }
+        if (layer.metadata && layer.metadata.v3Material) return;   // our own copy, handled with its original
         var material = layer.id + '-material';
+        if (!styleHidden.has(map3)) styleHidden.set(map3, new Map());
+        var first = styleHidden.get(map3);
+        if (!first.has(layer.id)) first.set(layer.id, !!layer.layout && layer.layout.visibility === 'none');
+        if (first.get(layer.id)) return;   // hidden by the style itself: left alone
+        var source = style.sources[layer.source];
+        if (!prepared || !source.tiles || !source.tiles.every(function (url) { return /^ofm:\/\//.test(url); })) {
+          if (!map3.getLayer(material)) map3.setLayoutProperty(layer.id, 'visibility', visibility);
+          return;
+        }
+        if (!map3.getLayer(material)) install(map3, layer, source);
+        map3.setLayoutProperty(layer.id, 'visibility', visibility);
+        map3.setLayoutProperty(material, 'visibility', visibility);
+        var wanted = landmarks.filter(layer.filter);
+        if (JSON.stringify(map3.getFilter(material)) !== JSON.stringify(wanted)) map3.setFilter(material, wanted);
         var textured = enabled || houses;
         map3.setPaintProperty(material, 'fill-extrusion-opacity', textured ? 1 : VIEW3D_BUILDING_OPACITY);
         map3.setPaintProperty(material, 'fill-extrusion-color', enabled ? ROOF_COLOR : houses ? '#a89d8e' : layer.paint['fill-extrusion-color']);
@@ -11808,6 +11843,10 @@
       else delete keyTurn.held[event.key];
     }
     textureBox.checked = store('sofia_3d_building_textures') === '1';
+    var vehicleModelBox = document.getElementById('v3VehicleModels'), buildingBox = document.getElementById('v3Buildings'), landmarkBox = document.getElementById('v3Landmarks');
+    vehicleModelBox.checked = store('sofia_3d_vehicle_models') !== '0';
+    buildingBox.checked = store('sofia_3d_buildings') !== '0';
+    landmarkBox.checked = store('sofia_3d_landmarks') !== '0';
     houseBox.checked = store('sofia_3d_house_designs') === '1';
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
     var HANDLERS = ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'];
@@ -11839,7 +11878,9 @@
       if (a.title !== t) { a.title = t; a.setAttribute('aria-label', t); }
       a.setAttribute('aria-pressed', view3d.on ? 'true' : 'false');
       document.getElementById('v3TerRow').hidden = !/^vector/.test(mapMode);   // v103
-      document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream;
+      document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream || !buildingBox.checked;
+      document.getElementById('v3ShowRow').hidden = !show;
+      document.getElementById('v3LandmarkRow').hidden = !window.DecompressionStream;
       document.getElementById('v3DayRow').hidden = !show;
       document.getElementById('v3TextureKey').hidden = !textureBox.checked;
       document.getElementById('v3HouseHint').hidden = !houseBox.checked;
@@ -12441,7 +12482,7 @@
       var fs = b.getSouth(), fn = b.getNorth(), fw = b.getWest(), fe = b.getEast();
       drawn = []; numberPoses = []; nearMoving = false;
       if (doFar) { farDue = now + 500; farPending=false; farDrawn = []; }
-      var close = m3.getZoom() >= vehicleModelZoom;
+      var close = vehicleModelBox.checked && m3.getZoom() >= vehicleModelZoom;
       var previousPoses = modelPoses, repaint = false;
       modelPoses = new Map();
 
@@ -13265,8 +13306,25 @@
     view3d.terrain = function () { return { on: terrainOn, set: !!(m3 && m3.getTerrain && m3.getTerrain()) }; };
 
     function applyBuildingTextures() {
-      if (m3 && m3.getSource('v3-me-acc') && window.DecompressionStream) buildingMaterials.apply(m3, textureBox.checked, houseBox.checked);
+      if (!m3 || !m3.getSource('v3-me-acc')) return;
+      buildingMaterials.apply(m3, textureBox.checked, houseBox.checked, { buildings: buildingBox.checked, landmarks: landmarkBox.checked }, !!window.DecompressionStream);
+      m3.triggerRepaint();
     }
+    // What the view draws: vehicle models, the city's buildings, and the landmark and monument models.
+    vehicleModelBox.onchange = function () {
+      store('sofia_3d_vehicle_models', this.checked ? '1' : '0');
+      view3d.vehicleSceneChanged();
+      if (m3) m3.triggerRepaint();
+    };
+    buildingBox.onchange = function () {
+      store('sofia_3d_buildings', this.checked ? '1' : '0');
+      refresh();
+      applyBuildingTextures();
+    };
+    landmarkBox.onchange = function () {
+      store('sofia_3d_landmarks', this.checked ? '1' : '0');
+      applyBuildingTextures();
+    };
     textureBox.onchange = function () {
       store('sofia_3d_building_textures', this.checked ? '1' : '0');
       refresh();

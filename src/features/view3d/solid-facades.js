@@ -162,7 +162,7 @@
       },
       render:function(gl,matrix) {
         var layer=map.getLayer(materialId);
-        if (!layer || map.getZoom()<(layer.minzoom || 0)) { asleep=true; return; }
+        if (!layer || map.getZoom()<(layer.minzoom || 0) || map.getLayoutProperty(materialId,'visibility')==='none') { asleep=true; return; }
         if (asleep) { asleep=false; dirty=true; view.invalidate(); }
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
         // The shared query decides when the visible buildings may have changed.

@@ -25,3 +25,5 @@ To check movement, zoom in on a moving bus with the camera stationary, then foll
 The selected bus's remaining route starts at its displayed ground position. In `src/features/vehicles/runs.js`, a route-matched bus supplies its distance along the shape directly. During a straight GPS glide, the displayed position is projected onto the shape using `motion.js`. If the bus is too far away to match, the last known progress is retained until it rejoins. Both map modes use the first shape vertex ahead of that distance for the line and trim the direction arrows as the bus passes. To verify, follow a bus across several vertices in 3D, then switch to 2D and check the line and arrows behind it.
 
 Scheduled metro trains use the same articulated mesh as trams. In `src/features/view3d/view.js`, each carriage takes its heading from the timetable path between its ends. To check a turn, follow a metro train in 3D at zoom 16 or closer. The front should enter the bend first and the rear should straighten last, while the number stays over the center.
+
+The **3D vehicle models** switch turns the meshes off and leaves the markers: see [what the 3D view draws](3d-show-switches.md).

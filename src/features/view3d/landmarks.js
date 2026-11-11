@@ -7,9 +7,11 @@
   var landmarks = (function () {
     var GLASS = [0.20, 0.30, 0.36], GOLD = [0.86, 0.68, 0.22], COPPER = [0.42, 0.60, 0.52], LEAD = [0.46, 0.49, 0.52];
     var STONE = [0.90, 0.87, 0.78], GRANITE = [0.62, 0.62, 0.60], DARK = [0.27, 0.26, 0.26], BRONZE = [0.33, 0.36, 0.28];
-    var hidden = [];
+    // Which models are drawn: the landmark buildings and monuments, and the malls (which follow the Buildings switch).
+    var shown = { landmarks: true, malls: true };
+    function drawn(site) { return site.k === 'mall' ? shown.malls : shown.landmarks; }
+    function setShown(landmarksOn, mallsOn) { shown.landmarks = !!landmarksOn; shown.malls = !!mallsOn; }
     landmarkSites.forEach(function (site) {
-      site.ids.forEach(function (id) { hidden.push(id); });
       site.reach = 0;
       for (var i = 0; i < site.p.length; i += 2) site.reach = Math.max(site.reach, Math.hypot(site.p[i], site.p[i + 1]));
     });
@@ -26,7 +28,11 @@
       if (['==', '!=', '<', '>', '<=', '>='].indexOf(op) >= 0) return nested;
       return true;
     }
+    // Only the buildings under a drawn model are taken out, so a model that is switched off leaves its plain building.
     function filter(existing) {
+      var hidden = [];
+      landmarkSites.forEach(function (site) { if (drawn(site)) site.ids.forEach(function (id) { hidden.push(id); }); });
+      if (!hidden.length) return existing;
       var expression = isExpression(existing);
       var mine = expression ? ['!', ['in', ['id'], ['literal', hidden]]] : ['!in', '$id'].concat(hidden);
       return existing ? ['all', existing, mine] : mine;
@@ -423,6 +429,7 @@
     function visible(bounds) {
       var seen = new Set(), west = bounds.getWest(), east = bounds.getEast(), south = bounds.getSouth(), north = bounds.getNorth();
       landmarkSites.forEach(function (site, i) {
+        if (!drawn(site)) return;
         var dLat = (site.reach + 120) / 110574, dLon = dLat / Math.cos(site.at[1] * Math.PI / 180);
         if (site.at[0] + dLon >= west && site.at[0] - dLon <= east && site.at[1] + dLat >= south && site.at[1] - dLat <= north) seen.add(i);
       });
@@ -442,5 +449,6 @@
       parts.forEach(function (part) { all.set(part, offset); offset += part.length; });
       return all;
     }
-    return { suffix: '-landmarks', minZoom: 12, visible: visible, vertices: vertices, filter: filter, mesh: mesh, sites: landmarkSites };
+    return { suffix: '-landmarks', minZoom: 12, visible: visible, vertices: vertices, filter: filter, mesh: mesh, sites: landmarkSites,
+      setShown: setShown, awake: function () { return shown.landmarks || shown.malls; } };
   })();

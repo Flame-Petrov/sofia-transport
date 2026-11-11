@@ -80,3 +80,24 @@ test('only sites near the view are drawn', () => {
   assert.ok(!centre.has(index('ndk')) && !centre.has(index('tvtower')));
   assert.equal(landmarks.visible(bounds(23.0, 42.9, 23.01, 42.91)).size, 0);
 });
+
+test('switching landmarks or malls off stops drawing them and gives their buildings back', () => {
+  const plain = value => JSON.parse(JSON.stringify(value));
+  const ids = f => (f ? plain(f)[2] : []);
+  const ndk = site('ndk').ids[0], mall = site('mall').ids[0];
+  const all = { getWest: () => 23.2, getEast: () => 23.5, getSouth: () => 42.6, getNorth: () => 42.8 };
+  const kinds = () => [...landmarks.visible(all)].map(i => landmarks.sites[i].k);
+  try {
+    landmarks.setShown(true, false);   // buildings off: landmarks and monuments only
+    assert.ok(landmarks.awake());
+    assert.ok(kinds().includes('tsar') && kinds().includes('ndk') && !kinds().includes('mall'));
+    assert.ok(ids(landmarks.filter(['!has', 'hide_3d'])).includes(ndk) && !ids(landmarks.filter(['!has', 'hide_3d'])).includes(mall));
+    landmarks.setShown(false, true);   // landmarks off: malls stay, the cathedral is an ordinary building again
+    assert.ok(kinds().every(k => k === 'mall') && kinds().length >= 15);
+    assert.ok(!ids(landmarks.filter(['!has', 'hide_3d'])).includes(ndk) && ids(landmarks.filter(['!has', 'hide_3d'])).includes(mall));
+    landmarks.setShown(false, false);
+    assert.ok(!landmarks.awake());
+    assert.equal(landmarks.visible(all).size, 0);
+    assert.deepEqual(plain(landmarks.filter(['!has', 'hide_3d'])), ['!has', 'hide_3d']);
+  } finally { landmarks.setShown(true, true); }
+});

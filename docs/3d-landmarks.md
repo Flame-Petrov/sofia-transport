@@ -19,6 +19,8 @@ Positions, outlines and long-axis bearings come from OpenStreetMap. Heights of t
 - The models are drawn by the fixed-model mode of the layer in `bulgarian-houses.js`, the same one that draws the metro roofs. `building-materials.js` adds it as `<material layer>-landmarks`.
 - `landmarks.filter()` removes the replaced building features from the extrusion layer, in legacy or expression filter syntax to match the style. Walls and house designs read that layer, so they skip those buildings too. Mall parts taller than the mall, such as office towers above it, are kept.
 
+The **Landmarks and monuments** switch turns the landmark and monument models off, and malls follow **3D buildings**: see [what the 3D view draws](3d-show-switches.md).
+
 ## Verify
 
 - `node --test tests/*.test.cjs`: `tests/landmarks.test.cjs` checks that every mesh is finite and stays on its site, landmark heights, mall heights and lit windows, both filter syntaxes and view culling.
