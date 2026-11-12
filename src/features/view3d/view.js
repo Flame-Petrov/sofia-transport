@@ -77,6 +77,8 @@
     vehicleModelBox.checked = store('sofia_3d_vehicle_models') !== '0';
     buildingBox.checked = store('sofia_3d_buildings') !== '0';
     landmarkBox.checked = store('sofia_3d_landmarks') !== '0';
+    var roadBox = document.getElementById('v3Roads'), roads = null;   // the 3D road layer while the 3D map is open
+    roadBox.checked = store('sofia_3d_roads') !== '0';
     houseBox.checked = store('sofia_3d_house_designs') === '1';
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
     var HANDLERS = ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'];
@@ -111,6 +113,7 @@
       document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream || !buildingBox.checked;
       document.getElementById('v3ShowRow').hidden = !show;
       document.getElementById('v3LandmarkRow').hidden = !window.DecompressionStream;
+      document.getElementById('v3RoadRow').hidden = !roadStore.available();
       document.getElementById('v3DayRow').hidden = !show;
       document.getElementById('v3TextureKey').hidden = !textureBox.checked;
       document.getElementById('v3HouseHint').hidden = !houseBox.checked;
@@ -319,6 +322,18 @@
       });
       // the tracked route: under the buildings (a building in front hides it, as it hides the street)
       var under = firstOf('fill-extrusion') || sym, U = ui;
+      // Modelled roads and tracks: over the flat street lines, under the route lines, buildings and labels.
+      // The street and rail lines they replace are hidden while the meshes cover the view (tunnels and paths stay).
+      if (roadStore.available()) {
+        try {
+          roads = roadLayer({ id: 'v3-roads', minzoom: VIEW3D_ROAD_ZOOM - 1, budget: (IS_IOS ? 12 : 24) * 1048576,
+            flat: m3.getStyle().layers.filter(function (l) {
+              return l.type === 'line' && l['source-layer'] === 'transportation' && !/tunnel|path|pedestrian|ferry|pier|aeroway/.test(l.id);
+            }).map(function (l) { return l.id; }) });
+          roads.setShown(roadBox.checked);
+          m3.addLayer(roads, under);
+        } catch (e) { roads = null; console.warn('3D roads failed:', e); }
+      }
       ['v3-trk-tail', 'v3-trk-head', 'v3-trk-x'].forEach(function (id) { m3.addSource(id, { type: 'geojson', data: EMPTY }); });
       var caseW = ['interpolate', ['linear'], ['zoom'], 11, 5, 15, 12], lineW = ['interpolate', ['linear'], ['zoom'], 11, 3, 15, 7];
       var round = { 'line-cap': 'round', 'line-join': 'round' };
@@ -467,7 +482,21 @@
     var railSource, railSegments = [], railsDirty = true, railRefreshAt = 0;
     var railNeighbors = new Map();
     var modelPoses = new Map();
+    var roadRailVersion = -1;   // the road tiles' centreline version the rails were last built from, or -1
     function refreshRails(now) {
+      // While the road meshes cover the view, trams follow the centrelines stored in the road tiles:
+      // they sit exactly on the drawn rails and the street tiles are not queried.
+      if (roads && roads.covers()) {
+        var drawnRails = roadStore.centrelines();
+        if (drawnRails.version === roadRailVersion) return;
+        roadRailVersion = drawnRails.version;
+        railSegments = [];
+        railNeighbors.clear();
+        drawnRails.lines.forEach(function (line) { if (line.kind === 0) addLine(line.points); });
+        fleetDirty = true;
+        return;
+      }
+      if (roadRailVersion !== -1) { roadRailVersion = -1; railsDirty = true; railRefreshAt = 0; }
       if (!railSource || !railsDirty || now < railRefreshAt) return;
       railsDirty = false;
       railRefreshAt = now + 350;
@@ -478,16 +507,17 @@
       tracks.forEach(function (track) {
         var g = track.geometry;
         var lines = g.type === 'MultiLineString' ? g.coordinates : g.type === 'LineString' ? [g.coordinates] : [];
-        lines.forEach(function (line) {
-          for (var i = 1; i < line.length; i++) {
-            var a = line[i-1], b = line[i];
-            if (a[0] === b[0] && a[1] === b[1]) continue;
-            railSegments.push([a, b]);
-            connect(a, b);
-            connect(b, a);
-          }
-        });
+        lines.forEach(addLine);
       });
+      function addLine(line) {
+        for (var i = 1; i < line.length; i++) {
+          var a = line[i-1], b = line[i];
+          if (a[0] === b[0] && a[1] === b[1]) continue;
+          railSegments.push([a, b]);
+          connect(a, b);
+          connect(b, a);
+        }
+      }
       function connect(a, b) {
         var key = a.join(',');
         if (!railNeighbors.has(key)) railNeighbors.set(key, new Map());
@@ -1166,6 +1196,7 @@
         daylightMap.detach();
         m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
+        roads = null; roadRailVersion = -1;
         numberPoses = []; modelPoses.clear(); railNeighbors.clear(); railSegments = []; trkMk = null; stopMks = {}; stopsDrawn = []; shown = []; drawn = []; farDrawn = []; labelsBy = null; rtMks = {}; rtSig = ''; fc.off = lc.off = null; userMoving = pointerDown = false;
         window.removeEventListener('mouseup', pointerOff, true); window.removeEventListener('touchend', pointerOff, true); window.removeEventListener('touchcancel', pointerOff, true);
         mapEl.classList.remove('v3on');
@@ -1508,6 +1539,12 @@
         }
         rows.push(['2D map while open', freed ? 'freed (VIEW3D_FREE_2D)' : 'kept (instant return)']);
         rows.push(['Terrain', terrainOn ? 'on (Mapterhorn)' : 'off']);   // v103
+        if (roads) {
+          var rc = roads.counters, gov = roadStore.governor.step();
+          rows.push(['3D roads', !roadBox.checked ? 'off' : roadStore.ready.length + ' tiles · ' + (roadStore.usedBytes() / 1048576).toFixed(1) + ' MB · last frame ' +
+            rc.draws + ' draws, ' + fmtN(Math.round(rc.triangles)) + ' triangles · ' + (roads.covers() ? 'flat lines hidden' : 'flat lines shown') +
+            (gov ? ' · detail reduced ' + gov + '/5' : '')]);
+        }
       }
       rows.push(['Opened', info.opens + '× this session' + (info.lastClose ? ' · last closed: ' + info.lastClose : '') + (info.lost ? ' · memory lost ' + info.lost + '×' : '')]);
       return rows;
@@ -1546,6 +1583,11 @@
       view3d.vehicleSceneChanged();
       if (m3) m3.triggerRepaint();
     };
+    roadBox.onchange = function () {
+      store('sofia_3d_roads', this.checked ? '1' : '0');
+      if (roads) roads.setShown(this.checked);
+    };
+    view3d.roads = function () { return roads; };
     buildingBox.onchange = function () {
       store('sofia_3d_buildings', this.checked ? '1' : '0');
       refresh();

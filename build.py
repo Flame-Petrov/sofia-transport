@@ -11,7 +11,7 @@ from tempfile import NamedTemporaryFile
 
 SITE = Path(__file__).resolve().parent
 SOURCE = SITE / "src"
-LOCAL_RELEASE = "103_public-transport.html"
+LOCAL_RELEASE = "104_public-transport.html"
 INCLUDE = re.compile(r"^\{\{include ([\w./-]+)\}\}\n", re.MULTILINE)
 
 
@@ -36,6 +36,21 @@ def render(standalone):
                 tiles[SITE / relative] = gzip.decompress(base64.b64decode(value))
                 manifest[key] = relative
             return credit + "  var sofiaBuildingTiles = " + json.dumps(manifest) + ";\n"
+        if path.name == "road-tiles.js":
+            # A leading "-" marks a tile the standalone page leaves out: it keeps an empty entry there,
+            # which the app reads as "not prepared here" and shows the flat street lines instead.
+            head, table = content.split("  var sofiaRoadTiles = ", 1)
+            manifest = {}
+            for key, value in json.loads(table.strip().removesuffix(";")).items():
+                if not re.fullmatch(r"\d+/\d+", key):
+                    raise ValueError(f"Invalid road tile key: {key}")
+                if standalone:
+                    manifest[key] = "" if value.startswith("-") else value
+                else:
+                    relative = f"tiles/roads/15/{key}.bin.gz"
+                    tiles[SITE / relative] = base64.b64decode(value.removeprefix("-"))
+                    manifest[key] = relative
+            return head + "  var sofiaRoadTiles = " + json.dumps(manifest, separators=(",", ":")) + ";\n"
         return content
 
     page = INCLUDE.sub(include, template.read_text(encoding="utf-8"))

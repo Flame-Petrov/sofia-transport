@@ -32,6 +32,7 @@
   var VIEW3D_MAX_PITCH = 60;          // most tilt allowed (MapLibre calls more than 60° experimental)
   var MAP_DPR_MAX = 2;                // WebGL drawing-buffer cap (phone layouts use 1.5)
   var VIEW3D_BUILDING_ZOOM = 15;      // 3D map: buildings stand up from this zoom
+  var VIEW3D_ROAD_ZOOM = 16;          // 3D map: modelled roads and tracks replace the flat street lines from this zoom
   var VIEW3D_BUILDING_OPACITY = 0.75; // a little see-through, so vehicles and lines behind buildings still show
   var VIEW3D_RETRY_MS = 864e5;        // after the 3D map ran out of memory on this device, its button is hidden this long
   var VIEW3D_VEH_HZ = 15;             // Fleet membership and near labels. Moving meshes update every frame.
