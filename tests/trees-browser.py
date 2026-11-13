@@ -21,7 +21,8 @@ root = Path(__file__).resolve().parents[1]
 RELEASE = max(root.parent.glob('*_public-transport.html'), key=lambda p: int(p.name.split('_')[0]))
 CAMERAS = [('borisova', 23.3420, 42.6830, 16.4, 62, 30), ('citygarden', 23.3256, 42.6950, 17.3, 60, 110),
     ('southpark', 23.3075, 42.6720, 16.3, 62, 200), ('doctors', 23.3335, 42.6940, 17.6, 62, 330),
-    ('street', 23.3290, 42.6880, 17.8, 66, 20), ('close', 23.3368, 42.6865, 18.6, 68, 60)]
+    ('street', 23.3290, 42.6880, 17.8, 66, 20), ('close', 23.3368, 42.6865, 18.6, 68, 60),
+    ('forest', 23.3455, 42.6745, 15.6, 50, 200)]   # the whole wood of Borisova Gradina: far more trees than the budget
 if args.only: CAMERAS = [c for c in CAMERAS if c[0] in args.only.split(',')]
 
 class Quiet(SimpleHTTPRequestHandler):
@@ -86,4 +87,7 @@ with sync_playwright() as pw:
     print(report.get('switch'))
     browser.close()
     assert not any(r['errors'] for k, r in report.items() if k != 'switch'), 'page errors'
+    for k, r in report.items():
+        view = k != 'switch' and r['stats']['view']
+        if view and view['trees'] > 2000: assert view['drawn'] > 2000 and view['covered'] >= view['cells'] - 2, 'cells left without trees: ' + str(view)
     assert report['switch'] == {'saved': '0', 'shown': False}

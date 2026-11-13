@@ -1,6 +1,8 @@
   // Trees in the 3D view: every mapped tree and tree row, and parks and woods filled by tools/tree_data.py.
   // Eight species shapes are built here in metres for a tree one metre tall; each tree is one instance row
-  // (position, height, turn and a seed) and every shape is drawn in one instanced call. Deciduous crowns
+  // (position, height, turn and a seed) and every shape is drawn in one instanced call. Every tree in view
+  // is considered: trees that are small on screen take a simpler shape, and when the view still holds more
+  // than the budget the distant ones are thinned, so no part of a wood is left empty. Deciduous crowns
   // follow Sofia's season: fresh in spring, deep green in summer, yellow, orange and red in autumn, bare
   // branches in winter. The tile format is described in tools/tree_data.py and docs/3d-trees.md.
   var trees = (function () {
@@ -8,13 +10,15 @@
     var EVERGREEN = { conifer: 1, pine: 1, thuja: 1 };
     var MIN_ZOOM = 15;   // MapLibre zoom (16 on the flat map)
     var ROW = 6;         // instance floats: x, y, z (metres from the origin), height, turn, seed
+    var FAR_COST = 0.3;  // what a simple far tree costs against the budget (about 30 triangles to a full tree's 95)
+    var NEAR_PX = 50;    // a 12 m tree drawn taller than this many pixels takes its full shape
     var table = typeof sofiaTreeTiles === 'object' && sofiaTreeTiles ? sofiaTreeTiles : {};
     var shown = true, seasonOverride = null;
     var param = typeof location === 'object' && /[?&]season=(spring|summer|late|autumn|winter)/.exec(location.search || '');
     if (param) seasonOverride = param[1];
 
     // ---- the tile store ----
-    var tiles = new Map(), loading = 0, changed = null, failures = 0;
+    var tiles = new Map(), loading = 0, changed = null, failures = 0, lastView = null;
     function gunzip(bytes) {
       if (bytes[0] !== 0x1f || bytes[1] !== 0x8b) return Promise.resolve(bytes.buffer);   // the server already unpacked it
       return new Response(new Blob([bytes]).stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer();
@@ -30,7 +34,8 @@
       for (var i = 0; i < text.length; i++) bytes[i] = text.charCodeAt(i);
       return gunzip(bytes);
     }
-    // A tile's 16 cells, each with its trees as Mercator x and y, kind and height.
+    function seed(x, y) { var h = Math.sin(x * 9.1e7 + y * 3.3e7) * 43758.5453; return h - Math.floor(h); }
+    // A tile's 16 cells, each with its trees as Mercator x and y, kind, height and a seed in [0, 1) from the position.
     function decode(buffer, tx, ty) {
       var head = new Uint32Array(buffer.slice(0, 64)), n = 0, k;
       for (k = 0; k < 16; k++) n += head[k];
@@ -38,11 +43,12 @@
       var xs = new Uint16Array(buffer.slice(64, 64 + 2 * n)), ys = new Uint16Array(buffer.slice(64 + 2 * n, 64 + 4 * n));
       var bytes = new Uint8Array(buffer, 64 + 4 * n, n), scale = 1 / 16384, cells = [], at = 0;
       for (k = 0; k < 16; k++) {
-        var count = head[k], cell = { x: new Float64Array(count), y: new Float64Array(count), kind: new Uint8Array(count), height: new Float32Array(count),
+        var count = head[k], cell = { x: new Float64Array(count), y: new Float64Array(count), kind: new Uint8Array(count), height: new Float32Array(count), seed: new Float32Array(count),
           x0: (tx + (k % 4) / 4) * scale, y0: (ty + Math.floor(k / 4) / 4) * scale, size: scale / 4 };
         for (var i = 0; i < count; i++, at++) {
           cell.x[i] = (tx + xs[at] / 65536) * scale; cell.y[i] = (ty + ys[at] / 65536) * scale;
           cell.kind[i] = bytes[at] >> 4; cell.height[i] = 3 + 1.6 * (bytes[at] & 15);
+          cell.seed[i] = seed(cell.x[i], cell.y[i]);
         }
         cells.push(cell);
       }
@@ -63,8 +69,8 @@
       return entry;
     }
 
-    // The cells near the camera, nearest first, until the budget is spent: Mercator bounds and centre.
-    function pick(west, north, east, south, cx, cy, budget) {
+    // Every loaded cell with trees inside the Mercator bounds.
+    function pick(west, north, east, south) {
       var n = 16384, found = [];
       for (var tx = Math.floor(west * n); tx <= Math.floor(east * n); tx++) for (var ty = Math.floor(north * n); ty <= Math.floor(south * n); ty++) {
         var key = tx + '/' + ty;
@@ -73,14 +79,10 @@
         if (!t.cells) continue;
         t.cells.forEach(function (cell, i) {
           if (!cell.x.length || cell.x0 > east || cell.x0 + cell.size < west || cell.y0 > south || cell.y0 + cell.size < north) return;
-          var dx = Math.max(0, Math.abs(cx - cell.x0 - cell.size / 2) - cell.size / 2), dy = Math.max(0, Math.abs(cy - cell.y0 - cell.size / 2) - cell.size / 2);
-          found.push({ key: key + '#' + i, cell: cell, d: Math.hypot(dx, dy) });
+          found.push({ key: key + '#' + i, cell: cell });
         });
       }
-      found.sort(function (a, b) { return a.d - b.d; });
-      var out = [], used = 0;
-      for (var i = 0; i < found.length && used < budget; i++) { out.push(found[i]); used += found[i].cell.x.length; }
-      return out;
+      return found;
     }
 
     // ---- the season ----
@@ -169,7 +171,7 @@
             }
             for (var j = 0; j < rings; j++) for (var i = 0; i < sides; i++) {
               var a = at(i, j), b2 = at(i + 1, j), c = at(i + 1, j + 1), d = at(i, j + 1);
-              if (j > 0) { vert(a.p, a.n, 1); vert(b2.p, b2.n, 1); vert(c.p, c.n, 1); }
+              if (j > 0 && j < rings - 1) { vert(a.p, a.n, 1); vert(b2.p, b2.n, 1); vert(c.p, c.n, 1); }
               if (j < rings - 1) { vert(a.p, a.n, 1); vert(c.p, c.n, 1); vert(d.p, d.n, 1); }
               else { vert(a.p, a.n, 1); vert(b2.p, b2.n, 1); vert(d.p, d.n, 1); }
             }
@@ -200,14 +202,14 @@
         return b;
       }
       function make(fn) { var b = builder(); fn(b); return b.done(); }
-      // Bare winter branches: a trunk and two tiers of limbs out to the crown's width.
-      function branches(b, z0, z1, width, limbs, part) {
-        b.trunk(0.03, 0.012, 0, z1 * 0.92, 5, part || 0);
+      // Bare winter branches: a trunk and two tiers of limbs out to the crown's width (`simple`: no twigs).
+      function branches(b, z0, z1, width, limbs, part, simple) {
+        b.trunk(0.03, 0.012, 0, z1 * 0.92, simple ? 3 : 5, part || 0);
         for (var i = 0; i < limbs; i++) {
           var a = 2 * Math.PI * (i + 0.37 * (i % 2)) / limbs, z = z0 + (z1 - z0) * (0.1 + 0.35 * (i % 3) / 2);
           var tip = [Math.cos(a) * width, Math.sin(a) * width, Math.min(z1, z + (z1 - z0) * 0.55)];
           b.branch([0, 0, z], tip, 0.014, 0.004);
-          b.branch([tip[0] * 0.55, tip[1] * 0.55, z + (tip[2] - z) * 0.55], [tip[0] * 0.75 + Math.cos(a + 0.9) * width * 0.3, tip[1] * 0.75 + Math.sin(a + 0.9) * width * 0.3, z1 * 0.97], 0.007, 0.003);
+          if (!simple) b.branch([tip[0] * 0.55, tip[1] * 0.55, z + (tip[2] - z) * 0.55], [tip[0] * 0.75 + Math.cos(a + 0.9) * width * 0.3, tip[1] * 0.75 + Math.sin(a + 0.9) * width * 0.3, z1 * 0.97], 0.007, 0.003);
         }
       }
       var leafy = {
@@ -227,39 +229,114 @@
         willow: make(function (b) { branches(b, 0.4, 0.9, 0.4, 6); }),
         small: make(function (b) { branches(b, 0.4, 0.95, 0.34, 5); })
       };
-      return { leafy: leafy, winter: winter };
+      // The same trees for the distance: a three-sided trunk and one lump of crown, about 30 triangles.
+      var far = {
+        broad: make(function (b) { b.trunk(0.035, 0.022, 0, 0.5, 3, 0); b.blob(0, 0, 0.66, 0.36, 0.35, 0.33, 6, 3); }),
+        conifer: make(function (b) { b.trunk(0.03, 0.018, 0, 0.25, 3, 0); b.cone(0.29, 0.1, 0.6, 5); b.cone(0.19, 0.45, 1.0, 5); }),
+        pine: make(function (b) { b.trunk(0.032, 0.02, 0, 0.78, 3, 0, 0.05, 0.02); b.blob(0.04, 0.02, 0.82, 0.3, 0.27, 0.14, 6, 3); }),
+        poplar: make(function (b) { b.trunk(0.03, 0.02, 0, 0.25, 3, 0); b.blob(0, 0, 0.58, 0.13, 0.13, 0.42, 5, 3); }),
+        thuja: make(function (b) { b.blob(0, 0, 0.5, 0.19, 0.19, 0.5, 5, 3); }),
+        birch: make(function (b) { b.trunk(0.025, 0.012, 0, 0.62, 3, 2); b.blob(0, 0, 0.7, 0.22, 0.21, 0.3, 5, 3); }),
+        willow: make(function (b) { b.trunk(0.045, 0.03, 0, 0.42, 3, 0); b.blob(0, 0, 0.58, 0.42, 0.4, 0.36, 6, 3, 0.3); }),
+        small: make(function (b) { b.trunk(0.04, 0.025, 0, 0.42, 3, 0); b.blob(0, 0, 0.7, 0.36, 0.35, 0.3, 6, 3); })
+      };
+      var farWinter = {
+        broad: make(function (b) { branches(b, 0.45, 0.95, 0.33, 3, 0, true); }),
+        poplar: make(function (b) { branches(b, 0.2, 1.0, 0.11, 3, 0, true); }),
+        birch: make(function (b) { branches(b, 0.4, 0.97, 0.2, 3, 2, true); }),
+        willow: make(function (b) { branches(b, 0.4, 0.9, 0.4, 3, 0, true); }),
+        small: make(function (b) { branches(b, 0.4, 0.95, 0.34, 3, 0, true); })
+      };
+      return { leafy: leafy, winter: winter, far: far, farWinter: farWinter };
     }
     var meshes = null;
-    function mesh(kind, now) {
+    function mesh(kind, now, far) {
       meshes = meshes || shapes();
-      return bare(kind, now) ? meshes.winter[kind] : meshes.leafy[kind];
+      return bare(kind, now) ? (far ? meshes.farWinter : meshes.winter)[kind] : (far ? meshes.far : meshes.leafy)[kind];
     }
 
     // ---- instance rows ----
-    // The rows for the picked cells, grouped by kind, in metres from `origin` (a MercatorCoordinate with .unit).
-    function seed(x, y) { var h = Math.sin(x * 9.1e7 + y * 3.3e7) * 43758.5453; return h - Math.floor(h); }
-    function rows(cells, origin, lift) {
-      var counts = new Array(KINDS.length).fill(0);
-      cells.forEach(function (c) { for (var i = 0; i < c.cell.kind.length; i++) counts[c.cell.kind[i]]++; });
-      var offsets = [], total = 0;
-      counts.forEach(function (n, k) { offsets[k] = total; total += n; });
-      var data = new Float32Array(total * ROW), fill = offsets.slice();
+    // Where the camera is: the Mercator point under it, its height in metres, one metre in Mercator units and
+    // `near`, the distance within which a tree is large enough on screen for its full shape. The position is
+    // rounded so a slow drift does not ask for new rows every frame.
+    function eye(map, center) {
+      var t = map.transform, h = map.getCanvas().clientHeight || 600;
+      var focal = h / 2 / Math.tan((t && t.fov || 36.87) * Math.PI / 360), world = 512 * Math.pow(2, map.getZoom());
+      var pitch = map.getPitch() * Math.PI / 180, bearing = map.getBearing() * Math.PI / 180, under = focal * Math.sin(pitch);
+      var unit = center.meterInMercatorCoordinateUnits(), near = 12 * focal / NEAR_PX, step = near / 8 * unit;
+      var height = focal * Math.cos(pitch) / world / unit;
+      return { x: Math.round((center.x - under * Math.sin(bearing) / world) / step) * step, y: Math.round((center.y + under * Math.cos(bearing) / world) / step) * step,
+        height: Math.pow(1.06, Math.round(Math.log(Math.max(1, height)) / Math.log(1.06))), unit: unit, near: near };
+    }
+    // The rows for the cells in view, grouped by kind and detail, in metres from `origin` (a MercatorCoordinate
+    // with .unit). With an eye (see above) and a budget, trees beyond eye.near take the simple shape, and when
+    // the view costs more than the budget a tree at distance d stays with a chance of range / d, where `range`
+    // is the distance that spends the budget exactly: the foreground stays whole and the distance thins evenly.
+    var distances = new Float32Array(0), slots = new Uint8Array(0);
+    function rows(cells, origin, lift, eye, budget) {
+      var K = KINDS.length, total = 0, at = 0, range = Infinity;
+      cells.forEach(function (c) { total += c.cell.kind.length; });
+      if (distances.length < total) { distances = new Float32Array(total + 4096); slots = new Uint8Array(total + 4096); }
+      if (eye) {
+        // Cost and cost over distance in bins of the logarithm of distance, from which any range is priced.
+        var BINS = 96, whole = new Float64Array(BINS), thinned = new Float64Array(BINS), all = 0;
+        var ex = eye.x, ey = eye.y, perMetre = 1 / eye.unit, up = Math.max(1, eye.height * eye.height), near = eye.near;
+        cells.forEach(function (c) {
+          var cell = c.cell;
+          for (var i = 0; i < cell.kind.length; i++, at++) {
+            var dx = (cell.x[i] - ex) * perMetre, dy = (cell.y[i] - ey) * perMetre, d = Math.sqrt(dx * dx + dy * dy + up);   // Math.hypot is many times slower
+            var cost = d < near ? 1 : FAR_COST, bin = Math.log2(d) * 6 | 0;
+            if (bin >= BINS) bin = BINS - 1;
+            distances[at] = d; whole[bin] += cost; thinned[bin] += cost / d; all += cost;
+          }
+        });
+        if (all > budget) {
+          var lo = 0, hi = 65536;
+          for (var step = 0; step < 24; step++) {
+            var mid = (lo + hi) / 2, spent = 0;
+            for (var bin = 0; bin < BINS; bin++) spent += Math.min(whole[bin], mid * thinned[bin]);
+            if (spent > budget) hi = mid; else lo = mid;
+          }
+          range = lo;
+        }
+      }
+      var counts = new Array(K * 2).fill(0), covered = 0, full = 0;
+      at = 0;
+      cells.forEach(function (c) {
+        var cell = c.cell, kept = 0;
+        for (var i = 0; i < cell.kind.length; i++, at++) {
+          var slot = cell.kind[i];
+          if (eye) {
+            var d = distances[at], chance = cell.seed[i] * 57.31;
+            if (d > range && (chance - Math.floor(chance)) * d > range) { slots[at] = 255; continue; }
+            if (d >= eye.near) slot += K; else full++;
+          }
+          slots[at] = slot; counts[slot]++; kept++;
+        }
+        if (kept) covered++;
+      });
+      var offsets = [], drawn = 0;
+      counts.forEach(function (n, k) { offsets[k] = drawn; drawn += n; });
+      var data = new Float32Array(drawn * ROW), fill = offsets.slice();
+      at = 0;
       cells.forEach(function (c) {
         var cell = c.cell;
-        for (var i = 0; i < cell.kind.length; i++) {
-          var o = fill[cell.kind[i]]++ * ROW, s = seed(cell.x[i], cell.y[i]);
+        for (var i = 0; i < cell.kind.length; i++, at++) {
+          if (slots[at] === 255) continue;
+          var o = fill[slots[at]]++ * ROW, s = cell.seed[i];
           data[o] = (cell.x[i] - origin.x) / origin.unit; data[o + 1] = (cell.y[i] - origin.y) / origin.unit;
           data[o + 2] = lift ? lift(cell.x[i], cell.y[i]) : 0;
           data[o + 3] = cell.height[i] * (0.92 + 0.16 * s); data[o + 4] = s * 2 * Math.PI; data[o + 5] = s;
         }
       });
-      return { data: data, groups: counts.map(function (n, k) { return { kind: KINDS[k], first: offsets[k], count: n }; }) };
+      return { data: data, groups: counts.map(function (n, k) { return { kind: KINDS[k % K], far: k >= K, first: offsets[k], count: n }; }),
+        view: { cells: cells.length, covered: covered, trees: total, drawn: drawn, full: full, range: range === Infinity ? null : Math.round(range) } };
     }
 
     // ---- the layer ----
     function layer(options) {
       var map, program, meshBuffers = {}, rowBuffer, loc = {}, instanced, origin = null, groups = [], key = '', lastBuild = 0, built = '', dirty = true;
-      var budget = (options && options.budget) || 12000;
+      var budget = (options && options.budget) || 12000;   // in full trees; a far tree costs FAR_COST of one
       function poke() { dirty = true; if (map) map.triggerRepaint(); }
       return {
         id: (options && options.id) || 'v3-trees', type: 'custom', renderingMode: '3d',
@@ -311,13 +388,13 @@
             origin = center; origin.unit = origin.meterInMercatorCoordinateUnits(); built = ''; dirty = true;
           }
           var b = map.getBounds(), nw = maplibregl.MercatorCoordinate.fromLngLat(b.getNorthWest()), se = maplibregl.MercatorCoordinate.fromLngLat(b.getSouthEast());
-          var picked = pick(nw.x, nw.y, se.x, se.y, center.x, center.y, budget);
-          key = picked.map(function (c) { return c.key; }).join(',') + '|' + season() + '|' + !!map.getTerrain();
+          var picked = pick(nw.x, nw.y, se.x, se.y), from = eye(map, center);
+          key = picked.map(function (c) { return c.key; }).join(',') + '|' + from.x + ',' + from.y + ',' + from.height + ',' + from.near + '|' + season() + '|' + !!map.getTerrain();
           if (key !== built && (now - lastBuild > 200 || dirty)) {
             var terrain = map.getTerrain();
             var lift = terrain ? function (x, y) { return map.queryTerrainElevation(new maplibregl.MercatorCoordinate(x, y).toLngLat()) || 0; } : null;
-            var made = rows(picked, origin, lift);
-            groups = made.groups;
+            var made = rows(picked, origin, lift, from, budget);
+            groups = made.groups; lastView = made.view;
             gl.bindBuffer(gl.ARRAY_BUFFER, rowBuffer);
             gl.bufferData(gl.ARRAY_BUFFER, made.data, gl.DYNAMIC_DRAW);
             built = key; lastBuild = now; dirty = false;
@@ -335,9 +412,9 @@
           var date = new Date();
           groups.forEach(function (g) {
             if (!g.count) return;
-            var shape = mesh(g.kind, date), buffer = meshBuffers[g.kind + (bare(g.kind, date) ? '-bare' : '')];
+            var shape = mesh(g.kind, date, g.far), name = g.kind + (bare(g.kind, date) ? '-bare' : '') + (g.far ? '-far' : ''), buffer = meshBuffers[name];
             if (!buffer) {
-              buffer = meshBuffers[g.kind + (bare(g.kind, date) ? '-bare' : '')] = gl.createBuffer();
+              buffer = meshBuffers[name] = gl.createBuffer();
               gl.bindBuffer(gl.ARRAY_BUFFER, buffer); gl.bufferData(gl.ARRAY_BUFFER, shape, gl.STATIC_DRAW);
             }
             var colors = palette(g.kind, date);
@@ -372,6 +449,9 @@
     return {
       kinds: KINDS, minZoom: MIN_ZOOM, layer: layer, decode: decode, pick: pick, rows: rows, mesh: mesh, season: season, palette: palette,
       setShown: function (value) { shown = !!value; }, shown: function () { return shown; },
-      stats: function () { return { tiles: tiles.size, loading: loading, failures: failures }; }
+      farCost: FAR_COST, eye: eye,
+      // `view` describes the last rows built: cells and trees in view, cells with a tree drawn, trees drawn, how many
+      // in full detail, and the thinning range in metres (null when nothing was thinned).
+      stats: function () { return { tiles: tiles.size, loading: loading, failures: failures, view: lastView }; }
     };
   })();
