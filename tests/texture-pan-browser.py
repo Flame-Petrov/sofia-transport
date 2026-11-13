@@ -56,8 +56,13 @@ with sync_playwright() as pw:
             html = (root / ('index.html' if mode == 'after' else '../102_public-transport.html')).read_text(encoding='utf-8')
         html = html.replace('m3 = new maplibregl.Map', 'm3 = window.qaMap = new maplibregl.Map')
         n = html.count('gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);')
+        sync = 'gl.bufferSubData(gl.ARRAY_BUFFER, at * 4, data);'
         html = html.replace('gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);',
             'window.qa.bytes+=data.byteLength; window.qa.uploads++; gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);')
+        # Walls and houses now write only the changed buildings into a shared kind of buffer.
+        if sync in html:
+            n = 2
+            html = html.replace(sync, 'window.qa.bytes+=data.byteLength; window.qa.uploads++; ' + sync)
         start = '  // ---------- Start ----------'
         html = html.replace(start, 'window.qa={calls:0,ms:0,bytes:0,uploads:0}; window.qaMode=()=>mapMode; window.qaFlat=map;\n' + start)
         page.route(base + '/', lambda r: r.fulfill(body=html, content_type='text/html; charset=utf-8'))

@@ -11,7 +11,7 @@ from tempfile import NamedTemporaryFile
 
 SITE = Path(__file__).resolve().parent
 SOURCE = SITE / "src"
-LOCAL_RELEASE = "105_public-transport.html"
+LOCAL_RELEASE = "106_public-transport.html"
 INCLUDE = re.compile(r"^\{\{include ([\w./-]+)\}\}\n", re.MULTILINE)
 
 

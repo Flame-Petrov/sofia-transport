@@ -24,6 +24,54 @@
     return points + ':' + hash;
   }
 
+  // A GPU vertex buffer that keeps each building where it was first written. A sync appends the
+  // new buildings and blanks the ones that left, so a pan uploads only what changed. The buffer
+  // is rewritten whole when it is full or more than half blank.
+  function buildingBuffer(stride) {
+    var slots = new Map(), used = 0, capacity = 0, holes = 0, stale = false, blank = new Float32Array(0);
+    return {
+      count: function () { return used / stride; },
+      // The meshes behind the keys have changed: the next sync writes everything again.
+      reset: function () { stale = true; },
+      // `keys` is the set of buildings to draw and `meshOf` returns a key's vertices. The buffer
+      // must be bound to ARRAY_BUFFER. Returns the bytes uploaded.
+      sync: function (gl, keys, meshOf) {
+        if (stale) { slots.clear(); used = 0; holes = 0; stale = false; }
+        var added = [], addedSize = 0, live = 0, gone = [], bytes = 0;
+        keys.forEach(function (key) {
+          var size = meshOf(key).length;
+          live += size;
+          if (!slots.has(key)) { added.push(key); addedSize += size; }
+        });
+        slots.forEach(function (slot, key) { if (!keys.has(key)) { gone.push(key); holes += slot.size; } });
+        function write(list, size, at) {
+          var data = new Float32Array(size), offset = 0;
+          list.forEach(function (key) {
+            var mesh = meshOf(key);
+            data.set(mesh, offset); slots.set(key, { at: at + offset, size: mesh.length }); offset += mesh.length;
+          });
+          gl.bufferSubData(gl.ARRAY_BUFFER, at * 4, data);
+          return data.byteLength;
+        }
+        if (used + addedSize > capacity || holes * 2 > used) {
+          // Room for the next buildings to arrive, in whole triangles.
+          capacity = Math.ceil(live * 1.5 / (3 * stride)) * 3 * stride;
+          gl.bufferData(gl.ARRAY_BUFFER, capacity * 4, gl.DYNAMIC_DRAW);
+          slots.clear(); used = live; holes = 0;
+          return write(Array.from(keys), live, 0);
+        }
+        gone.forEach(function (key) {
+          var slot = slots.get(key);
+          if (blank.length < slot.size) blank = new Float32Array(slot.size);
+          gl.bufferSubData(gl.ARRAY_BUFFER, slot.at * 4, blank.subarray(0, slot.size));   // zero-area triangles
+          bytes += slot.size * 4; slots.delete(key);
+        });
+        if (addedSize) { bytes += write(added, addedSize, used); used += addedSize; }
+        return bytes;
+      }
+    };
+  }
+
   function buildingView(map, layerId) {
     var views = buildingViews.get(map);
     if (!views) buildingViews.set(map, views = new Map());

@@ -104,7 +104,8 @@
           return;
         }
         if (!map3.getLayer(material)) install(map3, layer, source);
-        map3.setLayoutProperty(layer.id, 'visibility', visibility);
+        // The copy draws the buildings from here on. Hidden, the style's own layer costs the tile worker nothing.
+        map3.setLayoutProperty(layer.id, 'visibility', 'none');
         map3.setLayoutProperty(material, 'visibility', visibility);
         var wanted = landmarks.filter(layer.filter);
         if (JSON.stringify(map3.getFilter(material)) !== JSON.stringify(wanted)) map3.setFilter(material, wanted);

@@ -65,7 +65,22 @@ python site/tests/texture-pan-browser.py --baseline 7988541
 python serve.py --no-open
 ```
 
+## Cheaper 3D drawing (2026-11-13)
+
+Release 106 changes how four things are drawn. The picture is meant to stay the same.
+
+| Change | Where | Measured |
+| --- | --- | --- |
+| One texture lookup per wall pixel. All 13 façade styles sit in one texture array, four layers each (ground floor, two repeating floors, top floor), and share one draw call. | `solid-facades.js` | Time to fill a 780 × 1688 screen once with wall on an Intel UHD GPU: near 0.33 → 0.35 ms, mid 0.46 → 0.35 ms, far 0.77 → 0.36 ms. SwiftShader: about half the previous time at every distance. |
+| Walls and houses upload only the buildings that changed. Each building keeps its place in the GPU buffer; one that leaves is blanked, a new one is appended, and the buffer is rewritten when full or more than half blank. | `buildingBuffer` in `building-view.js`, used by `solid-facades.js` and `bulgarian-houses.js` | The 240-frame drag in `tests/texture-pan-browser.py`: 82 MB → 10.2 MB uploaded, with the same three queries. |
+| The style's own building layer is hidden while its copy draws, so the tile worker builds each building once. | `building-materials.js` | Not measured. |
+| All vehicles of one mesh type are drawn in one instanced call (three calls at most, six with shadows) instead of one or two per vehicle. | `vehicle-models.js` | Not measured. |
+
+The wall shaders are GLSL ES 3.00 and need WebGL 2. MapLibre uses WebGL 2 wherever the browser has it; without it the walls keep the plain extrusion colour. Shaders written in GLSL ES 1.00 cannot use screen-space derivatives (`fwidth`) in MapLibre's WebGL 2 context.
+
+Façade screenshots at seven cameras and vehicle screenshots with and without shadows were compared with the previous build. The scenes that are stable between runs match pixel for pixel. Vehicle shadows of the same mesh type no longer darken twice where they overlap. A real phone has not been tested.
+
 ## Remaining costs
 
-Leaving the padded margin repeats the visible-feature query, and a changed result rebuilds and uploads the whole wall or house batch (about 8 MB per upload in the drag above). Buildings just outside the queried area show plain wall colour until the next query. The original building layer stays loaded at zero opacity, so building geometry is tessellated twice in the worker. Multisample anti-aliasing and the second wall pass add GPU cost that this software-rendered replay cannot measure. Vehicle meshes still issue a draw per visible vehicle. Label placement still projects and draws visible badges on MapLibre renders. A physical-phone trace during a long pan or a crowded moving-fleet follow would distinguish these costs and establish frame-time percentiles and memory pressure. The byte and operation counters above measure the work removed under the stated workloads.
+Leaving the padded margin repeats the visible-feature query, and a changed result rebuilds the wall and house batches and uploads the buildings that changed. Buildings just outside the queried area show plain wall colour until the next query. Multisample anti-aliasing and the second wall pass add GPU cost that this software-rendered replay cannot measure. Label placement still projects and draws visible badges on MapLibre renders. A physical-phone trace during a long pan or a crowded moving-fleet follow would distinguish these costs and establish frame-time percentiles and memory pressure. The byte and operation counters above measure the work removed under the stated workloads.
 

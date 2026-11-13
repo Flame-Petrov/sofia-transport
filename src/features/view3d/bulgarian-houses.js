@@ -222,16 +222,18 @@
   function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
     var map, program, buffer, matrixLoc, anchorLoc, position, color, normal, emitLoc, lightLocs, shadowProgram, origin;
     var dirty=true, count=0, lastBuild=0, terrain, view, built=-1, asleep=false;
-    var previousKeys = null, meshCache = new Map();
+    var previousKeys = null, meshCache = new Map(), batch = buildingBuffer(10);
     function moved(){ if (canopy) dirty=true; else view.cameraMoved(); }
     function resized(){ if (canopy) dirty=true; else view.invalidate(); }
-    function resetGeometry(){previousKeys=null;meshCache.clear();dirty=true;}
+    function resetGeometry(){previousKeys=null;meshCache.clear();batch.reset();dirty=true;}
     function sourceChanged(event){
       var dem = map.getTerrain();
       if (dem && event.sourceId === dem.source) resetGeometry();
       else if (event.sourceId === sourceId && !canopy) view.invalidate();
     }
-    function rebuild(){
+    // Fixed models return their whole vertex array, or null when nothing changed. Houses are written
+    // into the shared building buffer, which uploads only the ones that changed.
+    function rebuild(gl){
       var center = maplibregl.MercatorCoordinate.fromLngLat(map.getCenter());
       if (!origin || Math.hypot(center.x-origin.x,center.y-origin.y)>0.001) {
         origin=center;
@@ -244,7 +246,7 @@
         previousKeys=sections;
         return canopy.vertices(map, origin, sections);
       }
-      var seen=new Set(), usedIds=new Set(), meshes=[], size=0;
+      var seen=new Set(), usedIds=new Set(), drawn=new Set();
       view.features.forEach(function(f){
         var material=f.properties.material;
         if ((material!=='green' && material!=='purple') || usedIds.has(f.id)) return;
@@ -256,14 +258,14 @@
         }
         seen.add(key);
         var mesh=meshCache.get(key);
-        if (mesh) { usedIds.add(f.id); meshes.push(mesh); size+=mesh.length; }
+        if (mesh) { usedIds.add(f.id); drawn.add(key); }
       });
       if (sameBuildingKeys(previousKeys,seen)) return null;
       previousKeys=seen;
       meshCache.forEach(function(_,key){if (!seen.has(key)) meshCache.delete(key);});
-      var data=new Float32Array(size), offset=0;
-      meshes.forEach(function(mesh){data.set(mesh,offset);offset+=mesh.length;});
-      return data;
+      batch.sync(gl,drawn,function(key){return meshCache.get(key);});
+      count=batch.count();
+      return null;
     }
     return {
       id:materialLayer+(canopy ? canopy.suffix : '-houses'),type:'custom',renderingMode:'3d',
@@ -302,7 +304,7 @@
         var free = !view || now-view.queriedAt>=30;   // walls take the frame after a query
         if((due && free && now-lastBuild>200) || terrain!==currentTerrain){
           if (terrain!==currentTerrain) resetGeometry();
-          var data = rebuild();
+          var data = rebuild(gl);
           if (data !== null) {
             count = data.length / 10;
             gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);

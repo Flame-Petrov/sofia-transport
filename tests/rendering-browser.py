@@ -45,6 +45,9 @@ with sync_playwright() as pw:
             html = artifact.read_text(encoding='utf-8')
         html=html.replace('m3 = new maplibregl.Map','m3 = window.qaMap = new maplibregl.Map')
         html=html.replace('gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);','window.qaHouseBytes+=data.byteLength; gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);')
+        # Houses now write only the changed buildings into their buffer.
+        sync = 'gl.bufferSubData(gl.ARRAY_BUFFER, at * 4, data);'
+        html=html.replace(sync,'window.qaHouseBytes+=data.byteLength; '+sync)
         start = '  // ---------- Start ----------'
         controls = """
           window.qaHouseBytes = 0;

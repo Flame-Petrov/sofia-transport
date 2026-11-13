@@ -73,7 +73,9 @@ function buildingMap(features) {
 }
 function buildingGl(uploads) {
   return new Proxy({ getShaderParameter: () => true, getProgramParameter: () => true,
-    bufferData: (_, data) => uploads.push(data.byteLength) }, { get: (o,k) => k in o ? o[k] : noop });
+    // Houses upload a whole batch; walls size their buffer, then write the changed buildings into it.
+    bufferData: (_, data) => { if (typeof data !== 'number') uploads.push(data.byteLength); },
+    bufferSubData: (_, at, data) => uploads.push(data.byteLength) }, { get: (o,k) => k in o ? o[k] : noop });
 }
 const buildingOrigin = { x: .012345, y: .023456, unit: 1e-7 };
 const buildingLibrary = { MercatorCoordinate: { fromLngLat: ([x,y]) => ({
@@ -102,11 +104,14 @@ test('house batches survive camera movement and refresh after geometry, source o
   assert.deepEqual([uploads.length,map.state.queries],[1,1]);
   features.reverse(); ms+=300; map.fire('sourcedata',{sourceId:'tiles'}); render();
   assert.deepEqual([uploads.length,map.state.queries],[1,2]);
+  // A changed house is blanked and written again; the other 49 stay in the buffer.
   features[0].properties.render_height=7; ms+=300; map.fire('sourcedata',{sourceId:'tiles'}); render();
-  assert.equal(uploads.length,2);
+  assert.equal(uploads.length,3);
+  assert.ok(uploads[1]+uploads[2]<uploads[0]/10);
   map.state.dem={source:'dem'}; ms+=300; map.fire('terrain'); render();
   ms+=300; map.fire('sourcedata',{sourceId:'dem'}); render();
-  assert.equal(uploads.length,4);
+  assert.equal(uploads.length,5);
+  assert.ok(uploads[3]>uploads[0]/2 && uploads[4]>uploads[0]/2);   // terrain moves every house
   // Leaving the margin asks the map again.
   const before=map.state.queries;
   features.length=0; ms+=300; map.shift.x=400; map.fire('move'); render();
@@ -138,7 +143,8 @@ test('wall and house batches share one building query, and only a pan beyond the
     geometry:{type:'Polygon',coordinates:[[[40,0],[60,0],[60,10],[40,0]]]} });
   ms+=300; map.shift.x=260; map.fire('move'); render();
   assert.equal(map.state.queries,2);
-  assert.equal(wallBytes.at(-1),(20*4+3)*48*4);
+  // Only the new block's three walls are uploaded; the buildings already in the buffer stay put.
+  assert.equal(wallBytes.at(-1),3*48*4);
   assert.equal(houseBytes.length,1);
   // A zoom jump or a resize also repeats the query; an unchanged result uploads nothing.
   map.state.zoom=17; ms+=300; map.fire('move'); render();
@@ -155,7 +161,7 @@ test('every wall carries whole window bays and floors in one colour per building
     geometry:{type:'Polygon',coordinates:[ring]} }];
   const map = buildingMap(features), uploads = [];
   const gl = new Proxy({ getShaderParameter: () => true, getProgramParameter: () => true,
-    bufferData: (_, data) => uploads.push(Array.from(data)) }, { get: (o,k) => k in o ? o[k] : noop });
+    bufferSubData: (_, at, data) => uploads.push(Array.from(data)) }, { get: (o,k) => k in o ? o[k] : noop });
   let ms = 1000;
   a.performance = { now: () => ms };
   const walls = a.solidFacadeLayer('material','tiles',true);
@@ -170,8 +176,9 @@ test('every wall carries whole window bays and floors in one colour per building
   // The 35 m front fits ten 3.6 m bays; the one-metre return has no windows.
   const spans = [];
   for (let i=0;i<corners.length;i+=6) spans.push([corners[i+1][3]-corners[i][3],corners[i][5]]);
-  assert.deepEqual(spans[0],[10,105]);
-  assert.deepEqual(spans[3],[1,205]);
+  // The third number also carries the style: 1000 for panel, the second style.
+  assert.deepEqual(spans[0],[10,1105]);
+  assert.deepEqual(spans[3],[1,1205]);
 });
 
 test('a footprint keeps its look, parts follow their building and mapped colours win', () => {

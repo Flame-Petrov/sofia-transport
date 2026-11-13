@@ -23,6 +23,7 @@ CAMERAS = [('centre', 23.3219, 42.6977, 16.6, 60, 20), ('close', 23.3282, 42.692
 class Quiet(SimpleHTTPRequestHandler):
     def __init__(self, *a, **k): super().__init__(*a, directory=str(root), **k)
     def log_message(self, *a): pass
+ThreadingHTTPServer.request_queue_size = 64   # Chrome opens many tile connections at once
 server = ThreadingHTTPServer(('127.0.0.1', 0), Quiet)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 base = 'http://127.0.0.1:' + str(server.server_port)
