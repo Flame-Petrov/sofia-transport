@@ -1,0 +1,3723 @@
+[
+ {
+  "key": "n1894569013",
+  "form": "stele",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "total_h": 4.0,
+  "width": 1.8,
+  "depth": 0.6,
+  "material": "white_stone",
+  "pedestal_material": "concrete",
+  "features": [
+   "relief",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Two tall overlapping grey stone slabs, one carved with relief faces of insurgents, the other inscribed."
+ },
+ {
+  "key": "n2578148668",
+  "form": "obelisk",
+  "top": "cross",
+  "pedestal": "stepped",
+  "pedestal_h": 1.2,
+  "total_h": 5.0,
+  "width": 0.8,
+  "depth": 0.8,
+  "material": "dark_granite",
+  "pedestal_material": "white_stone",
+  "features": [
+   "cross_on_top",
+   "steps",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark granite tapering pillar with small cross on top, on a block plinth over a wide four-step light stone base."
+ },
+ {
+  "key": "n2673873529",
+  "form": "wall",
+  "pedestal": "none",
+  "total_h": 1.0,
+  "width": 6.0,
+  "depth": 0.5,
+  "material": "white_stone",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Long low white stone slab inscribed with names of fallen antifascists, set in front of a building with steps."
+ },
+ {
+  "key": "n2675757600",
+  "form": "stele",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "total_h": 3.2,
+  "width": 1.0,
+  "depth": 0.5,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Tall grey granite slab inscribed with names of the fallen, on a block base."
+ },
+ {
+  "key": "n2675758000",
+  "form": "statue",
+  "pose": "soldier",
+  "pedestal": "block",
+  "pedestal_h": 1.0,
+  "figure_h": 2.6,
+  "total_h": 3.6,
+  "material": "dark_bronze",
+  "pedestal_material": "white_stone",
+  "features": [
+   "steps",
+   "star",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze soldier in a cloak raising a rifle over his head on a stone block at the top of a long flight of steps; an inscribed plaque with a star lists the fallen."
+ },
+ {
+  "key": "n2680819151",
+  "form": "obelisk",
+  "top": "cross",
+  "pedestal": "stepped",
+  "pedestal_h": 1.3,
+  "total_h": 5.0,
+  "width": 0.8,
+  "depth": 0.8,
+  "material": "granite",
+  "pedestal_material": "white_stone",
+  "features": [
+   "cross_on_top",
+   "steps",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Grey stone obelisk with a cross on top on a block plinth and a three-step light stone base."
+ },
+ {
+  "key": "n2703415198",
+  "form": "stele",
+  "pedestal": "low",
+  "total_h": 2.0,
+  "width": 1.0,
+  "depth": 0.4,
+  "material": "dark_granite",
+  "features": [
+   "inscription",
+   "star"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Dark grey stone slab with a gilded order emblem and an inscribed list of fallen soldiers."
+ },
+ {
+  "key": "n2769843554",
+  "form": "statue",
+  "pose": "arm",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "figure_h": 2.2,
+  "total_h": 2.5,
+  "material": "painted",
+  "color": "#c9907a",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Slender pinkish stone nude female figure with one arm raised, on a low base in a park."
+ },
+ {
+  "key": "n3016638824",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (portraits of people at an exhibition); entry from name/tags only."
+ },
+ {
+  "key": "n3017177369",
+  "form": "animal",
+  "animal": "squirrel",
+  "total_h": 0.8,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (the Battenberg mausoleum); entry from name/tags only. Small squirrel sculpture."
+ },
+ {
+  "key": "n3019207624",
+  "form": "wall",
+  "skip": true,
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Wall of Fame: plaques with hand/footprints set into a wall or pavement, flat."
+ },
+ {
+  "key": "n3062912692",
+  "form": "bust",
+  "pedestal": "herm",
+  "total_h": 2.5,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (hotel buildings); entry from name/tags only. Bust on a pedestal."
+ },
+ {
+  "key": "n3079362162",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.8,
+  "figure_h": 0.8,
+  "total_h": 2.6,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Bronze bust on a tall slender reddish stone pillar in a park."
+ },
+ {
+  "key": "n3111771729",
+  "form": "stele",
+  "pedestal": "stepped",
+  "pedestal_h": 1.0,
+  "total_h": 3.8,
+  "width": 1.4,
+  "depth": 1.4,
+  "material": "white_stone",
+  "pedestal_material": "white_stone",
+  "features": [
+   "inscription",
+   "steps",
+   "relief"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "White stone block monument with a cross-shaped inscribed panel, topped by a bronze double-headed eagle and ringed with chains and cannonballs, on a stepped base."
+ },
+ {
+  "key": "n3167726475",
+  "form": "pylon",
+  "top": "none",
+  "pedestal": "stepped",
+  "pedestal_h": 1.0,
+  "total_h": 6.5,
+  "width": 1.6,
+  "depth": 1.6,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "features": [
+   "relief",
+   "inscription",
+   "steps"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Tall grey stone pedestal with a round bronze portrait medallion and inscription, topped by a white element, on a stepped base."
+ },
+ {
+  "key": "n3384295086",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.8,
+  "figure_h": 1.0,
+  "total_h": 2.8,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze bust of Botev on a rectangular grey stone plinth, beside a row of flagpoles."
+ },
+ {
+  "key": "n3490379737",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 2.5,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (park trees only); entry from name/tags only. Bust on a pedestal."
+ },
+ {
+  "key": "n3514048761",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 3.0,
+  "material": "bronze",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a park alley and a Christmas tree); entry from name/tags only. Bust of Pushkin on a pedestal."
+ },
+ {
+  "key": "n3526994601",
+  "form": "head",
+  "pedestal": "herm",
+  "pedestal_h": 2.0,
+  "figure_h": 1.2,
+  "total_h": 3.4,
+  "width": 1.2,
+  "depth": 0.4,
+  "material": "dark_bronze",
+  "pedestal_material": "white_stone",
+  "features": [
+   "steps"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Bronze face of Atanasoff set in a lattice of square blocks on top of a tall dark post, on a low stepped base."
+ },
+ {
+  "key": "n3527049713",
+  "form": "statue",
+  "pedestal": "low",
+  "total_h": 2.0,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a boulder with an Aleko Konstantinov hiking plaque); entry from name/tags only. Metal statue of the actor."
+ },
+ {
+  "key": "n3534142163",
+  "form": "statue",
+  "pose": "stand",
+  "pedestal": "block",
+  "material": "bronze",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (Sofia University in snow); entry from name/tags only. Statue of a 1930s aviator holding a propeller, inscribed by Bulgarian students."
+ },
+ {
+  "key": "n3542529004",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 2.5,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a trolleybus and a police car); entry from name/tags only."
+ },
+ {
+  "key": "n3552228373",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 2.3,
+  "material": "bronze",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (an old photo of a building); entry from name/tags only."
+ },
+ {
+  "key": "n3587482906",
+  "form": "animal",
+  "animal": "lion",
+  "lying": true,
+  "pedestal": "block",
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (the eternal flame and granite wall of the Unknown Soldier memorial); entry from name/tags only. Bronze lion by Andrey Nikolov, assumed lying."
+ },
+ {
+  "key": "n3624027500",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.3,
+  "figure_h": 0.9,
+  "total_h": 2.2,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze bust of Ivan Vazov on a grey granite block inscribed with his name and dates."
+ },
+ {
+  "key": "n3635927112",
+  "form": "stele",
+  "pedestal": "none",
+  "total_h": 1.4,
+  "width": 0.9,
+  "depth": 0.3,
+  "material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Rough-edged upright grey stone slab with a carved inscription to Manfred Woerner, in a park."
+ },
+ {
+  "key": "n3688583817",
+  "form": "seated",
+  "pose": "robe",
+  "pedestal": "block",
+  "pedestal_h": 2.0,
+  "figure_h": 2.2,
+  "total_h": 4.2,
+  "material": "dark_bronze",
+  "pedestal_material": "white_stone",
+  "features": [
+   "steps"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Seated dark figure on a tall stone plinth flanking the main staircase of Sofia University."
+ },
+ {
+  "key": "n3688583818",
+  "form": "seated",
+  "pose": "robe",
+  "pedestal": "block",
+  "pedestal_h": 2.0,
+  "figure_h": 2.2,
+  "total_h": 4.2,
+  "material": "dark_bronze",
+  "pedestal_material": "white_stone",
+  "features": [
+   "steps"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Seated dark figure on a tall stone plinth beside the main staircase of Sofia University, matching his brother's statue."
+ },
+ {
+  "key": "n3773010830",
+  "form": "fountain",
+  "total_h": 1.2,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (the St Sofia column and a building under repair); entry from name/tags only. Covered drinking fountain with artwork."
+ },
+ {
+  "key": "n4222928192",
+  "form": "statue",
+  "pedestal": "low",
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (Vitosha Blvd and a street with a trolleybus); entry from name/tags only."
+ },
+ {
+  "key": "n4319784358",
+  "form": "statue",
+  "pose": "stand",
+  "pedestal": "block",
+  "pedestal_h": 0.9,
+  "figure_h": 1.4,
+  "total_h": 2.3,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Small dark bronze figure of Radichkov on a stone block on the lawn beside the National Gallery building."
+ },
+ {
+  "key": "n4361884793",
+  "form": "fountain",
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show only a plaque and a bronze detail with a pigeon, not the whole work. Drinking fountain with the Abduction of Europa (woman on a bull)."
+ },
+ {
+  "key": "n4400697592",
+  "form": "wall",
+  "pedestal": "low",
+  "total_h": 3.6,
+  "width": 1.2,
+  "depth": 0.5,
+  "material": "concrete",
+  "color": "#b0b0b0",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a city panorama and a park); entry from name/tags only. Upright segment of the Berlin Wall."
+ },
+ {
+  "key": "n4444730093",
+  "form": "statue",
+  "pose": "soldier",
+  "pedestal": "tall",
+  "pedestal_h": 4.0,
+  "figure_h": 2.0,
+  "total_h": 6.0,
+  "width": 1.8,
+  "depth": 1.8,
+  "material": "white_stone",
+  "pedestal_material": "white_stone",
+  "features": [
+   "steps",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "White stone soldier statue on a tall ornate white pedestal with inscriptions, on a stepped base."
+ },
+ {
+  "key": "n4485754989",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (an old photo of a woman reading); entry from name/tags only. Statue whose title quotes Botev."
+ },
+ {
+  "key": "n4486788870",
+  "form": "stone",
+  "pedestal": "none",
+  "total_h": 2.0,
+  "width": 3.0,
+  "depth": 1.5,
+  "material": "white_stone",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Carved light stone block shaped like a gun carriage with a real anti-tank gun barrel pointing up, covered in graffiti."
+ },
+ {
+  "key": "n4514452186",
+  "form": "abstract",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 1.8,
+  "total_h": 2.6,
+  "width": 1.2,
+  "material": "steel",
+  "pedestal_material": "concrete",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Dark metal bundle of upward pipes like a brush on a short grey post in front of a pavilion."
+ },
+ {
+  "key": "n4524000142",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 2.5,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a memorial plaque and a pigeon); entry from name/tags only."
+ },
+ {
+  "key": "n4542074406",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 2.5,
+  "material": "bronze",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a church in snow and a tram); entry from name/tags only."
+ },
+ {
+  "key": "n4542074407",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.5,
+  "figure_h": 0.9,
+  "total_h": 2.4,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription",
+   "wreath"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze bust on a grey granite block with wreaths at its foot."
+ },
+ {
+  "key": "n4545552933",
+  "form": "animal",
+  "animal": "otter",
+  "total_h": 1.0,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a white church with a small dark statue in front); entry from name/tags only. Otter drinking fountain."
+ },
+ {
+  "key": "n4545552963",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 2.3,
+  "material": "white_stone",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a white church); entry from name/tags only."
+ },
+ {
+  "key": "n4551515279",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 2.5,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (the Sveti Sedmochislenitsi church); entry from name/tags only."
+ },
+ {
+  "key": "n4587024193",
+  "form": "wall",
+  "skip": true,
+  "source": "tags",
+  "confidence": "medium",
+  "notes": "Permanent photo exhibit panels along Lovers' Bridge; flat display boards, not a monument."
+ },
+ {
+  "key": "n4657888386",
+  "form": "statue",
+  "pose": "robe",
+  "material": "marble",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (the mineral-water taps wall); entry from name/tags only. Covered statue of Apollo Medicus."
+ },
+ {
+  "key": "n4875568179",
+  "form": "bird",
+  "pedestal": "tall",
+  "total_h": 6.0,
+  "width": 4.0,
+  "depth": 1.5,
+  "material": "bronze",
+  "pedestal_material": "white_stone",
+  "features": [
+   "columns",
+   "wings"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "A flock of bronze doves flying between and above two tall white columns."
+ },
+ {
+  "key": "n4938157867",
+  "form": "stele",
+  "pedestal": "stepped",
+  "pedestal_h": 0.6,
+  "total_h": 2.4,
+  "width": 1.4,
+  "depth": 0.5,
+  "material": "dark_granite",
+  "pedestal_material": "granite",
+  "features": [
+   "relief",
+   "inscription",
+   "steps"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark grey stone slab with two round portrait medallions and an inscription plate, on a three-step stone base."
+ },
+ {
+  "key": "n4940823701",
+  "form": "group",
+  "figures": 2,
+  "pose": "child",
+  "pedestal": "low",
+  "pedestal_h": 0.4,
+  "figure_h": 1.2,
+  "total_h": 1.6,
+  "width": 0.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Bronze boy Yan Bibiyan striding with the little devil Fyut seated at his feet, on a low bronze base in a playground."
+ },
+ {
+  "key": "n4985551184",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a street protest); entry from name/tags only."
+ },
+ {
+  "key": "n4985558759",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a park lawn); entry from name/tags only."
+ },
+ {
+  "key": "n4987704441",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (aerial views of a park); entry from name/tags only."
+ },
+ {
+  "key": "n4987706591",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a city panorama); entry from name/tags only."
+ },
+ {
+  "key": "n4987707889",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (city panoramas); entry from name/tags only."
+ },
+ {
+  "key": "n4987717222",
+  "form": "statue",
+  "pose": "arm",
+  "pedestal": "block",
+  "pedestal_h": 1.0,
+  "figure_h": 2.0,
+  "total_h": 3.0,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Dark bronze slender figure with arms raised on a red stone plinth in the middle of a round fountain basin."
+ },
+ {
+  "key": "n4987735415",
+  "form": "stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a street with a pink wall); entry from name/tags only."
+ },
+ {
+  "key": "n4988884630",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (an apartment and office building); entry from name/tags only."
+ },
+ {
+  "key": "n4992340542",
+  "form": "statue",
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a trolleybus at a stop); entry from name/tags only."
+ },
+ {
+  "key": "n4994866389",
+  "form": "stele",
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a yellow building facade); entry from name/tags only."
+ },
+ {
+  "key": "n5211112529",
+  "form": "wall",
+  "pedestal": "stepped",
+  "total_h": 5.0,
+  "width": 12.0,
+  "depth": 2.0,
+  "material": "white_stone",
+  "features": [
+   "columns",
+   "lion",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Wide stone memorial wall with columns framing inscribed name panels and a lion sculpture in front (historic photo)."
+ },
+ {
+  "key": "n5528548990",
+  "form": "stone",
+  "pedestal": "none",
+  "total_h": 4.0,
+  "width": 1.5,
+  "depth": 1.0,
+  "material": "limestone",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Tall rough white stone monolith standing upright on a grassy mound."
+ },
+ {
+  "key": "n5863892267",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a snowy park); entry from name/tags only."
+ },
+ {
+  "key": "n5891668520",
+  "form": "statue",
+  "pose": "stride",
+  "pedestal": "block",
+  "pedestal_h": 0.5,
+  "figure_h": 1.8,
+  "total_h": 2.3,
+  "material": "dark_bronze",
+  "pedestal_material": "concrete",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Thin bronze Gandhi walking with a staff, lower half painted yellow, on a low concrete block with a blue plaque."
+ },
+ {
+  "key": "n5910009673",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.4,
+  "figure_h": 0.9,
+  "total_h": 2.3,
+  "material": "bronze",
+  "pedestal_material": "white_stone",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Grey bronze bust of young Kableshkov with open collar on a light stone pedestal."
+ },
+ {
+  "key": "n6054196893",
+  "form": "abstract",
+  "pedestal": "none",
+  "total_h": 4.0,
+  "width": 0.8,
+  "depth": 0.6,
+  "material": "dark_granite",
+  "features": [
+   "relief"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Tall slender dark stone pillar carved with reliefs and topped by sculpted hands, in front of an ornate building."
+ },
+ {
+  "key": "n6096765078",
+  "form": "statue",
+  "pose": "stand",
+  "pedestal": "none",
+  "figure_h": 1.9,
+  "total_h": 1.9,
+  "material": "dark_bronze",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Life-size bronze Radoy Ralin standing with arms out, a cat at his feet, on a round paved circle without a plinth."
+ },
+ {
+  "key": "n6096986563",
+  "form": "statue",
+  "pose": "robe",
+  "pedestal": "block",
+  "material": "marble",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show a white marble robed figure holding a child (looks like St Joseph) at the cathedral, probably not the Pope statue; entry from tags."
+ },
+ {
+  "key": "n6101359050",
+  "form": "group",
+  "figures": 2,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a red-brick building and a portrait painting); entry from name/tags only. Sculpture 'The Embrace' commemorating the rescue of Bulgarian Jews."
+ },
+ {
+  "key": "n6450887406",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.6,
+  "figure_h": 0.9,
+  "total_h": 2.5,
+  "material": "dark_bronze",
+  "pedestal_material": "white_stone",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze bust of Levski on a tall white stone pedestal inscribed with his name."
+ },
+ {
+  "key": "n6501421920",
+  "form": "statue",
+  "pose": "stand",
+  "pedestal": "stepped",
+  "pedestal_h": 1.8,
+  "figure_h": 2.2,
+  "total_h": 4.0,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "steps",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Bronze standing man in a long coat on a grey stone block plinth with a two-step base in a park."
+ },
+ {
+  "key": "n6512153706",
+  "form": "group",
+  "figures": 5,
+  "pose": "soldier",
+  "pedestal": "low",
+  "pedestal_h": 0.5,
+  "figure_h": 2.0,
+  "total_h": 2.5,
+  "width": 4.0,
+  "depth": 1.5,
+  "material": "dark_granite",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Dark grey sculpted group of fighting partisans, one figure lunging forward with outstretched arm, on a low ledge."
+ },
+ {
+  "key": "n6543321839",
+  "form": "abstract",
+  "material": "limestone",
+  "features": [
+   "columns"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a wall plaque); entry from name/tags only. Arrangement of ancient column fragments."
+ },
+ {
+  "key": "n6546822646",
+  "form": "statue",
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a gallery interior and a visitor); entry from name/tags only."
+ },
+ {
+  "key": "n6565986326",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 2.5,
+  "material": "bronze",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a snowy park); entry from name/tags only."
+ },
+ {
+  "key": "n6680029689",
+  "form": "abstract",
+  "pedestal": "low",
+  "pedestal_h": 0.2,
+  "total_h": 1.8,
+  "width": 3.5,
+  "depth": 1.5,
+  "material": "painted",
+  "color": "#8a5a3c",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Life-size ceramic Trabant car in rough brown-terracotta glaze, with a small head on its roof, on a low base on a lawn."
+ },
+ {
+  "key": "n6680036485",
+  "form": "statue",
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (the ceramic Trabant sculpture); entry from name/tags only. Stone statue of Vaptsarov ('The poet-worker')."
+ },
+ {
+  "key": "n6862320019",
+  "form": "statue",
+  "pose": "child",
+  "pedestal": "low",
+  "figure_h": 1.2,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (the large bronze head monument nearby); entry from name/tags only. Bronze boy with a gourd, drinking fountain."
+ },
+ {
+  "key": "n6909348085",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show an indoor light installation and a statue outside a gallery; unclear which is this. Sculpture 'Dance above the clouds'."
+ },
+ {
+  "key": "n7011916987",
+  "form": "stele",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "total_h": 1.6,
+  "width": 4.0,
+  "depth": 0.8,
+  "material": "granite",
+  "features": [
+   "inscription",
+   "wreath"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Wide grey granite block with a carved inscription and wreaths, on a paved platform in front of a red-brick wall."
+ },
+ {
+  "key": "n7011948985",
+  "form": "group",
+  "figures": 2,
+  "pose": "robe",
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (the Alexander Nevsky cathedral and an icon stall); entry from name/tags only. Pieta by Lyubomir Dalchev."
+ },
+ {
+  "key": "n7162289344",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (an apartment building); entry from name/tags only. Carved tree stump."
+ },
+ {
+  "key": "n7184389985",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (an apartment building facade); entry from name/tags only."
+ },
+ {
+  "key": "n7193298785",
+  "form": "abstract",
+  "total_h": 1.5,
+  "material": "painted",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (people in a radio studio); entry from name/tags only. Painted art box (likely a decorated street utility box)."
+ },
+ {
+  "key": "n7453554454",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 2.0,
+  "figure_h": 1.0,
+  "total_h": 3.0,
+  "material": "white_stone",
+  "pedestal_material": "white_stone",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "White stone bust of Bishop Strossmayer on a tall white stone pedestal inscribed with his name and dates."
+ },
+ {
+  "key": "n7490232469",
+  "form": "stele",
+  "skip": true,
+  "source": "tags",
+  "confidence": "medium",
+  "notes": "Memorial plaque to Bulgarian teachers, flat; photos show the church."
+ },
+ {
+  "key": "n7731588615",
+  "form": "obelisk",
+  "top": "cross",
+  "pedestal": "block",
+  "pedestal_h": 1.2,
+  "total_h": 5.5,
+  "width": 1.2,
+  "depth": 1.2,
+  "material": "white_stone",
+  "pedestal_material": "white_stone",
+  "features": [
+   "cross_on_top",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "White stone tapering obelisk with a cross on top on a square block base in a field."
+ },
+ {
+  "key": "n7908635904",
+  "form": "fountain",
+  "total_h": 1.2,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (buildings and a snowy tree); entry from name/tags only. Drinking fountain artwork."
+ },
+ {
+  "key": "n8094614571",
+  "form": "wall",
+  "skip": true,
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Ground-level ring of metal lettering on the site of the Dimitrov mausoleum; flat, and the second photo shows it dismantled."
+ },
+ {
+  "key": "n8220349996",
+  "form": "animal",
+  "animal": "bear",
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a cascade fountain and a metro station); entry from name/tags only. Stone bear sculpture."
+ },
+ {
+  "key": "n8818232779",
+  "form": "stele",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (an old photo of a building); entry from name/tags only."
+ },
+ {
+  "key": "n9202310593",
+  "form": "abstract",
+  "features": [
+   "wings"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (Grand Hotel Sofia and a snowy park); entry from name/tags only. Monument 'Spread wings'."
+ },
+ {
+  "key": "n9893691156",
+  "form": "head",
+  "pedestal": "rock",
+  "pedestal_h": 1.2,
+  "figure_h": 1.8,
+  "total_h": 3.0,
+  "width": 5.0,
+  "depth": 3.0,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Huge stylised dark bronze head on angled granite slabs, low and wide on a paved terrace."
+ },
+ {
+  "key": "n10124930643",
+  "form": "statue",
+  "pose": "sport",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a park strip with no statue visible); entry from name/tags only. Female gymnast statue."
+ },
+ {
+  "key": "n10124930644",
+  "form": "statue",
+  "pose": "sport",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a park strip with no statue visible); entry from name/tags only. Female basketball player statue."
+ },
+ {
+  "key": "n10124930645",
+  "form": "statue",
+  "pose": "sport",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a park strip); entry from name/tags only. The discus-thrower statue was stolen in the 1990s; now called 'Wheelchair', may be only a pedestal."
+ },
+ {
+  "key": "n10228889100",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (old photos of women in folk costume); entry from name/tags only."
+ },
+ {
+  "key": "n10264907164",
+  "form": "bust",
+  "skip": true,
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Relief portrait on a wall plaque ('Here lived Yana Yazova'), flat."
+ },
+ {
+  "key": "n10296694163",
+  "form": "stele",
+  "pedestal": "low",
+  "total_h": 2.4,
+  "width": 0.9,
+  "depth": 0.4,
+  "material": "dark_granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark granite upright slab with inscribed names in a small garden."
+ },
+ {
+  "key": "n10311189805",
+  "form": "bust",
+  "pedestal": "block",
+  "total_h": 2.5,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a snowy park); entry from name/tags only."
+ },
+ {
+  "key": "n10311229656",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.5,
+  "figure_h": 0.9,
+  "total_h": 2.4,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "wreath",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze bust of Gotse Delchev on a grey stone block with wreaths in a park."
+ },
+ {
+  "key": "n10311229657",
+  "form": "bust",
+  "pedestal": "block",
+  "figure_h": 1.0,
+  "total_h": 2.5,
+  "material": "green_bronze",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Grey-green bronze bust of Todor Alexandrov in a cap (close-up only, pedestal not visible)."
+ },
+ {
+  "key": "n10571058995",
+  "form": "cross",
+  "pedestal": "rock",
+  "pedestal_h": 0.5,
+  "total_h": 2.2,
+  "width": 0.8,
+  "material": "white_stone",
+  "pedestal_material": "white_stone",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Light stone cross on a rough stone base with an inscribed slab, beside a church."
+ },
+ {
+  "key": "n10681259033",
+  "form": "group",
+  "figures": 2,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a portrait of a singer); entry from name/tags only. Bronze statue of the Prosek brothers."
+ },
+ {
+  "key": "n10707600588",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a street junction); entry from name/tags only. Tagged underground (level -1), likely in an underpass or metro."
+ },
+ {
+  "key": "n10871496580",
+  "form": "wall",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "total_h": 2.2,
+  "width": 5.0,
+  "depth": 1.0,
+  "material": "white_stone",
+  "pedestal_material": "white_stone",
+  "features": [
+   "relief",
+   "columns",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Wide low white stone memorial with pilasters and a cornice framing a central bronze portrait relief and inscription, on a low base."
+ },
+ {
+  "key": "n10871532563",
+  "form": "statue",
+  "pose": "soldier",
+  "pedestal": "tall",
+  "pedestal_h": 3.0,
+  "figure_h": 3.0,
+  "total_h": 7.0,
+  "material": "dark_bronze",
+  "pedestal_material": "dark_granite",
+  "features": [
+   "flag",
+   "relief",
+   "steps"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze soldier holding a tall flag on a tall black granite pedestal with reliefs, on a wide stone platform."
+ },
+ {
+  "key": "n10871532564",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a 360 panorama of a park square with no statue clearly visible); entry from name/tags only."
+ },
+ {
+  "key": "n11066599979",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Photos show something else (a park pond); entry from name/tags only."
+ },
+ {
+  "key": "n11093266558",
+  "form": "bust",
+  "pedestal": "tall",
+  "pedestal_h": 2.5,
+  "figure_h": 1.0,
+  "total_h": 3.5,
+  "material": "white_stone",
+  "pedestal_material": "white_stone",
+  "features": [
+   "inscription",
+   "steps"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "White stone bust of Ivan Vazov on a tall white stone pedestal with an inscription, on a stepped base."
+ },
+ {
+  "key": "n11093266559",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bust of Hristo Botev in Borisova gradina; the photo shows only a snowy park.",
+  "pedestal": "herm",
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11093266560",
+  "form": "bust",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze bust of Yavorov on a tall slim dark granite herm with an inscription, in a park under willows.",
+  "pedestal": "herm",
+  "pedestal_h": 2.0,
+  "figure_h": 0.8,
+  "total_h": 2.8,
+  "material": "dark_bronze",
+  "pedestal_material": "dark_granite",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11290563752",
+  "form": "stele",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Memorial to fallen policemen; the photos show the nearby Nikola Petkov bust and Sveta Nedelya church, not this memorial.",
+  "pedestal": "block"
+ },
+ {
+  "key": "n11429616665",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Grief' (1975). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429616666",
+  "form": "head",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Head of a partisan commander by Asen Dermendzhiev. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429616667",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Dimitar Blagoev memorial (1969). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429616668",
+  "form": "group",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Harvest song' (1955), probably peasant women. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "figures": 2
+ },
+ {
+  "key": "n11429762969",
+  "form": "group",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Cooperative women' (1962). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "figures": 2
+ },
+ {
+  "key": "n11429762970",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bust of Lenin. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762971",
+  "form": "group",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Korean children' (1952). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "child",
+  "figures": 2
+ },
+ {
+  "key": "n11429762972",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762973",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'For freedom' (1946). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "soldier"
+ },
+ {
+  "key": "n11429762974",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Johann' (1984). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762975",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Lenin monument. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "stride"
+ },
+ {
+  "key": "n11429762976",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Hristo Kabakchiev by Konstantin Doganov. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762977",
+  "form": "bust",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Dark bronze head-and-shoulders bust of Che Guevara in a beret on a light limestone block pedestal in the Museum of Socialist Art park.",
+  "pedestal": "block",
+  "pedestal_h": 1.1,
+  "figure_h": 0.7,
+  "total_h": 1.8,
+  "material": "dark_bronze",
+  "pedestal_material": "limestone",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11429762978",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Requiem'. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "robe"
+ },
+ {
+  "key": "n11429762979",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Adalbert Antonov 'Malchika'. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762980",
+  "form": "pylon",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'The five-pointed star', presumably a star element on a support. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "top": "star",
+  "pedestal": "low",
+  "material": "concrete",
+  "features": [
+   "star"
+  ]
+ },
+ {
+  "key": "n11429762981",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762982",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Georgi Dimitrov monument. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762983",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'To the Balkan' (partisan theme). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "soldier"
+ },
+ {
+  "key": "n11429762984",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Piece labelled 'Nothing' (no sign). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762985",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762986",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762987",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762988",
+  "form": "group",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Land of war'. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "figures": 2
+ },
+ {
+  "key": "n11429762989",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Vasil Kolarov monument. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762990",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Piece labelled 'No sign'. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762991",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762993",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Georgi Dimitrov by Ivan Mandov. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429762999",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed memorial sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763002",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Waiting' by Velichko Minekov. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "robe"
+ },
+ {
+  "key": "n11429763003",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763004",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Republic' by Lyubomir Dalchev, likely an allegorical female figure. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "robe"
+ },
+ {
+  "key": "n11429763008",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763009",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'One of the first' by Valentin Starchev. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763012",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763013",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763014",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763015",
+  "form": "group",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Yataks' (partisan helpers). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "figures": 2
+ },
+ {
+  "key": "n11429763016",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Septemvriets' (September 1923 insurgent). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "soldier"
+ },
+ {
+  "key": "n11429763017",
+  "form": "group",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Rachenitsa' (folk dance). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "dancer",
+  "figures": 2
+ },
+ {
+  "key": "n11429763018",
+  "form": "group",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Cooperative women'. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "figures": 2
+ },
+ {
+  "key": "n11429763019",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture with a Russian sign 'And you speak through my heart'. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763020",
+  "form": "group",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Arrest'. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "figures": 2
+ },
+ {
+  "key": "n11429763021",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Dr Mara Maleeva-Zhivkova. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763022",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Lyudmila Zhivkova memorial. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763023",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Worker victor'. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "arm"
+ },
+ {
+  "key": "n11429763025",
+  "form": "group",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Shift' (workers). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "figures": 2
+ },
+ {
+  "key": "n11429763026",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Standing statue of Georgi Dimitrov. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763027",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Lenin statue. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone",
+  "pose": "stride"
+ },
+ {
+  "key": "n11429763028",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763032",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763033",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763036",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763034",
+  "form": "head",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Head of Lenin. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763035",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Lenin memorial (its sign wrongly names Nikola Vaptsarov). Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11429763037",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Labour-freedom 1947' by Marko Malkov. Museum of Socialist Art sculpture park; the photos are generic views of the park (Che Guevara bust, a white figure on a carved pillar, a dark robed figure) and do not identify this piece.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11431731245",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Statue of St Patriarch Evtimiy, expected as a robed cleric on a tall pedestal; the photo shows a different statue (a soldier holding a flag).",
+  "pose": "robe",
+  "pedestal": "tall",
+  "material": "bronze",
+  "pedestal_material": "granite"
+ },
+ {
+  "key": "n11575977539",
+  "form": "stele",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Memorial to the fallen in the wars of national unification and WWII; the photo shows only a nearby public building.",
+  "pedestal": "block",
+  "material": "white_stone",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11616125009",
+  "form": "wall",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "War memorial in Bankya: a dark granite slab carved with names beside a taller angled light-grey stone stele with an emblem, on a paved stone platform.",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "total_h": 3.0,
+  "width": 2.5,
+  "depth": 1.0,
+  "material": "dark_granite",
+  "pedestal_material": "white_stone",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11616152666",
+  "form": "statue",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Standing nude female Hygieia painted terracotta-pink, one arm raised holding a bowl and a snake in the other hand, on a low plinth in Bankya park.",
+  "pose": "arm",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "figure_h": 2.2,
+  "total_h": 2.5,
+  "material": "painted",
+  "pedestal_material": "painted",
+  "color": "#c98a78"
+ },
+ {
+  "key": "n11616197970",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed artwork; the photos show the Bankya mineral bath building, not the artwork."
+ },
+ {
+  "key": "n11646014038",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bust of Maj. Gen. Prof. Ivan Marinov Ivanov at the Military Medical Academy; the photo shows only the VMA building.",
+  "pedestal": "herm",
+  "material": "bronze",
+  "pedestal_material": "granite"
+ },
+ {
+  "key": "n11646014039",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bust of Maj. Gen. Prof. Konstantin Angelov Stoyanov at the Military Medical Academy; the photo shows only the VMA building.",
+  "pedestal": "herm",
+  "material": "bronze",
+  "pedestal_material": "granite"
+ },
+ {
+  "key": "n11646014042",
+  "form": "stele",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Memorial to fallen military ranks (2001, sculptor Ivan Lazarov) at the VMA; the photo shows only the hospital building.",
+  "pedestal": "block",
+  "material": "granite",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11688336217",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Metal bust of Petko Petkov; the photos show a nearby historic building and lawn.",
+  "pedestal": "herm",
+  "material": "bronze",
+  "pedestal_material": "granite"
+ },
+ {
+  "key": "n11688336218",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Sun Dance'; the photo is an elevated street view, not the sculpture.",
+  "pedestal": "low"
+ },
+ {
+  "key": "n11764738055",
+  "form": "stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Memorial stone to agronomists fallen fighting fascism; the photo shows a brick university building.",
+  "pedestal": "low",
+  "material": "granite",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11770870012",
+  "form": "bust",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze bust of Georgi Benkovski on a tall grey granite pedestal with inscriptions, in Borisova gradina.",
+  "pedestal": "tall",
+  "pedestal_h": 2.0,
+  "figure_h": 0.9,
+  "total_h": 2.9,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11770947978",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bust of Vasil Aprilov; the photo shows a street with buildings and the bust is not identifiable.",
+  "pedestal": "herm",
+  "material": "bronze",
+  "pedestal_material": "granite"
+ },
+ {
+  "key": "n11770949155",
+  "form": "bust",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Bronze bust of moustached Dobri Zhelyazkov with green patina streaks (close-up, pedestal not visible).",
+  "pedestal": "herm",
+  "figure_h": 0.9,
+  "material": "green_bronze",
+  "pedestal_material": "limestone"
+ },
+ {
+  "key": "n11770971609",
+  "form": "bust",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze bust of General Gurko on a tall stone pedestal with wreaths, an honour guard standing at its base.",
+  "pedestal": "tall",
+  "pedestal_h": 2.2,
+  "figure_h": 1.0,
+  "total_h": 3.2,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "wreath",
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11770993971",
+  "form": "bust",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Pale grey bust of bearded Marin Drinov on a tall granite pedestal with a long carved inscription, among trees.",
+  "pedestal": "tall",
+  "pedestal_h": 1.8,
+  "figure_h": 0.9,
+  "total_h": 2.7,
+  "material": "white_stone",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11771782429",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bust of Hadzhi Dimitar; the photos show a stage concert nearby.",
+  "pedestal": "herm",
+  "material": "bronze",
+  "pedestal_material": "granite"
+ },
+ {
+  "key": "n11954204170",
+  "form": "stele",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Memorial to the fallen in the Balkan War; the photos show a large sequoia with a small sign and the memorial is not visible.",
+  "pedestal": "low",
+  "material": "granite",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n11956561738",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Metal sculpture 'Water grazing' (2022) by Pavel Koychev, likely in or by the pond; the photos show the lake with no visible sculpture.",
+  "material": "steel"
+ },
+ {
+  "key": "n11982413114",
+  "form": "stele",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed monument; the photos show the Banya Bashi mosque minaret and the Central Market hall.",
+  "pedestal": "block"
+ },
+ {
+  "key": "n12146319114",
+  "form": "abstract",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Smooth white organic abstract figure ('Inhabitant') with a curved body and outstretched limbs, standing directly on a lawn beside a glass tower.",
+  "pedestal": "none",
+  "figure_h": 2.2,
+  "total_h": 2.2,
+  "width": 2.0,
+  "depth": 1.0,
+  "material": "white_stone"
+ },
+ {
+  "key": "n12147716371",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Monument to Filip Avramov; the photo shows a mountain hut, not the monument.",
+  "pedestal": "block",
+  "material": "bronze",
+  "pedestal_material": "granite"
+ },
+ {
+  "key": "n12215973108",
+  "form": "animal",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Wooden horse sculpture; the photos show only a red maple branch.",
+  "animal": "horse",
+  "material": "painted",
+  "color": "#8b6a4a"
+ },
+ {
+  "key": "n12231456660",
+  "form": "animal",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bronze roe deer sculpture by Vasil Zidarov; the photos show the nearby Stamboliyski head monument and a snowy park.",
+  "animal": "deer",
+  "pedestal": "block",
+  "material": "bronze"
+ },
+ {
+  "key": "n12238445811",
+  "form": "stele",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Stone stele for Bulgaria-Japan diplomatic relations; the photos show the Exarch Joseph tomb and a park, not this stele.",
+  "pedestal": "low",
+  "material": "white_stone",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n12241119892",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Statue of a man with a gadulka (folk fiddle); the photo shows only a park alley.",
+  "pedestal": "block",
+  "material": "bronze"
+ },
+ {
+  "key": "n12269073546",
+  "form": "statue",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Tall weathered wooden trunk carved into an elongated human figure with a face at the top, standing directly on the grass.",
+  "pedestal": "none",
+  "figure_h": 3.0,
+  "total_h": 3.0,
+  "width": 0.6,
+  "depth": 0.6,
+  "material": "painted",
+  "color": "#8c8478"
+ },
+ {
+  "key": "n12269074467",
+  "form": "abstract",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Rough light-grey stone block sculpture 'Icarus' (Krum Damyanov, 1988) with a carved bird-like figure between broken wing slabs, on a stone base with a metal plaque.",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 1.6,
+  "total_h": 2.2,
+  "width": 1.3,
+  "depth": 0.8,
+  "material": "white_stone",
+  "pedestal_material": "granite",
+  "features": [
+   "relief",
+   "inscription"
+  ]
+ },
+ {
+  "key": "n12269089164",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed statue; the photos show the nearby 'Icarus' stone sculpture, so this piece cannot be identified.",
+  "pedestal": "block"
+ },
+ {
+  "key": "n12269097603",
+  "form": "statue",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed statue; the photos show the nearby 'Icarus' stone sculpture, so this piece cannot be identified.",
+  "pedestal": "block"
+ },
+ {
+  "key": "n12294367081",
+  "form": "statue",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Slender dark bronze figure of a dancing ballerina standing in the middle of the fountain in front of the National Theatre, among water jets.",
+  "pose": "dancer",
+  "pedestal": "low",
+  "figure_h": 2.5,
+  "total_h": 2.8,
+  "material": "dark_bronze"
+ },
+ {
+  "key": "n12294464956",
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture 'Composition 1976'; the photos show a park alley and an archival document.",
+  "pedestal": "block"
+ },
+ {
+  "key": "n12425899228",
+  "form": "stele",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unsigned monument, possibly to Slavic writing; the photos show fountains and a concert, not the monument.",
+  "pedestal": "block",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n12592593987",
+  "form": "statue",
+  "pose": "robe",
+  "material": "limestone",
+  "source": "photo",
+  "confidence": "medium",
+  "skip": true,
+  "notes": "Bearded robed stone figure of St Nicholas holding a book, mounted on a bracket at a building corner; facade sculpture, not a free-standing monument."
+ },
+ {
+  "key": "n12606988562",
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bust of Diko Iliev; the photos show a stage concert nearby.",
+  "pedestal": "herm",
+  "material": "bronze",
+  "pedestal_material": "granite"
+ },
+ {
+  "key": "n12766426531",
+  "form": "fountain",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze standing female figure 'The bather' on a small stone pedestal in the middle of a round fountain basin with water jets.",
+  "pose": "arm",
+  "pedestal": "block",
+  "pedestal_h": 1.0,
+  "figure_h": 1.8,
+  "total_h": 2.8,
+  "width": 12,
+  "depth": 12,
+  "material": "dark_bronze",
+  "pedestal_material": "granite"
+ },
+ {
+  "key": "n12798548963",
+  "form": "stele",
+  "source": "tags",
+  "confidence": "low",
+  "skip": true,
+  "notes": "Informal roadside memorial to two young women killed in a 2022 crash, with no sculptural form; the photo shows a tower block and metro entrance."
+ },
+ {
+  "key": "n12977806944",
+  "form": "stone",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Large rough mossy boulder with a dark metal plaque, set on a low light-granite slab base on a lawn.",
+  "pedestal": "low",
+  "pedestal_h": 0.2,
+  "figure_h": 1.1,
+  "total_h": 1.3,
+  "width": 1.6,
+  "depth": 1.0,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ]
+ },
+ {
+  "key": "n12998726585",
+  "form": "animal",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Brown wooden carving of a standing bear beside the entrance of a mountain hut.",
+  "animal": "bear",
+  "pedestal": "none",
+  "figure_h": 1.6,
+  "total_h": 1.6,
+  "material": "painted",
+  "color": "#6b4a2b"
+ },
+ {
+  "key": "n13141123585",
+  "form": "stele",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Upright cream limestone slab with a round relief portrait of an aviator in a leather cap and goggles, on paving.",
+  "pedestal": "low",
+  "pedestal_h": 0.1,
+  "total_h": 2.0,
+  "width": 0.8,
+  "depth": 0.4,
+  "material": "limestone",
+  "features": [
+   "relief",
+   "inscription"
+  ]
+ },
+ {
+  "key": "n13159058200",
+  "form": "statue",
+  "pose": "stand",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 2.5,
+  "total_h": 3.3,
+  "material": "bronze",
+  "pedestal_material": "concrete",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Todor Zhivkov sculpture by Hristo Simeonov in the Museum of Socialist Art park; The photos show the Museum of Socialist Art sculpture park in general (other statues, a Che Guevara bust), not clearly this piece."
+ },
+ {
+  "key": "n13159209505",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 2.5,
+  "total_h": 3.1,
+  "material": "white_stone",
+  "pedestal_material": "concrete",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'The Republic' allegorical sculpture in the Museum of Socialist Art park; The photos show the Museum of Socialist Art sculpture park in general (other statues, a Che Guevara bust), not clearly this piece."
+ },
+ {
+  "key": "n13159209506",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.5,
+  "figure_h": 2.5,
+  "total_h": 3.0,
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed monument in the Museum of Socialist Art park; one photo shows a white stone standing figure with a carved patterned robe, but it appears for the neighbouring node too so the match is uncertain."
+ },
+ {
+  "key": "n13159209507",
+  "form": "statue",
+  "pose": "robe",
+  "pedestal": "block",
+  "pedestal_h": 0.4,
+  "figure_h": 2.6,
+  "total_h": 3.0,
+  "material": "white_stone",
+  "pedestal_material": "concrete",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Possibly the white stone standing figure with a carved, perforated long robe seen in one photo of the Museum of Socialist Art park; the same photo appears for a neighbouring node, so unconfirmed."
+ },
+ {
+  "key": "n13159209513",
+  "form": "statue",
+  "pose": "stand",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 3.0,
+  "total_h": 3.8,
+  "material": "dark_bronze",
+  "pedestal_material": "concrete",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Lenin statue by Stoyu Todorov in the Museum of Socialist Art park; The photos show the Museum of Socialist Art sculpture park in general (other statues, a Che Guevara bust), not clearly this piece."
+ },
+ {
+  "key": "n13159209514",
+  "form": "group",
+  "figures": 2,
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 2.0,
+  "total_h": 2.6,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'After the battle, September 1923' figure group by Sekul Krumov in the Museum of Socialist Art park; The photos show the Museum of Socialist Art sculpture park in general (other statues, a Che Guevara bust), not clearly this piece."
+ },
+ {
+  "key": "n13159209515",
+  "form": "statue",
+  "pose": "soldier",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 2.2,
+  "total_h": 2.8,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'September 1923' sculpture by Boris Gondov in the Museum of Socialist Art park; The photos show the Museum of Socialist Art sculpture park in general (other statues, a Che Guevara bust), not clearly this piece."
+ },
+ {
+  "key": "n13159209516",
+  "form": "statue",
+  "pose": "soldier",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 2.2,
+  "total_h": 2.8,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Insurgent' figure by Kiril Sivilov in the Museum of Socialist Art park; The photos show the Museum of Socialist Art sculpture park in general (other statues, a Che Guevara bust), not clearly this piece."
+ },
+ {
+  "key": "n13159209517",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.0,
+  "figure_h": 0.9,
+  "total_h": 1.9,
+  "material": "bronze",
+  "pedestal_material": "concrete",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Vasil Kolarov portrait by Boris Gondov in the Museum of Socialist Art park; The photos show the Museum of Socialist Art sculpture park in general (other statues, a Che Guevara bust), not clearly this piece."
+ },
+ {
+  "key": "n13159209518",
+  "form": "statue",
+  "pose": "stand",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 2.5,
+  "total_h": 3.1,
+  "material": "bronze",
+  "pedestal_material": "concrete",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Georgi Dimitrov sculpture by Boris Gondov in the Museum of Socialist Art park; The photos show the Museum of Socialist Art sculpture park in general (other statues, a Che Guevara bust), not clearly this piece."
+ },
+ {
+  "key": "n13164624825",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.2,
+  "figure_h": 0.8,
+  "total_h": 2.0,
+  "material": "dark_bronze",
+  "pedestal_material": "limestone",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Dark bronze bust of a bearded man in a coat on a pale stone block pedestal under fir trees."
+ },
+ {
+  "key": "n13165346215",
+  "form": "animal",
+  "animal": "lion",
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "steps"
+  ],
+  "pedestal": "block",
+  "pedestal_h": 1.2,
+  "figure_h": 1.8,
+  "total_h": 3.0,
+  "width": 1.2,
+  "depth": 3.0,
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Striding dark bronze lion on a high granite block flanking the steps of the Sofia Court House (Palace of Justice)."
+ },
+ {
+  "key": "n13165346216",
+  "form": "animal",
+  "animal": "lion",
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "steps"
+  ],
+  "pedestal": "block",
+  "pedestal_h": 1.2,
+  "figure_h": 1.8,
+  "total_h": 3.0,
+  "width": 1.2,
+  "depth": 3.0,
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Second dark bronze striding lion on a granite block in front of the colonnaded Sofia Court House."
+ },
+ {
+  "key": "n13172587524",
+  "form": "stone",
+  "pedestal": "none",
+  "total_h": 1.5,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Technical-monument memorial in the Vitosha mountain; the photo shows a mountain hut and skiers, not the object."
+ },
+ {
+  "key": "n13174273133",
+  "form": "abstract",
+  "pedestal": "none",
+  "total_h": 2.0,
+  "material": "painted",
+  "color": "#8b6a45",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Wooden sculpture in a forest; the photo shows only snowy fir trees."
+ },
+ {
+  "key": "n13240795077",
+  "form": "stele",
+  "pedestal": "low",
+  "pedestal_h": 0.2,
+  "total_h": 2.4,
+  "width": 1.0,
+  "depth": 0.4,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "features": [
+   "relief",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Grey granite stele with a relief profile portrait of Indira Gandhi near the top and her name below, in front of the 79th school."
+ },
+ {
+  "key": "n13255963656",
+  "form": "stele",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "total_h": 1.9,
+  "width": 0.7,
+  "depth": 0.4,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Small light-grey stone stele with a dark inscribed quote plate on a squat block, standing in grass."
+ },
+ {
+  "key": "n13458408253",
+  "form": "abstract",
+  "pedestal": "none",
+  "total_h": 1.5,
+  "material": "painted",
+  "color": "#8b5a2b",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Wooden rose sculpture; the photos show a nearby granite memorial with a black inscribed slab and a folded white panel instead."
+ },
+ {
+  "key": "n13610732333",
+  "form": "abstract",
+  "pedestal": "none",
+  "total_h": 2.0,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Sculpture at a metro station; the photos show a metro train and a departure board."
+ },
+ {
+  "key": "n13854641809",
+  "form": "stone",
+  "pedestal": "none",
+  "total_h": 1.2,
+  "width": 1.2,
+  "depth": 0.8,
+  "material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Inscribed memorial stone to Aleksandar Fol; the photos are panoramas of a square where it cannot be made out."
+ },
+ {
+  "key": "n13854641816",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.7,
+  "total_h": 1.9,
+  "material": "white_stone",
+  "pedestal_material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Maiden from Treklyano' stone bust by Ivan Lazarov (1934); the photos show a nearby stone Trabant-car sculpture."
+ },
+ {
+  "key": "n13854641817",
+  "form": "abstract",
+  "pedestal": "low",
+  "pedestal_h": 0.2,
+  "total_h": 1.5,
+  "width": 1.6,
+  "depth": 3.4,
+  "material": "limestone",
+  "color": "#a0603a",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Life-size rough brownish stone carving of a Trabant car on a low slab in a park lawn, with a small figure on its roof."
+ },
+ {
+  "key": "n13854641818",
+  "form": "statue",
+  "pose": "soldier",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 2.0,
+  "total_h": 2.6,
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'April Uprising' stone statue by Georgi Apostolov (1968); the photos show a museum display of folk costumes."
+ },
+ {
+  "key": "n13854641821",
+  "form": "statue",
+  "pose": "stand",
+  "pedestal": "block",
+  "pedestal_h": 1.0,
+  "figure_h": 2.2,
+  "total_h": 3.2,
+  "material": "bronze",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Statue of Zahari Stoyanov; the photos show the Alexander Nevsky Cathedral instead."
+ },
+ {
+  "key": "n13854641823",
+  "form": "statue",
+  "pose": "stand",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "figure_h": 1.8,
+  "total_h": 2.1,
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'The Prodigal Son' stone statue by Lyubomir Dalchev (1974); the photos show a yellow octagonal tower instead."
+ },
+ {
+  "key": "n13854641824",
+  "form": "seated",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "figure_h": 1.5,
+  "total_h": 1.8,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Job' statue by Lyubomir Dalchev (1975); the photos show an astronomical-point plaque and a snowy square."
+ },
+ {
+  "key": "n13854641825",
+  "form": "group",
+  "figures": 3,
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "figure_h": 1.8,
+  "total_h": 2.1,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Mauthausen' sculpture by Lyubomir Dalchev (1975); the photos show a plaque and a different soldier-with-flag monument."
+ },
+ {
+  "key": "n13856410622",
+  "form": "stele",
+  "pedestal": "low",
+  "pedestal_h": 0.2,
+  "total_h": 2.0,
+  "width": 1.0,
+  "depth": 0.3,
+  "material": "steel",
+  "color": "#bcd4dc",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Glass stele about the Edict of Serdica; the photos show the St Sofia church facade and door instead."
+ },
+ {
+  "key": "n13866185688",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.4,
+  "figure_h": 0.8,
+  "total_h": 2.2,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark bronze bust of a man in a buttoned military-style jacket on a grey granite block with an inscription."
+ },
+ {
+  "key": "n13893699531",
+  "form": "abstract",
+  "pedestal": "low",
+  "total_h": 2.0,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'The Horseman' sculpture by Ivan Rusev; the photo shows only a park alley with flower beds."
+ },
+ {
+  "key": "n13897097382",
+  "form": "abstract",
+  "pedestal": "low",
+  "total_h": 1.5,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'The Corner' sculpture by Ivan Rusev; the photo shows only park lawns and flower beds."
+ },
+ {
+  "key": "n13897111937",
+  "form": "abstract",
+  "pedestal": "low",
+  "total_h": 1.5,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed park sculpture; the photo shows only autumn trees."
+ },
+ {
+  "key": "n13897111938",
+  "form": "abstract",
+  "pedestal": "low",
+  "total_h": 1.5,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed park sculpture; the photo shows only autumn trees."
+ },
+ {
+  "key": "n13897134384",
+  "form": "abstract",
+  "pedestal": "low",
+  "total_h": 1.5,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed park sculpture; the photo shows only park lawns and flower beds."
+ },
+ {
+  "key": "n13897209356",
+  "form": "stele",
+  "pedestal": "low",
+  "total_h": 1.8,
+  "width": 1.0,
+  "depth": 0.4,
+  "material": "granite",
+  "features": [
+   "inscription",
+   "relief"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Stone stele to Simon Bolivar with a quote; the photo shows only snowy fir trees."
+ },
+ {
+  "key": "n13897243559",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.4,
+  "figure_h": 0.8,
+  "total_h": 2.2,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Metal bust of General Jose Artigas; the photo shows only snowy fir trees."
+ },
+ {
+  "key": "n13901270210",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.4,
+  "figure_h": 0.8,
+  "total_h": 2.2,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bronze bust of Stefan Stambolov; the photos show an overgrown grave enclosure with a balustrade in a cemetery, bust not visible."
+ },
+ {
+  "key": "n13905844456",
+  "form": "abstract",
+  "pedestal": "low",
+  "total_h": 2.0,
+  "material": "steel",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Metal sculpture by a street; the photos show only apartment blocks and a crossroads."
+ },
+ {
+  "key": "n13969995895",
+  "skip": true,
+  "form": "wall",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Light map of Bulgaria in an underground (level -1) metro station; flat and indoor, the photo shows a station platform."
+ },
+ {
+  "key": "n14102568778",
+  "skip": true,
+  "form": "wall",
+  "source": "photo",
+  "confidence": "low",
+  "notes": "Metal artwork at a spot where both photos show wall plaques (sports day, Rusi Petrov); probably a flat plaque."
+ },
+ {
+  "key": "n14103529577",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 1.8,
+  "total_h": 2.6,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Untitled statue; the photos show the Alexander Nevsky Cathedral, museum paintings or an indoor bronze bust, not an outdoor monument."
+ },
+ {
+  "key": "n14103529578",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 1.8,
+  "total_h": 2.6,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Untitled statue; the photos show the Alexander Nevsky Cathedral, museum paintings or an indoor bronze bust, not an outdoor monument."
+ },
+ {
+  "key": "n14103529579",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 1.8,
+  "total_h": 2.6,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Untitled statue; the photos show the Alexander Nevsky Cathedral, museum paintings or an indoor bronze bust, not an outdoor monument."
+ },
+ {
+  "key": "n14103529580",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 1.8,
+  "total_h": 2.6,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Untitled statue; the photos show the Alexander Nevsky Cathedral, museum paintings or an indoor bronze bust, not an outdoor monument."
+ },
+ {
+  "key": "n14103529581",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 1.8,
+  "total_h": 2.6,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Untitled statue; the photos show the Alexander Nevsky Cathedral, museum paintings or an indoor bronze bust, not an outdoor monument."
+ },
+ {
+  "key": "n14103529582",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 1.8,
+  "total_h": 2.6,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Untitled statue; one photo shows a small bust on a pedestal in a snowy garden before the National Gallery, but it may not be this one; the other is a painting."
+ },
+ {
+  "key": "n14103587446",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.0,
+  "figure_h": 0.8,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "white_stone",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Bronze-coloured bust of Grigor Zhotev in a jacket on a plain white stone block in a park."
+ },
+ {
+  "key": "n14105034758",
+  "form": "fountain",
+  "pedestal": "none",
+  "total_h": 1.2,
+  "material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Drinking-water fountain artwork; the photos show only steps and railings in a park."
+ },
+ {
+  "key": "n14107219060",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.4,
+  "figure_h": 0.8,
+  "total_h": 2.2,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bust of composer Pancho Vladigerov; the photos show an open-air stage performance nearby."
+ },
+ {
+  "key": "n14107343243",
+  "form": "stele",
+  "pedestal": "low",
+  "pedestal_h": 0.1,
+  "total_h": 2.0,
+  "width": 1.2,
+  "depth": 0.3,
+  "material": "white_stone",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Weathered white stone slab with an irregular broken top edge carrying a long list of cosmonaut names, standing on paving in a park."
+ },
+ {
+  "key": "n14109105692",
+  "form": "stele",
+  "pedestal": "low",
+  "pedestal_h": 0.2,
+  "total_h": 2.6,
+  "width": 1.6,
+  "depth": 0.5,
+  "material": "granite",
+  "features": [
+   "relief"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Tall grey granite slab with a curved cut-out holding a bronze relief medallion portrait of Angel Balevski in glasses, in front of the Metal Science Institute."
+ },
+ {
+  "key": "n14109145384",
+  "form": "bird",
+  "pedestal": "block",
+  "pedestal_h": 1.0,
+  "figure_h": 1.2,
+  "total_h": 2.2,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Dark metal dove with ruffled feathers on a small square pedestal beside a glass pavilion."
+ },
+ {
+  "key": "n14110181544",
+  "form": "stone",
+  "pedestal": "none",
+  "total_h": 1.2,
+  "width": 1.8,
+  "depth": 1.0,
+  "material": "granite",
+  "color": "#b49a86",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Rounded pinkish granite boulder in a lawn with a small metal inscription plate on its face."
+ },
+ {
+  "key": "n14110188415",
+  "form": "group",
+  "figures": 2,
+  "pose": "child",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 1.6,
+  "total_h": 2.2,
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Mother with child' statue; the photos show Krum Damyanov's 'Icarus' stone sculpture nearby instead."
+ },
+ {
+  "key": "n14110188416",
+  "form": "abstract",
+  "pedestal": "block",
+  "pedestal_h": 0.7,
+  "figure_h": 1.4,
+  "total_h": 2.1,
+  "width": 1.2,
+  "depth": 0.8,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "features": [
+   "wings",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Blocky grey granite carving of Icarus with stylised wings and faces cut into stacked stone slabs, on a rough granite block with a bronze plate (Krum Damyanov, 1968)."
+ },
+ {
+  "key": "n14110188417",
+  "form": "aircraft",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "total_h": 2.0,
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Airplanes' sculpture; the photos show Krum Damyanov's 'Icarus' stone sculpture nearby instead."
+ },
+ {
+  "key": "n14110188418",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 1.6,
+  "total_h": 2.2,
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Untitled statue; the photos show Krum Damyanov's 'Icarus' stone sculpture nearby instead."
+ },
+ {
+  "key": "n14110188419",
+  "form": "statue",
+  "pose": "robe",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 1.8,
+  "total_h": 2.4,
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Bulgaria' allegorical statue; the photos show Krum Damyanov's 'Icarus' stone sculpture nearby instead."
+ },
+ {
+  "key": "n14110188420",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 1.6,
+  "total_h": 2.2,
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Statue named Liliyana Dimitrova; the photo shows a portrait of an elderly man, not the sculpture."
+ },
+ {
+  "key": "n14119792892",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 1.8,
+  "total_h": 2.4,
+  "material": "white_stone",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Woman - architecture' statue; the photo is an old portrait photograph of a man."
+ },
+ {
+  "key": "n14140545243",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.3,
+  "figure_h": 0.8,
+  "total_h": 2.1,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed memorial bust; the photos show an open-air stage festival nearby."
+ },
+ {
+  "key": "n14157272617",
+  "form": "bust",
+  "pedestal": "block",
+  "pedestal_h": 1.5,
+  "figure_h": 0.9,
+  "total_h": 2.4,
+  "material": "green_bronze",
+  "pedestal_material": "white_stone",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Greenish bronze bust of Vasil Petleshkov with moustache and bow tie on a tall pale stone block carved with his name and 1845-1876."
+ },
+ {
+  "key": "n14157842876",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 1.6,
+  "total_h": 2.2,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Untyped artwork; the photo is an old photo of a woman reading."
+ },
+ {
+  "key": "n14157842889",
+  "form": "abstract",
+  "pedestal": "low",
+  "total_h": 1.5,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture; the photo shows a corner apartment building."
+ },
+ {
+  "key": "n14157842890",
+  "form": "abstract",
+  "pedestal": "low",
+  "total_h": 1.5,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed sculpture; the photo shows a corner apartment building."
+ },
+ {
+  "key": "n14157842933",
+  "skip": true,
+  "form": "bust",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Pope John XXIII artwork mounted on a facade above the top-floor entrance (photos show the villa facade); part of a building, not a free-standing monument."
+ },
+ {
+  "key": "n14159879209",
+  "form": "stele",
+  "pedestal": "low",
+  "total_h": 1.5,
+  "width": 0.6,
+  "depth": 0.3,
+  "material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Glagolitic alphabet' small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879210",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Khan Kubrat: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879211",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Khan Asparuh: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879212",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Khan Omurtag: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879213",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Khan Tervel: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879214",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Khan Krum: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879215",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Prince Boris I: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879216",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Tsar Simeon: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879217",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Tsar Petar: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879218",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Tsar Samuil: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879219",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Tsar Asen I: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879220",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Tsar Kaloyan: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879221",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Tsar Ivan Asen II: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14159879222",
+  "form": "bust",
+  "pedestal": "herm",
+  "pedestal_h": 1.2,
+  "figure_h": 0.6,
+  "total_h": 1.8,
+  "material": "bronze",
+  "pedestal_material": "granite",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Tsar Ivan Shishman: small artwork in a series of Bulgarian rulers in a small square; the photos show a playground climbing globe and a lottery kiosk, not the artwork."
+ },
+ {
+  "key": "n14161867589",
+  "form": "animal",
+  "animal": "lion",
+  "pedestal": "block",
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "pedestal_h": 2.0,
+  "figure_h": 1.6,
+  "total_h": 3.6,
+  "width": 1.0,
+  "depth": 2.4,
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "One of the four dark bronze lions of Lions' Bridge, standing on a tall square granite pedestal at a bridge corner."
+ },
+ {
+  "key": "n14161867590",
+  "form": "animal",
+  "animal": "lion",
+  "pedestal": "block",
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "pedestal_h": 2.0,
+  "figure_h": 1.6,
+  "total_h": 3.6,
+  "width": 1.0,
+  "depth": 2.4,
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Dark bronze lion on a tall granite pedestal at a corner of Lions' Bridge, seen behind a liberation memorial stone."
+ },
+ {
+  "key": "n14161867591",
+  "form": "animal",
+  "animal": "lion",
+  "pedestal": "block",
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "pedestal_h": 2.0,
+  "figure_h": 1.6,
+  "total_h": 3.6,
+  "width": 1.0,
+  "depth": 2.4,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Lions' Bridge lion (inferred from neighbouring nodes); the photos show only the Vladaya river channel under the bridge."
+ },
+ {
+  "key": "n14161906223",
+  "form": "column",
+  "top": "eagle",
+  "pedestal": "stepped",
+  "material": "green_bronze",
+  "pedestal_material": "granite",
+  "total_h": 9.0,
+  "width": 1.5,
+  "depth": 1.5,
+  "features": [
+   "wings"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Probably one of the four Eagles' Bridge columns (a sibling node's photo shows an eagle on a column); these photos show street traffic, an old postcard or a protester."
+ },
+ {
+  "key": "n14161906224",
+  "form": "column",
+  "top": "eagle",
+  "pedestal": "stepped",
+  "material": "green_bronze",
+  "pedestal_material": "granite",
+  "total_h": 9.0,
+  "width": 1.5,
+  "depth": 1.5,
+  "features": [
+   "wings"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Probably one of the four Eagles' Bridge columns (a sibling node's photo shows an eagle on a column); these photos show street traffic, an old postcard or a protester."
+ },
+ {
+  "key": "n14161906225",
+  "form": "column",
+  "top": "eagle",
+  "pedestal": "stepped",
+  "material": "green_bronze",
+  "pedestal_material": "granite",
+  "total_h": 9.0,
+  "width": 1.5,
+  "depth": 1.5,
+  "features": [
+   "wings"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Probably one of the four Eagles' Bridge columns (a sibling node's photo shows an eagle on a column); these photos show street traffic, an old postcard or a protester."
+ },
+ {
+  "key": "n14161906226",
+  "form": "column",
+  "top": "eagle",
+  "pedestal": "stepped",
+  "material": "green_bronze",
+  "pedestal_material": "granite",
+  "total_h": 9.0,
+  "width": 1.5,
+  "depth": 1.5,
+  "features": [
+   "wings"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Tall granite column at Eagles' Bridge topped by a stone ball and a green bronze eagle with outspread wings."
+ },
+ {
+  "key": "n14162479627",
+  "form": "animal",
+  "animal": "lion",
+  "pedestal": "block",
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "pedestal_h": 2.0,
+  "figure_h": 1.6,
+  "total_h": 3.6,
+  "width": 1.0,
+  "depth": 2.4,
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Dark bronze lion of Lions' Bridge with a heavy mane, shown close-up under snow."
+ },
+ {
+  "key": "n14203555221",
+  "form": "stele",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "total_h": 4.0,
+  "width": 0.8,
+  "depth": 0.6,
+  "material": "dark_granite",
+  "features": [
+   "relief",
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "medium",
+  "notes": "Tall dark stone pillar carved with reliefs and topped by sculpted raised hands, in front of the trade-union palace with the clock and twin towers."
+ },
+ {
+  "key": "n14219544727",
+  "form": "statue",
+  "pose": "child",
+  "pedestal": "block",
+  "pedestal_h": 0.6,
+  "figure_h": 1.9,
+  "total_h": 2.5,
+  "material": "marble",
+  "pedestal_material": "marble",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "White marble statue of St Joseph in a long robe holding the child Jesus, on a marble block in a church arcade."
+ },
+ {
+  "key": "n14227267576",
+  "form": "stele",
+  "pedestal": "low",
+  "total_h": 1.5,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Unnamed memorial; the photos show a snowy square and a small old church building."
+ },
+ {
+  "key": "n14235621484",
+  "form": "abstract",
+  "pedestal": "none",
+  "total_h": 0.6,
+  "width": 1.0,
+  "depth": 0.6,
+  "material": "bronze",
+  "features": [
+   "inscription"
+  ],
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Stylised bronze heart half emerging from the ground (Kurt Gebauer, 2024, Vaclav Havel memorial); the photo shows only a street-corner building."
+ },
+ {
+  "key": "n14255889707",
+  "form": "statue",
+  "pedestal": "block",
+  "pedestal_h": 0.5,
+  "figure_h": 2.0,
+  "total_h": 2.5,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Bronze sculpture by Vezhdi Rashidov; the photo shows a shopping mall facade instead."
+ },
+ {
+  "key": "n14255889708",
+  "form": "statue",
+  "pose": "stride",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "figure_h": 2.0,
+  "total_h": 2.3,
+  "material": "bronze",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "'Running man' bronze figure by Pavel Koychev; the photo shows a shopping mall facade instead."
+ },
+ {
+  "key": "n14259082195",
+  "form": "statue",
+  "pose": "robe",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "figure_h": 1.7,
+  "total_h": 2.0,
+  "material": "dark_bronze",
+  "pedestal_material": "concrete",
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Slender dark bronze standing woman in a long dress and headscarf on a small low base among park trees."
+ },
+ {
+  "key": "n14259082196",
+  "form": "animal",
+  "animal": "dog",
+  "pedestal": "block",
+  "pedestal_h": 0.8,
+  "figure_h": 0.9,
+  "total_h": 1.7,
+  "width": 1.0,
+  "depth": 1.0,
+  "material": "dark_bronze",
+  "pedestal_material": "painted",
+  "color": "#b08a6a",
+  "features": [
+   "inscription"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Dark metal seated dog (Mailo) atop a block decorated with painted mosaic flowers and small cat figurines, next to benches."
+ },
+ {
+  "key": "n14259082197",
+  "form": "animal",
+  "animal": "lion",
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "figure_h": 2.2,
+  "total_h": 2.5,
+  "material": "steel",
+  "features": [
+   "shield"
+  ],
+  "source": "photo",
+  "confidence": "high",
+  "notes": "Grey metal lion rampant standing upright on its hind legs holding a shield, on a low base among shrubs before a glass office building."
+ },
+ {
+  "key": "n14279831686",
+  "skip": true,
+  "form": "abstract",
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Serdica VR experience inside the Central Market Hall basement (level -1); an indoor installation, the photos show the hall interior."
+ },
+ {
+  "key": "w1287290326",
+  "form": "wall",
+  "pedestal": "none",
+  "total_h": 2.0,
+  "width": 20,
+  "depth": 0.4,
+  "source": "tags",
+  "confidence": "low",
+  "notes": "Wall installation artwork; the photos show the Sofia Synagogue building instead."
+ }
+]

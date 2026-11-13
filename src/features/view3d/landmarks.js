@@ -204,6 +204,60 @@
           k.quad([u, a, low], [u, b, low], [u, b, high], [u, a, high], color || GLASS, [u - side, a, low], !color);
         }
       };
+      // A shaft between two points in any direction, with n sides and optional end caps.
+      k.rod = function (a, b, r0, r1, n, color, caps) {
+        var d = [b[0] - a[0], b[1] - a[1], b[2] - a[2]], l = Math.hypot(d[0], d[1], d[2]);
+        if (l < 1e-6) return;
+        d = [d[0] / l, d[1] / l, d[2] / l];
+        var e = Math.abs(d[2]) < 0.9 ? [0, 0, 1] : [1, 0, 0];
+        var s = [d[1] * e[2] - d[2] * e[1], d[2] * e[0] - d[0] * e[2], d[0] * e[1] - d[1] * e[0]], sl = Math.hypot(s[0], s[1], s[2]);
+        s = [s[0] / sl, s[1] / sl, s[2] / sl];
+        var t = [d[1] * s[2] - d[2] * s[1], d[2] * s[0] - d[0] * s[2], d[0] * s[1] - d[1] * s[0]];
+        function at(o, i, r) { var g = 2 * Math.PI * i / n, c = Math.cos(g), q = Math.sin(g); return [o[0] + r * (c * s[0] + q * t[0]), o[1] + r * (c * s[1] + q * t[1]), o[2] + r * (c * s[2] + q * t[2])]; }
+        var mid = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, (a[2] + b[2]) / 2];
+        for (var i = 0; i < n; i++) k.quad(at(a, i, r0), at(a, i + 1, r0), at(b, i + 1, r1), at(b, i, r1), color, mid);
+        if (caps) for (i = 1; i < n - 1; i++) {
+          if (r0 > 0) k.tri(at(a, 0, r0), at(a, i, r0), at(a, i + 1, r0), color, b);
+          if (r1 > 0) k.tri(at(b, 0, r1), at(b, i, r1), at(b, i + 1, r1), color, a);
+        }
+      };
+      // A ball (an ellipsoid with radii r, r and rz) of `sides` faces round and `rings` bands.
+      k.ball = function (c, r, color, rz, sides, rings) {
+        rz = rz || r; sides = sides || 8; rings = rings || 4;
+        function at(i, j) { var g = 2 * Math.PI * i / sides, t = Math.PI * j / rings; return [c[0] + r * Math.sin(t) * Math.cos(g), c[1] + r * Math.sin(t) * Math.sin(g), c[2] + rz * Math.cos(t)]; }
+        for (var j = 0; j < rings; j++) for (var i = 0; i < sides; i++) {
+          if (j > 0) k.tri(at(i, j), at(i + 1, j), at(i + 1, j + 1), color, c);
+          if (j < rings - 1) k.tri(at(i, j), at(i + 1, j + 1), at(i, j + 1), color, c);
+        }
+      };
+      // A rough boulder: an irregular prism that narrows to a ridge, from a seed.
+      k.rock = function (cu, cv, w, d, h, color, seed) {
+        var n = 7, low = [], mid = [], top = [];
+        for (var i = 0; i < n; i++) {
+          var g = 2 * Math.PI * i / n, j = 0.78 + 0.3 * Math.abs(Math.sin(seed * 12.7 + i * 3.1));
+          low.push([cu + w / 2 * j * Math.cos(g), cv + d / 2 * j * Math.sin(g), 0]);
+          mid.push([cu + w / 2 * j * 0.92 * Math.cos(g), cv + d / 2 * j * 0.86 * Math.sin(g), h * (0.55 + 0.2 * Math.abs(Math.cos(seed * 5.3 + i)))]);
+          top.push([cu + w / 2 * j * 0.45 * Math.cos(g), cv + d / 2 * j * 0.4 * Math.sin(g), h * (0.85 + 0.15 * Math.abs(Math.sin(seed * 2.9 + i * 1.7)))]);
+        }
+        var c = [cu, cv, h * 0.4];
+        for (i = 0; i < n; i++) {
+          var q = (i + 1) % n;
+          k.quad(low[i], low[q], mid[q], mid[i], color, c); k.quad(mid[i], mid[q], top[q], top[i], color, c);
+        }
+        for (i = 1; i < n - 1; i++) k.tri(top[0], top[i], top[i + 1], color, c);
+      };
+      // Build with `fn(sub)` in a frame of its own (x forward, y left, z up), then turn it by `turn`
+      // radians and move it to (cu, cv, z0) in this frame, scaled by `scale`.
+      k.placed = function (cu, cv, z0, turn, scale, fn) {
+        var local = [];
+        fn(kit(local));
+        var c = Math.cos(turn), s = Math.sin(turn);
+        for (var i = 0; i < local.length; i += 10) {
+          var x = local[i] * scale, y = local[i + 1] * scale, nx = local[i + 6], ny = local[i + 7];
+          out.push(cu + x * c - y * s, cv + x * s + y * c, z0 + local[i + 2] * scale, local[i + 3], local[i + 4], local[i + 5], nx * c - ny * s, nx * s + ny * c, local[i + 8], local[i + 9]);
+        }
+      };
+      k.GLASS = GLASS;
       return k;
     }
 
@@ -581,10 +635,11 @@
     }
 
     // The source the fixed-model layer in bulgarian-houses.js draws: which sites are in view, and their vertices.
-    function visible(bounds) {
+    // A site with `z` (small monuments) waits for that MapLibre zoom; the others show from minZoom.
+    function visible(bounds, zoom) {
       var seen = new Set(), west = bounds.getWest(), east = bounds.getEast(), south = bounds.getSouth(), north = bounds.getNorth();
       landmarkSites.forEach(function (site, i) {
-        if (!drawn(site)) return;
+        if (!drawn(site) || (site.z && zoom !== undefined && zoom < site.z)) return;
         var dLat = (site.reach + 120) / 110574, dLon = dLat / Math.cos(site.at[1] * Math.PI / 180);
         if (site.at[0] + dLon >= west && site.at[0] - dLon <= east && site.at[1] + dLat >= south && site.at[1] - dLat <= north) seen.add(i);
       });
@@ -592,7 +647,7 @@
     }
     function vertices(map, origin, seen) {
       var parts = [], size = 0;
-      (seen || visible(map.getBounds())).forEach(function (i) {
+      (seen || visible(map.getBounds(), map.getZoom())).forEach(function (i) {
         var site = landmarkSites[i], data = mesh(site), part = new Float32Array(data);
         var at = maplibregl.MercatorCoordinate.fromLngLat(site.at), unit = at.meterInMercatorCoordinateUnits();
         var x = (at.x - origin.x) / origin.unit, y = (at.y - origin.y) / origin.unit, k = unit / origin.unit;
@@ -604,6 +659,9 @@
       parts.forEach(function (part) { all.set(part, offset); offset += part.length; });
       return all;
     }
-    return { suffix: '-landmarks', minZoom: 12, visible: visible, vertices: vertices, filter: filter, mesh: mesh, sites: landmarkSites,
+    // Builders in other files (monument-models.js) register here; meshes are built on first use.
+    function define(kind, builder) { builders[kind] = builder; }
+    return { suffix: '-landmarks', minZoom: 12, visible: visible, vertices: vertices, filter: filter, mesh: mesh, sites: landmarkSites, define: define,
+      colors: { GLASS: GLASS, GOLD: GOLD, COPPER: COPPER, LEAD: LEAD, STONE: STONE, GRANITE: GRANITE, DARK: DARK, BRONZE: BRONZE },
       setShown: setShown, awake: function () { return shown.landmarks || shown.malls; } };
   })();

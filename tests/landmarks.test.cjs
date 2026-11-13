@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const vm = require('node:vm');
 const { app } = require('./app.cjs');
 
-const context = app(['features/view3d/landmark-data', 'features/view3d/landmarks'], { clearInterval() {} });
+const context = app(['features/view3d/landmark-data', 'features/view3d/landmarks', 'features/view3d/monument-models'], { clearInterval() {} });
 const landmarks = vm.runInContext('landmarks', context);
 const site = kind => landmarks.sites.find(s => s.k === kind);
 function measure(mesh) {
@@ -20,7 +20,7 @@ function measure(mesh) {
 
 test('every landmark and mall builds a finite mesh that stays on its site', () => {
   assert.ok(landmarks.sites.length >= 30);
-  for (const s of landmarks.sites) {
+  for (const s of landmarks.sites.filter(site => site.k !== 'monument')) {   // monuments: tests/monuments.test.cjs
     const m = measure(landmarks.mesh(s));
     assert.ok(m.triangles >= 40, s.n + ' triangles ' + m.triangles);
     assert.equal(m.low, 0, s.n);

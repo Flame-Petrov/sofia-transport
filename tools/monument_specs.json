@@ -1,0 +1,868 @@
+[
+ {
+  "key": "w867938756",
+  "form": "obelisk",
+  "total_h": 41,
+  "figure_h": 4.5,
+  "pedestal": "stepped",
+  "pedestal_h": 4,
+  "width": 24,
+  "depth": 23,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "relief",
+   "steps",
+   "wreath",
+   "star"
+  ],
+  "notes": "Bratska Mogila (1956): a 41 m tapering grey granite obelisk with a red-star emblem; in front of its foot stands a bronze male and female partisan pair (about 4–5 m) on a stepped plinth, flanked left and right by two low granite walls (each about 10 m long, about 4 m high) carrying high-relief bronze crowds. The figure and wall sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://bg.wikipedia.org/wiki/Братска_могила_(София)",
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=629&Itemid=140",
+   "https://commons.wikimedia.org/wiki/Category:Bratska_mogila,_Borisova_gradina",
+   "https://nonument.org/?p=1674"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "w1432216584",
+  "form": "flame",
+  "total_h": 1.0,
+  "width": 2.5,
+  "depth": 2.5,
+  "material": "dark_granite",
+  "features": [
+   "flame"
+  ],
+  "notes": "One of two eternal-flame bowls at Bratska Mogila. OSM gives a round footprint about 2.5 m across. The height of about 1 m is a guess, because no photo of the bowls was found.",
+  "source": "tags",
+  "refs": [
+   "https://www.openstreetmap.org/way/1432216584",
+   "https://bg.wikipedia.org/wiki/Братска_могила_(София)"
+  ],
+  "confidence": "low"
+ },
+ {
+  "key": "w1432216585",
+  "form": "flame",
+  "total_h": 1.0,
+  "width": 2.5,
+  "depth": 2.5,
+  "material": "dark_granite",
+  "features": [
+   "flame"
+  ],
+  "notes": "The second eternal-flame bowl at Bratska Mogila, about 50 m south-west of the first one. OSM gives a round footprint about 2.5 m across. The height is a guess.",
+  "source": "tags",
+  "refs": [
+   "https://www.openstreetmap.org/way/1432216585",
+   "https://bg.wikipedia.org/wiki/Братска_могила_(София)"
+  ],
+  "confidence": "low"
+ },
+ {
+  "key": "w1433086220",
+  "form": "bells",
+  "total_h": 37,
+  "width": 7,
+  "depth": 3,
+  "material": "concrete",
+  "features": [
+   "inscription"
+  ],
+  "notes": "Kambanite (1979): a central 37 m tower of four tall grey concrete slab-pylons joined at the top by an open ring or sphere that holds bells. Around it is a roughly 66 m circular complex (the OSM outline) of low concrete walls and benches with over 100 donated bells. The tower footprint is an estimate from photos.",
+  "source": "photo",
+  "refs": [
+   "https://www.rexby.com/zvezdizhekova/ttd/symbol-of-peace-and-childrens-dreams",
+   "https://bg.wikipedia.org/wiki/Камбаните",
+   "https://commons.wikimedia.org/wiki/File:Kambanite_Sofia_20090405_002.JPG",
+   "https://commons.wikimedia.org/wiki/File:София_2004_-_panoramio.jpg"
+  ],
+  "confidence": "medium",
+  "ring_d": 66
+ },
+ {
+  "key": "n1117218042",
+  "form": "statue",
+  "pose": "robe",
+  "figure_h": 2.2,
+  "pedestal": "block",
+  "pedestal_h": 1.7,
+  "total_h": 4.1,
+  "material": "dark_bronze",
+  "pedestal_material": "dark_granite",
+  "features": [
+   "cross_on_top",
+   "inscription",
+   "steps"
+  ],
+  "notes": "Patriarch Evtimiy at the Popa square (Marko Markov, 1938–39): a bronze patriarch in a long robe and cowl, holding a cross before his chest. The polished dark granite pedestal is an inverted truncated pyramid on a two-step platform.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=43&Itemid=140",
+   "https://bg.wikipedia.org/wiki/Патриарх_Евтимий_(паметник_в_София)",
+   "https://commons.wikimedia.org/wiki/File:Popa_Sofia_TB.jpg"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "n4913020290",
+  "form": "wall",
+  "total_h": 2.5,
+  "width": 12,
+  "depth": 3,
+  "material": "granite",
+  "features": [
+   "lion",
+   "flame",
+   "wreath",
+   "inscription",
+   "flag"
+  ],
+  "notes": "Unknown Soldier (1981), against the south wall of the St Sofia basilica: a low grey granite wall-sarcophagus bearing Vazov's verse and bronze wreaths, a low granite altar and a dark bronze eternal-flame ring in front, and seven flag pylons on one side. Andrey Nikolov's bronze lying lion (about 4 m long) sits on a low plinth a little in front. The wall size is an estimate from photos.",
+  "facing": 180,
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=1023&Itemid=140",
+   "https://bg.wikipedia.org/wiki/Паметник_на_Незнайния_воин_(София)",
+   "https://commons.wikimedia.org/wiki/File:Monument_to_the_Unknown_Soldier,_Sofia.jpg",
+   "https://commons.wikimedia.org/wiki/File:20140618_Sofia_18.jpg"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "w696756848",
+  "form": "pylon",
+  "top": "none",
+  "total_h": 10,
+  "width": 10,
+  "depth": 8,
+  "material": "white_stone",
+  "pedestal_material": "granite",
+  "features": [
+   "wreath",
+   "inscription",
+   "steps"
+  ],
+  "notes": "Doctors' Monument (1884): a 10 m four-sided truncated pyramid of large rough-faced white sandstone blocks carved with names, on a grey granite plinth and topped by a monolithic grey granite sarcophagus. Eight bronze wreaths hang on the base. The base is 10 × 8 m. Its main face is described as oriented west.",
+  "facing": 270,
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=561&Itemid=140",
+   "https://bg.wikipedia.org/wiki/Докторски_паметник",
+   "https://commons.wikimedia.org/wiki/Category:Doctors_monument,_Sofia"
+  ],
+  "confidence": "high",
+  "shaft_w": 9
+ },
+ {
+  "key": "w167323812",
+  "form": "pylon",
+  "top": "figure",
+  "total_h": 12,
+  "figure_h": 2.8,
+  "pedestal": "tall",
+  "pedestal_h": 9.2,
+  "width": 7,
+  "depth": 7,
+  "material": "white_stone",
+  "pedestal_material": "granite",
+  "features": [
+   "relief",
+   "wreath",
+   "inscription",
+   "steps"
+  ],
+  "notes": "Odrin Epic monument: a tapering pyramidal obelisk of grey Vladaya granite on a 7 × 7 m stepped base, crowned by a 2.8 m white Vratsa-stone militiaman in a greatcoat holding a rifle. A bronze medallion with a laurel wreath and a bronze battle relief are on the front, which faces east. The total height is 12 m.",
+  "facing": 90,
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=533&Itemid=140",
+   "https://bg.wikipedia.org/wiki/Паметник_на_Одринската_епопея"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "n4722201300",
+  "form": "pylon",
+  "top": "eagle",
+  "total_h": 12.1,
+  "pedestal_h": 10.6,
+  "figure_h": 1.5,
+  "width": 13,
+  "depth": 13,
+  "material": "bronze",
+  "pedestal_material": "dark_granite",
+  "features": [
+   "wings",
+   "inscription"
+  ],
+  "notes": "Aviation monument (2012): a 10.6 m dark-grey granite-clad concrete shaft with an asymmetrically narrowing rectangular section, topped by a 1.5 m brass eagle with a 2.5 m wingspan. At its foot stand two light travertine curved 'wing' slabs (4.3 m and 3 m high, 4.3 m and 3.8 m long, 0.4 m thick) on a 13 × 13 m square platform with a marble propeller inlay.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=427&Itemid=140",
+   "https://commons.wikimedia.org/wiki/File:Monument_of_aviation_and_air_force_by_night,_Sofia_03.JPG"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "n5431216098",
+  "form": "wall",
+  "total_h": 3,
+  "width": 58,
+  "depth": 1,
+  "material": "dark_granite",
+  "features": [
+   "cross_on_top",
+   "inscription"
+  ],
+  "notes": "Memorial to the victims of the communist regime (1999): a 58 m wall in polished black granite, in angled sections, inscribed with 7,526 names. In front stands an old carved light-stone Christian cross (about 1.8 m), and a small chapel is part of the complex. The wall height of about 3 m is estimated from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=516&Itemid=140",
+   "https://bg.wikipedia.org/wiki/Мемориал_на_жертвите_на_комунистическия_режим_в_България",
+   "https://commons.wikimedia.org/wiki/File:20140615_Sofia_044.jpg"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "w1217586052",
+  "form": "group",
+  "figures": 7,
+  "figure_h": 3,
+  "pedestal": "block",
+  "pedestal_h": 1.8,
+  "total_h": 4.8,
+  "width": 6,
+  "depth": 2.5,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "facing": 45,
+  "notes": "This is NOT the main monument. It is one of two secondary bronze sculpture groups (soldiers and civilians, with a cart or gun wheel) still standing on grey granite plinths beside the approach to the former Monument to the Soviet Army from Tsar Osvoboditel Blvd; this one is on the north-west side. A July 2026 photo shows both groups in place. The main pylon about 130 m south-west has lost its three top figures (cut down in December 2023) and its bas-reliefs (in storage at Lozen); scaffolding was removed in 2026 and the bare grey stone shaft, about 25–29 m by estimate, still stands. The sizes here are estimates from the OSM outline (5.7 × 1.9 m) and the photo, which suggests the plinth may be up to about 8 m wide.",
+  "source": "photo",
+  "refs": [
+   "https://www.bta.bg/en/news/bulgaria/1065919-council-of-ministers-funds-security-scaffolding-for-dismantled-monument-to-sovi",
+   "https://www.bta.bg/en/news/1125795-sofia-municipality-to-acquire-sculptural-figures-of-soviet-army-monument-from-st",
+   "https://www.novinite.com/view_news.php?id=238146",
+   "https://www.rferl.org/a/bulgaria-red-army-soviet-monument-uncertain-future/32738055.html",
+   "https://commons.wikimedia.org/wiki/File:Monument_to_the_Soviet_Army,_Sofia_(2026).jpg",
+   "https://en.wikipedia.org/wiki/Monument_to_the_Soviet_Army,_Sofia"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "w1217586053",
+  "form": "group",
+  "figures": 8,
+  "figure_h": 3,
+  "pedestal": "block",
+  "pedestal_h": 1.8,
+  "total_h": 4.8,
+  "width": 6,
+  "depth": 2.5,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "flag"
+  ],
+  "facing": 45,
+  "notes": "The second secondary bronze group (soldiers and partisans with a flag) on a grey granite plinth, south-east of the approach to the partially dismantled Soviet Army monument, mirroring w1217586052. It was still standing in July 2026. The bas-reliefs and top figures of the main pylon have been removed; the bare pylon shaft remains about 130 m south-west.",
+  "source": "photo",
+  "refs": [
+   "https://www.bta.bg/en/news/bulgaria/1065919-council-of-ministers-funds-security-scaffolding-for-dismantled-monument-to-sovi",
+   "https://www.bta.bg/en/news/1125795-sofia-municipality-to-acquire-sculptural-figures-of-soviet-army-monument-from-st",
+   "https://www.novinite.com/view_news.php?id=238146",
+   "https://www.rferl.org/a/bulgaria-red-army-soviet-monument-uncertain-future/32738055.html",
+   "https://commons.wikimedia.org/wiki/File:Monument_to_the_Soviet_Army,_Sofia_(2026).jpg",
+   "https://en.wikipedia.org/wiki/Monument_to_the_Soviet_Army,_Sofia"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "w584413761",
+  "form": "abstract",
+  "total_h": 6,
+  "figure_h": 5,
+  "pedestal": "block",
+  "pedestal_h": 1,
+  "width": 4,
+  "depth": 2,
+  "material": "white_stone",
+  "pedestal_material": "white_stone",
+  "features": [
+   "wings",
+   "inscription"
+  ],
+  "notes": "Monument to the revolutionaries of Macedonia and Adrianople (2016): two 5 m stylised white-stone wings rising side by side like flames or feathers, carved with 150 names, on a low faceted light-stone base inscribed 'Българийо, за тебе...'. The base size is an estimate; the paved plaza is about 17 m square.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=914&Itemid=140",
+   "https://bg.wikipedia.org/wiki/Паметник_на_загиналите_за_свободата_на_Македония_и_Одринско_(София)"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "w1456454864",
+  "form": "pylon",
+  "top": "none",
+  "total_h": 18,
+  "figure_h": 4,
+  "width": 4,
+  "depth": 4,
+  "material": "dark_bronze",
+  "pedestal_material": "concrete",
+  "features": [
+   "relief"
+  ],
+  "notes": "'Mother' (Serdika – Mayka, Velichko Minekov, 1976) in front of Sofia Central Station: a tall angular, faceted light-grey concrete or stone pylon that zig-zags upward, with a dark seated mother holding children attached about a third of the way up. The height of about 18 m is an estimate from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=854&Itemid=140"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "w1267338248",
+  "form": "stone",
+  "total_h": 0.05,
+  "width": 22,
+  "depth": 20,
+  "material": "granite",
+  "features": [
+   "star",
+   "inscription"
+  ],
+  "notes": "Flat granite floor plaques and stars: nothing stands up, so no model. Bulgarian Alley of Glory (2005) in front of the Arena Mladost cinema: flat granite floor plaques, some replaced by gold stars with signatures. There is nothing vertical, so it is best rendered flush with the ground or skipped.",
+  "source": "web",
+  "refs": [
+   "https://bg.wikipedia.org/wiki/Българска_алея_на_славата"
+  ],
+  "confidence": "medium",
+  "skip": true
+ },
+ {
+  "key": "n2289227032",
+  "form": "head",
+  "figure_h": 2.2,
+  "pedestal": "block",
+  "pedestal_h": 1.6,
+  "total_h": 3.8,
+  "width": 6,
+  "depth": 4,
+  "material": "dark_bronze",
+  "pedestal_material": "dark_granite",
+  "features": [
+   "inscription"
+  ],
+  "notes": "Stefan Stambolov (1995): a giant dark bronze head split by a vertical cleft, standing on a dark granite block that rises from a broken, tilted granite slab with his signature, in Crystal Garden. The sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=121&Itemid=140",
+   "https://bg.wikipedia.org/wiki/Паметник_на_Стефан_Стамболов",
+   "https://commons.wikimedia.org/wiki/Category:Monument_to_Stefan_Stambolov,_Sofia"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n2289261248",
+  "form": "statue",
+  "pose": "robe",
+  "figure_h": 4.5,
+  "pedestal": "block",
+  "pedestal_h": 1.5,
+  "total_h": 6,
+  "material": "limestone",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "notes": "St Kliment Ohridski (Lyubomir Dalchev, 1978–79), opposite Sofia University: a tall, columnar, stylised robed saint in light stone with both arms raised, holding a metal torch in each hand, on a plain square light-granite plinth on a polygonal platform. The sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=139&Itemid=140",
+   "https://routes.e-tours.bg/en/place/pametnik-na-sv-kliment-okhridski"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n3540035696",
+  "form": "seated",
+  "pose": "book",
+  "figure_h": 2.5,
+  "pedestal": "block",
+  "pedestal_h": 1.5,
+  "total_h": 4.2,
+  "material": "dark_bronze",
+  "pedestal_material": "limestone",
+  "features": [
+   "book",
+   "steps",
+   "inscription"
+  ],
+  "notes": "Ivan Vazov (by St Sofia, Rakovski St): a dark bronze figure seated on a rock with a book in his right hand, on a light-stone block pedestal on a low stepped platform. The sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=130&Itemid=140"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n3586591854",
+  "form": "statue",
+  "pose": "robe",
+  "figure_h": 3.7,
+  "pedestal": "block",
+  "pedestal_h": 2,
+  "total_h": 5.7,
+  "material": "bronze",
+  "pedestal_material": "white_stone",
+  "features": [
+   "crown",
+   "sword",
+   "cross_on_top",
+   "inscription"
+  ],
+  "notes": "Tsar Samuil (2014): a 3.7 m bronze crowned ruler in long robes and cloak, holding a tall patriarchal-cross sceptre in his right hand and a sheathed sword at his left side, on a 2 m light-stone pedestal. He faces the Samuil's Warriors group to the south-south-west.",
+  "facing": 210,
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=117&Itemid=140",
+   "https://bnr.bg/en/post/100566509/new-monument-to-matchlessly-brave-tsar-samuil"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "n10871532561",
+  "form": "group",
+  "figures": 5,
+  "figure_h": 2.2,
+  "pedestal": "low",
+  "pedestal_h": 0.4,
+  "total_h": 2.6,
+  "width": 4,
+  "depth": 2,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "notes": "'Samuil's Warriors' by Lyubomir Dalchev (1970s design): a bronze group of blinded Bulgarian soldiers placed facing the 2014 Tsar Samuil statue. The figure count and sizes were not found in sources and are guesses.",
+  "source": "web",
+  "refs": [
+   "https://voicemap.me/tour/sofia/sofia-s-golden-streets-a-tour-of-the-historical-capital-s-highlights/sites/tsar-samuil-monument",
+   "https://www.president.bg/news2659/izkazvane-na-prezidenta-rosen-plevneliev-na-tseremoniyata-za-otkrivaneto-na-pametnik-na-balgarskiya-tsar-997-1014-g-samuil.html&lang=en"
+  ],
+  "confidence": "low"
+ },
+ {
+  "key": "n1678441192",
+  "form": "group",
+  "figures": 2,
+  "pose": "book",
+  "figure_h": 4.2,
+  "pedestal": "block",
+  "pedestal_h": 2,
+  "total_h": 6.2,
+  "width": 3,
+  "depth": 2,
+  "material": "green_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "book",
+   "inscription"
+  ],
+  "notes": "Sts Cyril and Methodius (Vladimir Ginovski, 1975) in front of the National Library: two 4.2 m robed monks standing shoulder to shoulder and holding an unrolled scroll with the alphabet between them, on a tall light granite block inscribed 'Кирил и Методий'. The photos show green-patinated bronze, though Bulgarian Wikipedia says stone. The pedestal height is estimated.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=116&Itemid=140",
+   "https://bg.wikipedia.org/wiki/Паметник_на_св._св._Кирил_и_Методий_(София)",
+   "https://commons.wikimedia.org/wiki/File:Cyril_and_Methodius_monument_Sofia.jpg"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "n4587789885",
+  "form": "statue",
+  "pose": "arm",
+  "figure_h": 3,
+  "pedestal": "rock",
+  "pedestal_h": 1.6,
+  "total_h": 4.6,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "notes": "Paisiy Hilendarski (Mihail Simeonov, 1965): an elongated, expressive bronze monk in a long habit raising one arm high (holding a quill or scroll), on a rough-hewn stone block. It faces St Alexander Nevsky Cathedral. The sizes are estimates from photos.",
+  "facing": 195,
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=600&Itemid=140"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n2637650781",
+  "form": "statue",
+  "pose": "soldier",
+  "figure_h": 3,
+  "pedestal": "tall",
+  "pedestal_h": 4,
+  "total_h": 7,
+  "width": 8,
+  "depth": 8,
+  "material": "dark_bronze",
+  "pedestal_material": "dark_granite",
+  "features": [
+   "flag",
+   "relief",
+   "steps"
+  ],
+  "notes": "'The Bulgarian Volunteer' (2008): a bronze opalchenets with a flag (after Veshin's 'Samara Flag') on a tall rectangular dark granite pedestal with bronze reliefs on all four sides, on a stepped platform shaped like the 'Cross for Bravery' order seen from above. The total height is 7 m.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=129&Itemid=140"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "n2661411198",
+  "form": "statue",
+  "pose": "stand",
+  "figure_h": 3.2,
+  "pedestal": "low",
+  "pedestal_h": 0.5,
+  "total_h": 3.7,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "notes": "Aleksandar Stamboliyski, in front of the National Opera on Rakovski St: a larger-than-life dark bronze standing figure in a long open coat, on a low granite plinth. The sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://commons.wikimedia.org/wiki/File:Aleksandar_Stamboliyski_monument_in_front_of_the_National_Opera_House_Sofia_IMG_5505.JPG",
+   "https://commons.wikimedia.org/wiki/File:Sofia_Feb_2020_00_13_15_421000.jpeg"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n1839575259",
+  "form": "fountain",
+  "figure_h": 1.3,
+  "pedestal": "block",
+  "pedestal_h": 1.8,
+  "total_h": 3.1,
+  "width": 3,
+  "depth": 3,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "horse",
+   "sword"
+  ],
+  "notes": "St George fountain (Mina Ivanov, 1935, restored): a small bronze St George on a rearing horse spearing the dragon, on a round granite column-fountain standing in a round granite basin about 3 m across, in front of the St Sofia church. The sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=1194&Itemid=140"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n3007594094",
+  "form": "statue",
+  "pose": "soldier",
+  "figure_h": 4,
+  "pedestal": "block",
+  "pedestal_h": 2.5,
+  "total_h": 7,
+  "width": 6,
+  "depth": 6,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "relief",
+   "wreath",
+   "flag",
+   "steps"
+  ],
+  "notes": "Monument of the Soviet Soldier in Lozenets (near Hotel Hemus): a dark bronze Red Army soldier in a cape with a submachine gun across his chest, standing on a heap of captured banners, on a light-grey granite block with wreath reliefs and steps, backed by a long low relief wall. The sizes are estimates from a 2005 photo, and its 2026 status was not separately confirmed.",
+  "source": "photo",
+  "refs": [
+   "https://commons.wikimedia.org/wiki/File:Sofia-Monument_of_the_Soviet_soldier-02.jpg"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n2616211725",
+  "form": "statue",
+  "pose": "robe",
+  "pedestal": "block",
+  "material": "bronze",
+  "notes": "A second statue of Patriarch Evtimiy near Cherni Vrah Blvd and James Bourchier (St Mina garden). No source or photo was found, so only the OSM tags are known; render it as a generic robed figure on a plinth.",
+  "source": "tags",
+  "refs": [
+   "https://www.openstreetmap.org/node/2616211725"
+  ],
+  "confidence": "low"
+ },
+ {
+  "key": "n6486627412",
+  "form": "group",
+  "figures": 2,
+  "pose": "soldier",
+  "figure_h": 3,
+  "pedestal": "block",
+  "pedestal_h": 1.8,
+  "total_h": 4.8,
+  "width": 2,
+  "depth": 1.5,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "notes": "'Opalchenets and Russian soldier' (Ivan Blazhev, 1953): a light-grey stone two-figure group (a Bulgarian volunteer with a rifle and a Russian soldier embracing his shoulder) on a granite block. It is one of four corner groups of the 'Most na druzhbata' bridge and is NOT part of the Soviet Army monument. The sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=717&Itemid=140"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n8251742598",
+  "form": "group",
+  "figures": 2,
+  "pose": "book",
+  "figure_h": 3,
+  "pedestal": "block",
+  "pedestal_h": 1.8,
+  "total_h": 4.8,
+  "width": 2,
+  "depth": 1.5,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "notes": "'Soviet specialist and Bulgarian technician' (Iliya Iliev, 1953): a light-grey stone two-figure civilian group (the taller Russian embraces the Bulgarian holding a scroll) on a granite block at a corner of the 'Most na druzhbata' bridge. The sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=716&Itemid=140"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n8251742602",
+  "form": "group",
+  "figures": 2,
+  "pose": "soldier",
+  "figure_h": 3,
+  "pedestal": "block",
+  "pedestal_h": 1.8,
+  "total_h": 4.8,
+  "width": 2,
+  "depth": 1.5,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "notes": "'Partisan and Soviet soldier' (Stefan Stoimirov, 1953): a light-grey stone two-figure group (a partisan with a submachine gun and a Red Army soldier holding flowers) on a granite block at a corner of the 'Most na druzhbata' bridge. The sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=715&Itemid=140"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n5584615197",
+  "form": "statue",
+  "pose": "sword",
+  "figure_h": 2.6,
+  "pedestal": "block",
+  "pedestal_h": 1.8,
+  "total_h": 4.4,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "sword",
+   "inscription"
+  ],
+  "notes": "Georgi S. Rakovski (Lilyana Marinova, 1967) in front of the Rakovski Military Academy: a bronze standing figure in a long coat with one hand resting on a sabre, on a plain granite block on a low base. The sizes are estimates from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=849&Itemid=140"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n7631723644",
+  "form": "equestrian",
+  "figure_h": 2,
+  "pedestal": "tall",
+  "pedestal_h": 3,
+  "total_h": 5,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "horse",
+   "sword",
+   "inscription"
+  ],
+  "notes": "Giuseppe Garibaldi (Georgi Chapkanov, 2010): a small dark bronze Garibaldi with a raised sabre on a horse rearing on its hind legs (the sculpture is 2 m tall, 130 kg), set on a high, slender round granite column. The column height is estimated from photos.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=127&Itemid=140"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "n3384302699",
+  "form": "statue",
+  "pose": "book",
+  "figure_h": 3.7,
+  "pedestal": "low",
+  "pedestal_h": 0.3,
+  "total_h": 4,
+  "width": 2.5,
+  "depth": 2,
+  "material": "dark_bronze",
+  "pedestal_material": "granite",
+  "features": [
+   "flame",
+   "book"
+  ],
+  "notes": "Taras Shevchenko (Igor Grechanik, 2009/2016): a 4 m dark bronze young Shevchenko holding his 'Kobzar' book, engulfed by tall curling flame-like forms that arch over his head and rise from a tree-root base, on a low red-granite plinth.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=582&Itemid=140"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "w1212179844",
+  "form": "statue",
+  "pose": "sport",
+  "figure_h": 2.5,
+  "pedestal": "low",
+  "pedestal_h": 0.8,
+  "total_h": 3.3,
+  "width": 16,
+  "depth": 5,
+  "material": "bronze",
+  "pedestal_material": "marble",
+  "features": [
+   "inscription"
+  ],
+  "notes": "Georgi Asparuhov – Gundi (Lyubomir Grigorov, 2023): a 2.5 m polished brown bronze footballer dribbling a ball, standing on a small artificial mound fronted by a long, low curved light-grey marble wall with a bronze plaque (the OSM outline is 16 × 5 m).",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=1228&Itemid=140"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "w1328854608",
+  "form": "statue",
+  "pose": "stand",
+  "figure_h": 2.4,
+  "pedestal": "low",
+  "pedestal_h": 0.2,
+  "total_h": 2.6,
+  "width": 3.5,
+  "depth": 3.5,
+  "material": "dark_bronze",
+  "pedestal_material": "dark_granite",
+  "features": [
+   "inscription"
+  ],
+  "notes": "Atanas Burov (Emil Popov, 2011) in the City Garden: a life-size-plus dark bronze figure in a long coat, standing on a large square, 20 cm high, dark polished stone plinth reached by concrete steps. The figure height is estimated.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=525&Itemid=140",
+   "https://dnes.dir.bg/sofia/-10071205"
+  ],
+  "confidence": "medium"
+ },
+ {
+  "key": "n12294464962",
+  "form": "statue",
+  "pose": "child",
+  "figure_h": 3,
+  "pedestal": "none",
+  "total_h": 3,
+  "material": "painted",
+  "color": "#857a6c",
+  "notes": "'Maykata' (The Mother) in the City Garden by the National Theatre: a weathered grey-brown carved tree trunk showing a woman's head and torso with a child's face carved lower down. Identified from a geotagged Commons photo 4 m from the node; the photo date and current condition are unknown.",
+  "source": "photo",
+  "refs": [
+   "https://commons.wikimedia.org/wiki/File:Garden_-_panoramio_-_zonemars.jpg",
+   "https://www.openstreetmap.org/node/12294464962"
+  ],
+  "confidence": "low"
+ },
+ {
+  "key": "w1449475334",
+  "form": "abstract",
+  "total_h": 2.5,
+  "width": 11,
+  "depth": 11,
+  "material": "steel",
+  "pedestal": "low",
+  "notes": "'Sundial' sculpture (mapped in 2025) in a round plaza about 11 m across, per the OSM outline. No description or photo was found; render a flat dial disc with a slanted gnomon of about 2.5 m (a guess).",
+  "source": "tags",
+  "refs": [
+   "https://www.openstreetmap.org/way/1449475334"
+  ],
+  "confidence": "low"
+ },
+ {
+  "key": "n10773656804",
+  "form": "pylon",
+  "top": "eagle",
+  "total_h": 4.3,
+  "pedestal_h": 3.5,
+  "figure_h": 0.8,
+  "width": 1,
+  "depth": 0.6,
+  "material": "white_stone",
+  "pedestal_material": "dark_granite",
+  "features": [
+   "inscription",
+   "wings"
+  ],
+  "notes": "Monument to the fighter pilots (2007): an upright polished black granite slab (3.5 m) inscribed with names, topped by a light-grey eagle with spread wings, on a small base.",
+  "source": "photo",
+  "refs": [
+   "https://registersofia.bg/index.php?view=monument&option=com_monuments&formdata[id]=707&Itemid=140"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "n13403512135",
+  "form": "stone",
+  "total_h": 1.4,
+  "width": 2,
+  "depth": 1.3,
+  "material": "granite",
+  "features": [
+   "inscription"
+  ],
+  "notes": "Ivan Vazov's grave (1926) behind the St Sofia church: a large rough grey granite boulder inscribed 'Иванъ Вазовъ 1850-1921', at the head of a flower-bed grave plot with a stone kerb. The size is estimated from photos.",
+  "source": "photo",
+  "refs": [
+   "https://commons.wikimedia.org/wiki/File:Vazov_grave_in_Sofia.jpg",
+   "https://commons.wikimedia.org/wiki/File:Ivan_Vazov_grave,_гробът_на_Иван_Вазов.jpg"
+  ],
+  "confidence": "high"
+ },
+ {
+  "key": "r16537164",
+  "name": "Паметник на Съветската армия",
+  "form": "pylon",
+  "top": "none",
+  "total_h": 27,
+  "width": 30,
+  "depth": 30,
+  "material": "granite",
+  "pedestal_material": "granite",
+  "features": [
+   "steps"
+  ],
+  "source": "web",
+  "confidence": "low",
+  "notes": "Monument to the Soviet Army (1954). The three top figures were removed in December 2023 and the bas-reliefs too; the bare stone shaft (about 25-29 m, an estimate from 2026 photos) still stands on its stepped plaza. Mapped as was:historic=monument.",
+  "refs": [
+   "https://bg.wikipedia.org/wiki/Паметник_на_Съветската_армия_в_София"
+  ],
+  "shaft_w": 4.5
+ }
+]

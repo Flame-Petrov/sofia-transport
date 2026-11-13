@@ -11,7 +11,7 @@ from tempfile import NamedTemporaryFile
 
 SITE = Path(__file__).resolve().parent
 SOURCE = SITE / "src"
-LOCAL_RELEASE = "106_public-transport.html"
+LOCAL_RELEASE = "107_public-transport.html"
 INCLUDE = re.compile(r"^\{\{include ([\w./-]+)\}\}\n", re.MULTILINE)
 
 
@@ -51,6 +51,19 @@ def render(standalone):
                     tiles[SITE / relative] = base64.b64decode(value.removeprefix("-"))
                     manifest[key] = relative
             return head + "  var sofiaRoadTiles = " + json.dumps(manifest, separators=(",", ":")) + ";\n"
+        if path.name == "tree-tiles.js":
+            # The standalone page embeds every tree tile; the hosted page fetches each when it is first in view.
+            head, table = content.split("  var sofiaTreeTiles = ", 1)
+            if standalone:
+                return content
+            manifest = {}
+            for key, value in json.loads(table.strip().removesuffix(";")).items():
+                if not re.fullmatch(r"\d+/\d+", key):
+                    raise ValueError(f"Invalid tree tile key: {key}")
+                relative = f"tiles/trees/14/{key}.bin.gz"
+                tiles[SITE / relative] = base64.b64decode(value)
+                manifest[key] = relative
+            return head + "  var sofiaTreeTiles = " + json.dumps(manifest, separators=(",", ":")) + ";\n"
         return content
 
     page = INCLUDE.sub(include, template.read_text(encoding="utf-8"))

@@ -77,6 +77,9 @@
     vehicleModelBox.checked = store('sofia_3d_vehicle_models') !== '0';
     buildingBox.checked = store('sofia_3d_buildings') !== '0';
     landmarkBox.checked = store('sofia_3d_landmarks') !== '0';
+    var treeBox = document.getElementById('v3Trees');
+    treeBox.checked = store('sofia_3d_trees') !== '0';
+    trees.setShown(treeBox.checked);
     var roadBox = document.getElementById('v3Roads'), roads = null;   // the 3D road layer while the 3D map is open
     roadBox.checked = store('sofia_3d_roads') !== '0';
     houseBox.checked = store('sofia_3d_house_designs') === '1';
@@ -113,6 +116,7 @@
       document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream || !buildingBox.checked;
       document.getElementById('v3ShowRow').hidden = !show;
       document.getElementById('v3LandmarkRow').hidden = !window.DecompressionStream;
+      document.getElementById('v3TreeRow').hidden = !window.DecompressionStream;
       document.getElementById('v3RoadRow').hidden = !roadStore.available();
       document.getElementById('v3DayRow').hidden = !show;
       document.getElementById('v3TextureKey').hidden = !textureBox.checked;
@@ -173,7 +177,7 @@
       try {
         m3 = new maplibregl.Map({
           container: el, style: style3d(), center: [c.lng, c.lat], zoom: z - 1, pitch: 0, bearing: 0,
-          minZoom: 8, maxZoom: 18, maxPitch: VIEW3D_MAX_PITCH,
+          minZoom: 8, maxZoom: 20, maxPitch: VIEW3D_MAX_PITCH,
           pixelRatio: mapPixelRatio(),
           antialias: true,
           fadeDuration: 120, maxTileCacheZoomLevels: 3, attributionControl: false, renderWorldCopies: false,
@@ -367,6 +371,8 @@
       railsDirty = true; railRefreshAt = 0; railSegments = [];
       m3.on('sourcedata', function (e) { if (e.sourceId === railSource) { railsDirty = true; fleetDirty=true; } });
       m3.on('moveend', function () { if (!selfMove) railsDirty = true; });
+      // Trees: under the vehicles, depth-tested against the buildings.
+      try { m3.addLayer(trees.layer({ id: 'v3-trees', budget: IS_IOS ? 6000 : 12000 })); } catch (e) { console.warn('3D trees failed:', e); }
       m3.addLayer(vehicleModelLayer(function () { return drawn; }));
       var LZ = LABEL_ZOOM - 1, faded = function (a) { return ['case', ['==', ['get', 'pk'], 1], a, 1]; };
       var label = function (size) {
@@ -1220,7 +1226,8 @@
       // Match the receiving map's zoom precision when handing the camera back to Leaflet.
       var snap = map.options.zoomSnap, zs = m3.getZoom();
       if (snap) zs = Math.round((zs + 1) / snap) * snap - 1;
-      m3.easeTo({ pitch: 0, bearing: 0, zoom: zs, padding: PAD0, duration: 600 });
+      // The flat map stops at zoom 19 (18 here); the 3D view goes two levels closer for monuments and trees.
+      m3.easeTo({ pitch: 0, bearing: 0, zoom: Math.min(zs, map.getMaxZoom() - 1), padding: PAD0, duration: 600 });
       m3.once('moveend', function () { requestAnimationFrame(finish); });
       setTimeout(finish, 1000);
     }
@@ -1592,6 +1599,11 @@
       store('sofia_3d_buildings', this.checked ? '1' : '0');
       refresh();
       applyBuildingTextures();
+    };
+    treeBox.onchange = function () {
+      store('sofia_3d_trees', this.checked ? '1' : '0');
+      trees.setShown(this.checked);
+      if (m3) m3.triggerRepaint();
     };
     landmarkBox.onchange = function () {
       store('sofia_3d_landmarks', this.checked ? '1' : '0');

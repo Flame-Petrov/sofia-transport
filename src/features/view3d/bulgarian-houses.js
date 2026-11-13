@@ -241,7 +241,7 @@
         resetGeometry();
       }
       if (canopy) {
-        var sections = canopy.visible(map.getBounds());
+        var sections = canopy.visible(map.getBounds(), map.getZoom());
         if (sameBuildingKeys(previousKeys, sections)) return null;
         previousKeys=sections;
         return canopy.vertices(map, origin, sections);
