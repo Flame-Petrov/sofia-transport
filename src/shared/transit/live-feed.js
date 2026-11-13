@@ -1,6 +1,6 @@
   // ---------- Fetching ----------
   var lastHeaderTs = 0, feedTime = 0, busy = false, staleFeed = false, staleUpdates = 0;
-  var feedFailed = false, feedError = '';
+  var feedFailed = false, feedError = '', feedFailures = 0;
 
   function applyTripUpdates(buf) {
     if (!buf) return;
@@ -46,9 +46,10 @@
   }
 
   var unresolvedPositions = [];
-  function applyPositions(msg) {
+  // `arrived` is when this file came in. A vehicle's `seenAt` is when its last new report came in.
+  function applyPositions(msg, arrived) {
     unresolvedPositions = [];
-    var seen = {};
+    var seen = {}, gaps = [];
     tripToVeh = {}; vehByLabel = {};
     (msg.entity || []).forEach(function (ent) {
       if (ent.is_deleted || !ent.vehicle || !ent.vehicle.position) return;
@@ -58,8 +59,12 @@
       if (d.tripRef) tripToVeh[d.tripRef] = d.key;
       if (d.label) vehByLabel[d.label] = d.key;
       if (d.via !== 'position') unresolvedPositions.push(ent);
+      var old = vehicles[d.key], fresh = !!(old && d.ts && old.d.ts && d.ts > old.d.ts);
+      if (fresh && old.seenAt && arrived) gaps.push(arrived - old.seenAt);
       upsert(d);
+      if (fresh && arrived) old.seenAt = arrived;
     });
+    learnReportInterval(gaps);
     Object.keys(vehicles).forEach(function (k) {
       var v = vehicles[k];
       if (v.d.metroPlan) return;
@@ -71,6 +76,20 @@
       forgetMotion(v);
       delete vehicles[k];
     });
+  }
+
+  // Moves are planned to last until the vehicle's next report arrives (motion.js). That is the time
+  // between two sightings of a new report from the same vehicle: its report interval (about 5 s) when
+  // checks are more frequent, the check interval when they are slower (Data Saver, a failing feed).
+  // The time between checks alone would say 1 s. Only sightings measured on both ends count: a
+  // vehicle's first report after it appears was not seen when it was made.
+  function learnReportInterval(gaps) {
+    if (staleFeed) return;   // after a data gap the sightings are far apart for no reason of the feed's
+    gaps = gaps.filter(function (g) { return g > 500 && g < 60000; });
+    if (gaps.length < 5) return;
+    gaps.sort(function (a, b) { return a - b; });
+    var mid = gaps[gaps.length >> 1];
+    feedInterval = Math.max(4000, Math.min(25000, feedInterval * 0.7 + mid * 0.3));
   }
 
   // A feed file, given up after `ms`: a request that never answered used to leave `busy` set, so the map
@@ -114,6 +133,15 @@
     renderDiag();
     if (route) renderRoute();
   }
+  // Trip updates follow every TU_REFRESH_MS, one request at a time. A forced update (startup, back
+  // online) asks at once. Positions never wait for them.
+  var tuRequestedAt = 0, tuPending = false;
+  function maybeRefreshTripUpdates(force) {
+    if (tuPending || (!force && Date.now() - tuRequestedAt < TU_REFRESH_MS)) return;
+    tuPending = true;
+    tuRequestedAt = Date.now();
+    refreshTripUpdates(++updateSequence).then(function () { tuPending = false; });
+  }
   function refreshTripUpdates(sequence) {
     return fetchFeed(TU_URL, TU_TIMEOUT_MS).then(function (buf) {
       if (sequence <= lastTripSequence || !applyTripUpdates(buf)) return;
@@ -135,6 +163,7 @@
         var ts = (msg.header && msg.header.timestamp) || 0;
         lastFeedTime = Date.now();
         feedFailed = false;
+        feedFailures = 0;
         showReload(false);
         setProgress('vehicles', 1, 'Vehicles');
         if (!force && ts && ts === lastHeaderTs) { renderFeedStatus(); return; }
@@ -146,19 +175,16 @@
         // this update places every vehicle where it is instead of animating from its old spot
         staleFeed = !!lastNewDataAt && arrived - lastNewDataAt > Math.max(STALE_FEED_MS, feedInterval * 3);
         if (staleFeed) staleUpdates++;
-        if (lastNewDataAt && !force) {
-          var gap = arrived - lastNewDataAt;
-          if (gap > 2000 && gap < 60000) feedInterval = Math.max(4000, Math.min(25000, feedInterval * 0.7 + gap * 0.3));
-        }
         lastNewDataAt = arrived;
-        applyPositions(msg);
+        applyPositions(msg, arrived);
         staleFeed = false;
         refreshFeedViews(true);
-        refreshTripUpdates(++updateSequence);
+        maybeRefreshTripUpdates(force);
       })
       .catch(function (e) {
         console.warn('Feed failed:', e);
         feedFailed = true;
+        feedFailures++;
         feedError = String(e && e.message || e);
         setStatus('err', 'Live feed unavailable');
         setProgress('vehicles', 1, 'Vehicles unavailable');
@@ -166,5 +192,30 @@
         renderDiag();
       })
       .then(function () { busy = false; });
+  }
+
+  // ---------- Checking for new positions ----------
+  // One check at a time, the next one REFRESH_MS after the last one started (or after it ended, if it
+  // took longer). Data Saver keeps the old 5-second pace; while the feed fails the wait doubles up to
+  // REFRESH_MAX_MS. A hidden page stops checking and checks at once when it is shown again.
+  var pollTimer = 0;
+  function pollDelay() {
+    var c = typeof navigator !== 'undefined' && navigator.connection;
+    var base = c && c.saveData ? REFRESH_SAVE_DATA_MS : REFRESH_MS;
+    return feedFailures ? Math.min(REFRESH_MAX_MS, base * Math.pow(2, feedFailures)) : base;
+  }
+  function poll() {
+    clearTimeout(pollTimer);
+    pollTimer = 0;
+    if (document.hidden) return;
+    var started = Date.now();
+    Promise.resolve(update(false)).then(function () {
+      if (pollTimer || document.hidden) return;   // a newer poll() already holds the timer
+      pollTimer = setTimeout(poll, Math.max(250, pollDelay() - (Date.now() - started)));
+    });
+  }
+  function startPolling() {
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+    pollTimer = setTimeout(poll, pollDelay());
   }
 

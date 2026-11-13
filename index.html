@@ -1577,7 +1577,13 @@
   var FEED_URL   = 'https://gtfs.sofiatraffic.bg/api/v1/vehicle-positions';
   var TU_URL     = 'https://gtfs.sofiatraffic.bg/api/v1/trip-updates';
   var STATIC_URL = 'https://gtfs.sofiatraffic.bg/api/v1/static';
-  var REFRESH_MS = 5000;  // check twice as often; the work is skipped when the feed hasn't changed
+  // Live checks (see docs/live-feed-polling.md). The positions file (~70 KB) is rebuilt every second and
+  // each vehicle reports about every 5 s at its own moment, so a check a second shows a report about a
+  // second after it is made (up to 5 s later before). Trip updates (~1 MB) only feed ETAs and delays.
+  var REFRESH_MS = 1000;            // vehicle positions while the page is visible
+  var REFRESH_SAVE_DATA_MS = 5000;  // …with the browser's Data Saver on
+  var REFRESH_MAX_MS = 15000;       // longest wait while the feed keeps failing (doubles from REFRESH_MS)
+  var TU_REFRESH_MS = 15000;        // trip updates (they were downloaded with every position check)
   // Size of everything drawn over the map (v74): --ui shrinks the panel, sheets, buttons, popups and
   // markers on smaller screens (CSS zoom, see the style sheet). 1 from a 412 × 860 phone or a 1280 × 760
   // desktop window up; smaller below that, never under 0.75 on phones (held close; a 320 × 568 phone needs
@@ -8611,7 +8617,7 @@
 
   // ---------- Fetching ----------
   var lastHeaderTs = 0, feedTime = 0, busy = false, staleFeed = false, staleUpdates = 0;
-  var feedFailed = false, feedError = '';
+  var feedFailed = false, feedError = '', feedFailures = 0;
 
   function applyTripUpdates(buf) {
     if (!buf) return;
@@ -8657,9 +8663,10 @@
   }
 
   var unresolvedPositions = [];
-  function applyPositions(msg) {
+  // `arrived` is when this file came in. A vehicle's `seenAt` is when its last new report came in.
+  function applyPositions(msg, arrived) {
     unresolvedPositions = [];
-    var seen = {};
+    var seen = {}, gaps = [];
     tripToVeh = {}; vehByLabel = {};
     (msg.entity || []).forEach(function (ent) {
       if (ent.is_deleted || !ent.vehicle || !ent.vehicle.position) return;
@@ -8669,8 +8676,12 @@
       if (d.tripRef) tripToVeh[d.tripRef] = d.key;
       if (d.label) vehByLabel[d.label] = d.key;
       if (d.via !== 'position') unresolvedPositions.push(ent);
+      var old = vehicles[d.key], fresh = !!(old && d.ts && old.d.ts && d.ts > old.d.ts);
+      if (fresh && old.seenAt && arrived) gaps.push(arrived - old.seenAt);
       upsert(d);
+      if (fresh && arrived) old.seenAt = arrived;
     });
+    learnReportInterval(gaps);
     Object.keys(vehicles).forEach(function (k) {
       var v = vehicles[k];
       if (v.d.metroPlan) return;
@@ -8682,6 +8693,20 @@
       forgetMotion(v);
       delete vehicles[k];
     });
+  }
+
+  // Moves are planned to last until the vehicle's next report arrives (motion.js). That is the time
+  // between two sightings of a new report from the same vehicle: its report interval (about 5 s) when
+  // checks are more frequent, the check interval when they are slower (Data Saver, a failing feed).
+  // The time between checks alone would say 1 s. Only sightings measured on both ends count: a
+  // vehicle's first report after it appears was not seen when it was made.
+  function learnReportInterval(gaps) {
+    if (staleFeed) return;   // after a data gap the sightings are far apart for no reason of the feed's
+    gaps = gaps.filter(function (g) { return g > 500 && g < 60000; });
+    if (gaps.length < 5) return;
+    gaps.sort(function (a, b) { return a - b; });
+    var mid = gaps[gaps.length >> 1];
+    feedInterval = Math.max(4000, Math.min(25000, feedInterval * 0.7 + mid * 0.3));
   }
 
   // A feed file, given up after `ms`: a request that never answered used to leave `busy` set, so the map
@@ -8725,6 +8750,15 @@
     renderDiag();
     if (route) renderRoute();
   }
+  // Trip updates follow every TU_REFRESH_MS, one request at a time. A forced update (startup, back
+  // online) asks at once. Positions never wait for them.
+  var tuRequestedAt = 0, tuPending = false;
+  function maybeRefreshTripUpdates(force) {
+    if (tuPending || (!force && Date.now() - tuRequestedAt < TU_REFRESH_MS)) return;
+    tuPending = true;
+    tuRequestedAt = Date.now();
+    refreshTripUpdates(++updateSequence).then(function () { tuPending = false; });
+  }
   function refreshTripUpdates(sequence) {
     return fetchFeed(TU_URL, TU_TIMEOUT_MS).then(function (buf) {
       if (sequence <= lastTripSequence || !applyTripUpdates(buf)) return;
@@ -8746,6 +8780,7 @@
         var ts = (msg.header && msg.header.timestamp) || 0;
         lastFeedTime = Date.now();
         feedFailed = false;
+        feedFailures = 0;
         showReload(false);
         setProgress('vehicles', 1, 'Vehicles');
         if (!force && ts && ts === lastHeaderTs) { renderFeedStatus(); return; }
@@ -8757,19 +8792,16 @@
         // this update places every vehicle where it is instead of animating from its old spot
         staleFeed = !!lastNewDataAt && arrived - lastNewDataAt > Math.max(STALE_FEED_MS, feedInterval * 3);
         if (staleFeed) staleUpdates++;
-        if (lastNewDataAt && !force) {
-          var gap = arrived - lastNewDataAt;
-          if (gap > 2000 && gap < 60000) feedInterval = Math.max(4000, Math.min(25000, feedInterval * 0.7 + gap * 0.3));
-        }
         lastNewDataAt = arrived;
-        applyPositions(msg);
+        applyPositions(msg, arrived);
         staleFeed = false;
         refreshFeedViews(true);
-        refreshTripUpdates(++updateSequence);
+        maybeRefreshTripUpdates(force);
       })
       .catch(function (e) {
         console.warn('Feed failed:', e);
         feedFailed = true;
+        feedFailures++;
         feedError = String(e && e.message || e);
         setStatus('err', 'Live feed unavailable');
         setProgress('vehicles', 1, 'Vehicles unavailable');
@@ -8777,6 +8809,31 @@
         renderDiag();
       })
       .then(function () { busy = false; });
+  }
+
+  // ---------- Checking for new positions ----------
+  // One check at a time, the next one REFRESH_MS after the last one started (or after it ended, if it
+  // took longer). Data Saver keeps the old 5-second pace; while the feed fails the wait doubles up to
+  // REFRESH_MAX_MS. A hidden page stops checking and checks at once when it is shown again.
+  var pollTimer = 0;
+  function pollDelay() {
+    var c = typeof navigator !== 'undefined' && navigator.connection;
+    var base = c && c.saveData ? REFRESH_SAVE_DATA_MS : REFRESH_MS;
+    return feedFailures ? Math.min(REFRESH_MAX_MS, base * Math.pow(2, feedFailures)) : base;
+  }
+  function poll() {
+    clearTimeout(pollTimer);
+    pollTimer = 0;
+    if (document.hidden) return;
+    var started = Date.now();
+    Promise.resolve(update(false)).then(function () {
+      if (pollTimer || document.hidden) return;   // a newer poll() already holds the timer
+      pollTimer = setTimeout(poll, Math.max(250, pollDelay() - (Date.now() - started)));
+    });
+  }
+  function startPolling() {
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) poll(); });
+    pollTimer = setTimeout(poll, pollDelay());
   }
 
   // ---------- Search, filters, rendering ----------
@@ -8965,6 +9022,11 @@
     return fmtN(tt.nTrips) + ' trips · ' + fmtN(tt.patRoute.length) + ' patterns · ' +
       (ttInfo.from === 'saved' ? 'loaded from storage in ' : 'built in ') + fmtN(ttInfo.ms) + ' ms';
   }
+  // How often the live feed is asked for positions and trip updates (shared/transit/live-feed.js)
+  function checksText() {
+    var s = function (ms) { return (Math.round(ms / 100) / 10) + ' s'; };
+    return 'positions every ' + s(pollDelay()) + ' · trip updates every ' + s(TU_REFRESH_MS);
+  }
   function renderDiag() {
     var keys = Object.keys(vehicles), withLine = 0, viaPos = 0, viaTu = 0, parked = 0;
     keys.forEach(function (k) {
@@ -9005,6 +9067,7 @@
       'map preload: ' + (!preload.state ? (/^image/.test(mapMode) ? 'not used on the image map' : 'waiting') :
         preload.done + '/' + preload.total + ' tiles (zoom ' + preload.zoom + ', ' + preload.saved + ' already saved' +
         (preload.failed ? ', ' + preload.failed + ' failed' : '') + ')' + (preload.state === 'done' ? ' · done in ' + preload.ms + ' ms' : ' · loading…')),
+      'checks: ' + checksText() + (feedFailures ? ' · ' + feedFailures + ' failed in a row' : ''),
       'motion: reports every ~' + Math.round(feedInterval / 1000) + ' s · ' + onScreenCount + ' moving on screen · ' +
         parked + ' waiting at the end of their line' +
         (staleUpdates ? ' · placed directly after a data gap: ' + staleUpdates + '×' : ''),
@@ -9045,6 +9108,7 @@
       section('Live feed', [
         kv('Vehicles', fmtN(keys.length) + ' · ' + (staticState !== 'ok' ? 'lines loading' : missing ? fmtN(missing) + ' without line' : 'all lines matched')),
         kv('Report interval', '~' + Math.round(feedInterval / 1000) + ' s'),
+        kv('Checks', checksText()),
         kv('Moving on screen', fmtN(onScreenCount) + ' · ' + fmtN(parked) + ' at terminus'),
         kv('Trip updates', tuStats ? fmtN(tuStats.n) + ' stops · delay ' + fmtN(tuStats.delay) : '—'),
         kv('Linked to vehicles', fmtN(tuCount))
@@ -14168,8 +14232,7 @@
   // ---------- Start ----------
   loadStatic();
   update(true);
-  setInterval(function () { update(false); }, REFRESH_MS);
-  document.addEventListener('visibilitychange', function () { if (!document.hidden) update(false); });
+  startPolling();
 })();
 </script>
 </body>

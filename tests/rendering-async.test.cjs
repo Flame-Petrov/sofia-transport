@@ -61,7 +61,7 @@ test('a slow trip response cannot overwrite a later successful response or repla
 
 test('positions render while trip updates are pending and repeated GPS timestamps skip fleet rendering', async () => {
   const a = app(['shared/transit/live-feed'], { FEED_URL: 'positions', TU_URL: 'updates',
-    FEED_TIMEOUT_MS: 8000, TU_TIMEOUT_MS: 8000, lastNewDataAt: 0, feedInterval: 9000,
+    FEED_TIMEOUT_MS: 8000, TU_TIMEOUT_MS: 8000, TU_REFRESH_MS: 15000, lastNewDataAt: 0, feedInterval: 9000,
     STALE_FEED_MS: 90000, decode: msg => msg, showReload: noop, setProgress: noop });
   let positions = 0, views = 0, statuses = 0;
   a.fetchFeed = url => url === 'positions' ? Promise.resolve({header: {timestamp: 100}}) : new Promise(noop);

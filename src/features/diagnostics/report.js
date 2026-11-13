@@ -54,6 +54,11 @@
     return fmtN(tt.nTrips) + ' trips · ' + fmtN(tt.patRoute.length) + ' patterns · ' +
       (ttInfo.from === 'saved' ? 'loaded from storage in ' : 'built in ') + fmtN(ttInfo.ms) + ' ms';
   }
+  // How often the live feed is asked for positions and trip updates (shared/transit/live-feed.js)
+  function checksText() {
+    var s = function (ms) { return (Math.round(ms / 100) / 10) + ' s'; };
+    return 'positions every ' + s(pollDelay()) + ' · trip updates every ' + s(TU_REFRESH_MS);
+  }
   function renderDiag() {
     var keys = Object.keys(vehicles), withLine = 0, viaPos = 0, viaTu = 0, parked = 0;
     keys.forEach(function (k) {
@@ -94,6 +99,7 @@
       'map preload: ' + (!preload.state ? (/^image/.test(mapMode) ? 'not used on the image map' : 'waiting') :
         preload.done + '/' + preload.total + ' tiles (zoom ' + preload.zoom + ', ' + preload.saved + ' already saved' +
         (preload.failed ? ', ' + preload.failed + ' failed' : '') + ')' + (preload.state === 'done' ? ' · done in ' + preload.ms + ' ms' : ' · loading…')),
+      'checks: ' + checksText() + (feedFailures ? ' · ' + feedFailures + ' failed in a row' : ''),
       'motion: reports every ~' + Math.round(feedInterval / 1000) + ' s · ' + onScreenCount + ' moving on screen · ' +
         parked + ' waiting at the end of their line' +
         (staleUpdates ? ' · placed directly after a data gap: ' + staleUpdates + '×' : ''),
@@ -134,6 +140,7 @@
       section('Live feed', [
         kv('Vehicles', fmtN(keys.length) + ' · ' + (staticState !== 'ok' ? 'lines loading' : missing ? fmtN(missing) + ' without line' : 'all lines matched')),
         kv('Report interval', '~' + Math.round(feedInterval / 1000) + ' s'),
+        kv('Checks', checksText()),
         kv('Moving on screen', fmtN(onScreenCount) + ' · ' + fmtN(parked) + ' at terminus'),
         kv('Trip updates', tuStats ? fmtN(tuStats.n) + ' stops · delay ' + fmtN(tuStats.delay) : '—'),
         kv('Linked to vehicles', fmtN(tuCount))

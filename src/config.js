@@ -2,7 +2,13 @@
   var FEED_URL   = 'https://gtfs.sofiatraffic.bg/api/v1/vehicle-positions';
   var TU_URL     = 'https://gtfs.sofiatraffic.bg/api/v1/trip-updates';
   var STATIC_URL = 'https://gtfs.sofiatraffic.bg/api/v1/static';
-  var REFRESH_MS = 5000;  // check twice as often; the work is skipped when the feed hasn't changed
+  // Live checks (see docs/live-feed-polling.md). The positions file (~70 KB) is rebuilt every second and
+  // each vehicle reports about every 5 s at its own moment, so a check a second shows a report about a
+  // second after it is made (up to 5 s later before). Trip updates (~1 MB) only feed ETAs and delays.
+  var REFRESH_MS = 1000;            // vehicle positions while the page is visible
+  var REFRESH_SAVE_DATA_MS = 5000;  // …with the browser's Data Saver on
+  var REFRESH_MAX_MS = 15000;       // longest wait while the feed keeps failing (doubles from REFRESH_MS)
+  var TU_REFRESH_MS = 15000;        // trip updates (they were downloaded with every position check)
   // Size of everything drawn over the map (v74): --ui shrinks the panel, sheets, buttons, popups and
   // markers on smaller screens (CSS zoom, see the style sheet). 1 from a 412 × 860 phone or a 1280 × 760
   // desktop window up; smaller below that, never under 0.75 on phones (held close; a 320 × 568 phone needs

@@ -17,6 +17,7 @@ node --test --test-reporter=tap --test-reporter-destination=tests/YYYY-MM-DD.tap
 | `tests/transit.test.cjs` | Builds a timetable from interleaved service rows, applies calendar exceptions, and checks overnight and daylight-saving ETAs. Plans a bus-to-metro journey, handles missed and prohibited transfers, rebuilds an old cache, and merges live arrivals with the metro station board. |
 | `tests/rider-actions.test.cjs` | Searches by line, fleet number and plate, toggles a transport type, restores saved places and destinations after reload, accepts and releases a GPS watch, and completes walking guidance. |
 | `tests/map.test.cjs` | Moves a vehicle through a bend and into its terminus, switches the 3D follow camera, decodes the shipped vehicle meshes, retries an offline download, and checks the phone performance overlay. |
+| `tests/live-feed.test.cjs` | Checks positions every second while trip updates follow every 15 s without overlapping, learns the glide length from each vehicle's own reports, and slows checks for Data Saver, a failing feed and a hidden page. See [live feed checks](live-feed-polling.md). |
 
 `tests/app.cjs` loads whole production scripts into a fresh Node VM for each fixture. The tests supply the clock, decoded feed messages, storage and device interfaces. Map geometry, timetable compilation, routing, arrivals and persistence decisions run from the application source. The mesh test reads the three GLBs in `models/`.
 
