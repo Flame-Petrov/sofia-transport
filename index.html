@@ -14444,14 +14444,16 @@
     }
     function unstore(k) { try { localStorage.removeItem(k); } catch (e) {} }
     // WebKit can kill and reload a page that uses too much memory without any event: a 3D view still marked open at
-    // start-up (opened less than 10 min ago) means the last session died in it. A normal reload or close clears the
-    // mark (pagehide).
+    // start-up (opened less than 10 min ago) means the last session died in it. The mark is only kept while the 3D
+    // view is on screen: a normal reload or close clears it (pagehide), and so does leaving for another app
+    // (visibilitychange, below), because phones discard background tabs without pagehide and that is no 3D crash.
     (function () {
       var t = +(store(OPEN_KEY) || 0);
       if (t && Date.now() - t < 10 * 60e3) store(MEMO_KEY, JSON.stringify({ t: Date.now(), why: 'the page reloaded while 3D was open' }));
       unstore(OPEN_KEY);
     })();
     window.addEventListener('pagehide', function () { unstore(OPEN_KEY); });
+    function markOpen() { if (view3d.on && !document.hidden) store(OPEN_KEY, String(Date.now())); }
     function available() { return /^vector/.test(mapMode) && !!builtStyle && !memo(); }
 
     // ---- the buttons and the menu note ----
@@ -14515,8 +14517,9 @@
         else if (x.enabled()) { x._v3off = true; x.disable(); }
       });
     }
-    function open() {
+    function open(quiet) {
       cancelFocusCard();
+      reopenOnShow = false;
       if (view3d.on || !available()) return;
       if (savedPlaces && savedPlaces.isPlacing) savedPlaces.cancelPlacement();
       map.closePopup();
@@ -14545,14 +14548,14 @@
       m3.getCanvas().addEventListener('keydown', keyboardCamera, true);
       m3.getCanvas().addEventListener('keyup', keyboardCameraRelease, true);
       m3.getCanvas().addEventListener('blur', keyboardCameraRelease);
-      controlsHelp.showModal();
+      if (!quiet) controlsHelp.showModal();   // not when 3D comes back by itself after the phone dropped it in the background
       viewBounds01 = null;
       function invalidateBounds() { viewBounds01 = null; fleetDirty=true; farPending=true; }
       m3.on('move', scheduleViewportPrefetch);
       m3.on('move', invalidateBounds);
       m3.on('resize', invalidateBounds);
       info.opens++; info.tiles0 = tileReq; info.hits0 = tileHits;
-      store(OPEN_KEY, String(Date.now()));
+      markOpen();
       handlers(false);
       m3.getCanvas().addEventListener('webglcontextlost', onLost, false);
       // our layers go in as soon as the style is there ('load' waits for the first complete picture)
@@ -15861,10 +15864,21 @@
     }
 
     // ---- memory: the iPhone's ceiling ----
+    // A loss on screen means the 3D view ran out of graphics memory: it closes and its button stays hidden for a day.
+    // A loss in the background (or delivered just as the page comes back) is the phone taking the memory back from an
+    // app it isn't showing (Android Chrome and iOS do this when another app opens): no memo, and 3D reopens on return.
+    var shownAt = 0, reopenOnShow = false, BACKGROUND_LOSS_MS = 3000;
     function onLost(e) {
       if (!view3d.on || !m3 || (e && e.target && e.target !== m3.getCanvas())) return;   // only the open 3D map's own loss
       if (e && e.preventDefault) e.preventDefault();
       info.lost++;
+      if (document.hidden || Date.now() - shownAt < BACKGROUND_LOSS_MS) {
+        info.bgLost = (info.bgLost || 0) + 1;
+        close('graphics dropped in the background', true);
+        if (document.hidden) reopenOnShow = true;
+        else setTimeout(function () { open(true); }, 0);
+        return;
+      }
       store(MEMO_KEY, JSON.stringify({ t: Date.now(), why: 'graphics memory lost' }));
       close('ran out of graphics memory', true);
       toast('3D view closed: the phone ran out of graphics memory.', 7000);
@@ -15875,8 +15889,14 @@
       clearTimeout(hideTimer);
       if (document.hidden) {
         hiddenAt = Date.now();
-        if (view3d.on) hideTimer = setTimeout(function () { if (document.hidden) close('in the background for 10 min', true); }, 10 * 60e3);
-      } else if (view3d.on && hiddenAt && Date.now() - hiddenAt > 10 * 60e3) close('in the background for 10 min', true);
+        unstore(OPEN_KEY);   // a background tab the phone discards is not a 3D crash
+        if (view3d.on) hideTimer = setTimeout(function () { if (document.hidden) { reopenOnShow = false; close('in the background for 10 min', true); } }, 10 * 60e3);
+        return;
+      }
+      shownAt = Date.now();
+      if (hiddenAt && Date.now() - hiddenAt > 10 * 60e3) { reopenOnShow = false; if (view3d.on) close('in the background for 10 min', true); }
+      if (reopenOnShow) setTimeout(function () { if (!document.hidden) open(true); }, 0);
+      markOpen();
     });
 
     // ---- Diagnostics ----
@@ -15905,7 +15925,7 @@
             (gov ? ' · detail reduced ' + gov + '/5' : '')]);
         }
       }
-      rows.push(['Opened', info.opens + '× this session' + (info.lastClose ? ' · last closed: ' + info.lastClose : '') + (info.lost ? ' · memory lost ' + info.lost + '×' : '')]);
+      rows.push(['Opened', info.opens + '× this session' + (info.lastClose ? ' · last closed: ' + info.lastClose : '') + (info.lost - (info.bgLost || 0) ? ' · memory lost ' + (info.lost - (info.bgLost || 0)) + '×' : '') + (info.bgLost ? ' · dropped in the background ' + info.bgLost + '×' : '')]);
       return rows;
     };
 
