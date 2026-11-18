@@ -14,7 +14,7 @@ node --test --test-reporter=tap --test-reporter-destination=tests/YYYY-MM-DD.tap
 
 | Suite | Rider behavior covered |
 | --- | --- |
-| `tests/transit.test.cjs` | Builds a timetable from interleaved service rows, applies calendar exceptions, and checks overnight and daylight-saving ETAs. Plans a bus-to-metro journey, handles missed and prohibited transfers, rebuilds an old cache, and merges live arrivals with the metro station board. |
+| `tests/transit.test.cjs` | Builds a timetable from interleaved service rows, applies calendar exceptions, and checks overnight and daylight-saving ETAs. Plans a bus-to-metro journey, handles missed and prohibited transfers, rebuilds an old cache, merges live arrivals with the metro station board, and checks that a metro train stands 15 to 20 s at each station while keeping its timetable times (see [metro station stops](metro-station-stops.md)). |
 | `tests/rider-actions.test.cjs` | Searches by line, fleet number and plate, toggles a transport type, restores saved places and destinations after reload, accepts and releases a GPS watch, and completes walking guidance. |
 | `tests/map.test.cjs` | Moves a vehicle through a bend and into its terminus, switches the 3D follow camera, decodes the shipped vehicle meshes, retries an offline download, and checks the phone performance overlay. |
 | `tests/live-feed.test.cjs` | Checks positions every second while trip updates follow every 15 s without overlapping, learns the glide length from each vehicle's own reports, and slows checks for Data Saver, a failing feed and a hidden page. See [live feed checks](live-feed-polling.md). |

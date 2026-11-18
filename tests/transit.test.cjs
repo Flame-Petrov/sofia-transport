@@ -155,3 +155,38 @@ test('metro station board includes the hour boundary, marks the terminus and dro
   assert.equal(board(arrival)[0].t, arrival);
   assert.equal(board(arrival + 1).length, 0);
 });
+
+test('metro trains stand 15-20 s at each station and keep the timetable time between stations', async () => {
+  const a = await network(null);
+  const mt = a.metroTimetable;
+  const run = { key: 'metro:train:1' };
+  const dwells = [0, 1, 2, 3, 4, 5, 6, 7].map(i => mt.dwellSec(run, i));
+  for (const d of dwells) assert.ok(d >= 15 && d <= 20, d);
+  assert.ok(new Set(dwells.map(Math.round)).size > 1, 'dwell varies by station');
+  assert.equal(mt.dwellSec({ key: 'metro:train:1' }, 3), dwells[3], 'same train and station, same dwell');
+
+  // 1.2 km in a 100 s timetable gap, half a dwell standing at each end
+  const hold0 = dwells[0] * 500, hold1 = dwells[1] * 500, dur = 100000, L = 1200;
+  const plan = mt.stationPlan({}, 300, 300 + L, 0, dur, hold0, hold1);
+  const at = t => plan.at(t / dur);
+  assert.equal(at(0), 300);
+  assert.equal(at(hold0 - 1), 300, 'still standing at the station it is leaving');
+  assert.equal(at(dur), 300 + L, 'at the next station by its timetable time');
+  assert.equal(at(dur - hold1 + 1), 300 + L, 'already standing at the next station');
+  assert.ok(at(hold0 + 2000) > 300, 'pulls away once the dwell is over');
+  let last = 300, top = 0, prevV = 0, maxAcc = 0;
+  for (let t = 0; t <= dur; t += 100) {
+    const s = at(t), v = (s - last) / 0.1;
+    assert.ok(s >= last - 1e-9, 'never reverses');
+    top = Math.max(top, v);
+    if (t > 0) maxAcc = Math.max(maxAcc, Math.abs(v - prevV) / 0.1);
+    last = s; prevV = v;
+  }
+  assert.ok(top < 25, 'top speed ' + top);   // under 90 km/h
+  assert.ok(maxAcc < 1.3, 'gentle acceleration and braking ' + maxAcc);
+
+  // a short gap is never filled by standing still
+  const tight = mt.stationPlan({}, 0, 900, 0, 30000, 10000, 10000);
+  assert.ok(tight.hold0 + tight.hold1 <= 18000);
+  assert.equal(tight.at(1), 900);
+});

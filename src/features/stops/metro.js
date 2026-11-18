@@ -64,6 +64,42 @@
       return path;
     }
 
+    // The timetable gives one time per station (arrival = departure), so a train used to glide
+    // through every station at one speed. Now it stands at each station for 15-20 s, centred on
+    // the timetable time (it pulls in half a dwell early and leaves half a dwell late), then
+    // accelerates, cruises and brakes into the next one. Each station keeps its timetable time.
+    var DWELL_MIN = 15, DWELL_MAX = 20, ACCEL = 1.0, BRAKE = 1.0;   // seconds; m/s²
+    function dwellSec(run, i) {
+      if (run.seed === undefined) {
+        var h = 2166136261;
+        for (var c = 0; c < run.key.length; c++) h = Math.imul(h ^ run.key.charCodeAt(c), 16777619);
+        run.seed = h >>> 0;
+      }
+      var x = Math.imul(run.seed ^ Math.imul(i + 1, 0x9E3779B1), 0x85EBCA6B) >>> 0;
+      return DWELL_MIN + (DWELL_MAX - DWELL_MIN) * ((x >>> 8) / 16777216);
+    }
+    // A plan for one timetable gap: stand `hold0` ms at s0, run, stand `hold1` ms at s1.
+    // `at(k)` gives the distance along the line at share k (0…1) of the gap.
+    function stationPlan(m, s0, s1, t0, dur, hold0, hold1) {
+      var holds = hold0 + hold1, cap = dur * 0.6;
+      if (holds > cap) { hold0 *= cap / holds; hold1 *= cap / holds; }
+      var T = (dur - hold0 - hold1) / 1000, L = Math.max(0, s1 - s0);
+      var a = ACCEL, b = BRAKE, c = 1 / (2 * a) + 1 / (2 * b), disc = T * T - 4 * c * L, top;
+      if (disc >= 0) top = (T - Math.sqrt(disc)) / (2 * c);
+      else { top = 2 * L / T; a = b = top / (T / 2); }   // too far for gentle braking: no cruise
+      var ta = top / a, tb = top / b, tc = Math.max(0, T - ta - tb);
+      function at(k) {
+        var t = (k * dur - hold0) / 1000;
+        if (t <= 0) return s0;
+        if (t >= T) return s0 + L;
+        if (t < ta) return s0 + a * t * t / 2;
+        if (t < ta + tc) return s0 + a * ta * ta / 2 + top * (t - ta);
+        var left = T - t;
+        return s0 + L - b * left * left / 2;
+      }
+      return { kind: 'route', m: m, s0: s0, s1: s1, t0: t0, dur: dur, hold0: hold0, hold1: hold1, top: top, at: at };
+    }
+
     function updateTrains() {
       if (!tt || document.hidden) return;
       var now = Date.now(), sec = (now - tt.base) / 1000, next = new Set(), changed = false;
@@ -82,7 +118,8 @@
           v.d.lat = v.pos[0]; v.d.lon = v.pos[1];
           return;
         }
-        var plan = { kind: 'route', m: path.m, s0: path.distances[i], s1: path.distances[i + 1], t0: start, dur: dur };
+        var plan = stationPlan(path.m, path.distances[i], path.distances[i + 1], start, dur,
+                               dwellSec(run, i) * 500, dwellSec(run, i + 1) * 500);
         var pos = pointAt(path.m, routeS(plan, (now - start) / dur));
         var line = routes[run.rid].short;
         upsert({ key: run.key, type: 1, routeId: run.rid, tripId: run.tid, tripRef: run.tid,
@@ -144,7 +181,8 @@
       return out;
     }
 
-    return { index: index, serves: serves, stationIds: function () { return patterns.keys(); }, upcoming: upcoming };
+    return { index: index, serves: serves, stationIds: function () { return patterns.keys(); }, upcoming: upcoming,
+             stationPlan: stationPlan, dwellSec: dwellSec };
   })();
 
   // Offline timetables still count down when the live feed stalls.

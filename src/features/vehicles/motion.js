@@ -177,6 +177,7 @@
   // Where along the road a move is at moment k (0…1): a smooth curve from the start speed v0 to the
   // end speed v1 (m per ms), so consecutive moves join without a jump in speed
   function routeS(mo, k) {
+    if (mo.at) return mo.at(k);   // a plan with its own speed profile (metro: dwell, accelerate, brake)
     if (!mo.smooth) return mo.s0 + (mo.s1 - mo.s0) * k;   // constant speed
     var k2 = k * k, k3 = k2 * k;
     var s = (2 * k3 - 3 * k2 + 1) * mo.s0 + (k3 - 2 * k2 + k) * mo.dur * mo.v0 +
