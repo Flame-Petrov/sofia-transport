@@ -59,12 +59,13 @@ test('culling detaches an offscreen dot, reattaches it at its new pose, and keep
 
 // A flat stand-in for the 3D map: `shift` pans the picture in screen pixels.
 function buildingMap(features) {
-  const events = {}, shift = { x: 0, y: 0 }, state = { queries: 0, dem: null, zoom: 16 };
+  const events = {}, shift = { x: 0, y: 0 }, state = { queries: 0, dem: null, zoom: 16, houses: false };
   const map = { events, shift, state,
     getCenter: () => Object.assign([0,0], { lng: 0, lat: 0 }), getZoom: () => state.zoom,
     getPitch: () => 0, getBearing: () => 0, getCanvas: () => ({ clientWidth: 390, clientHeight: 844 }),
     project: ([x,y]) => ({ x: 195 + x*1e5 - shift.x, y: 422 - y*1e5 - shift.y }),
-    getLayoutProperty: () => 'visible', getLayer: () => ({ minzoom: 14 }),
+    getLayoutProperty: () => 'visible',
+    getLayer: id => id.endsWith('-houses') && !state.houses ? undefined : { minzoom: 14 },
     on: (name, cb) => { (events[name] ||= []).push(cb); },
     fire: (name, event) => (events[name] || []).forEach(cb => cb(event)),
     getTerrain: () => state.dem, queryTerrainElevation: () => 4,
@@ -150,6 +151,33 @@ test('wall and house batches share one building query, and only a pan beyond the
   map.state.zoom=17; ms+=300; map.fire('move'); render();
   ms+=300; map.fire('resize'); render();
   assert.deepEqual([map.state.queries,wallBytes.length],[4,3]);
+});
+
+test('a footprint the house layer models gets no textured walls while the houses are drawn', () => {
+  const a = app(['features/view3d/building-view','features/view3d/bulgarian-houses','features/view3d/facade-styles',
+    'features/view3d/solid-facades'], { maplibregl: buildingLibrary, ImageData: FakeImageData });
+  // Twenty rectangles that take a house design, and one triangle that cannot.
+  const features = footprints(20);
+  features.push({ id:99, properties:{render_height:9,render_min_height:0,material:'green'},
+    geometry:{type:'Polygon',coordinates:[[[40,0],[60,0],[60,10],[40,0]]]} });
+  assert.deepEqual([a.takesHouseModel(features[0]),a.takesHouseModel(features[20])],[true,false]);
+  const map = buildingMap(features), wallBytes = [], gl = buildingGl(wallBytes);
+  let ms = 1000;
+  a.performance = { now: () => ms };
+  const walls = a.solidFacadeLayer('material','tiles',true);
+  const render = () => { for (let i=0;i<3;i++) { walls.render(gl,new Float32Array(16)); ms+=300; } };
+  walls.onAdd(map,gl);
+  render();
+  assert.equal(wallBytes.at(-1),(20*4+3)*48*4);   // no house layer: every footprint has walls
+  // With the house layer installed, at its zoom, only the triangle keeps walls (the houses are blanked).
+  map.state.houses=true; render();
+  const full=wallBytes.length;
+  map.state.zoom=15.5; map.fire('move'); render();
+  assert.equal(wallBytes.length,full);   // still house zoom: nothing changes
+  // Below the house layer's zoom the walls come back, since the houses are no longer drawn.
+  map.state.zoom=14.6; map.fire('move'); render();
+  assert.ok(wallBytes.length>full);
+  assert.ok(wallBytes.slice(full).reduce((s,b)=>s+b,0)>=20*4*48*4);
 });
 
 test('every wall carries whole window bays and floors in one colour per building', () => {

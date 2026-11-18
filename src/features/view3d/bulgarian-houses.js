@@ -19,11 +19,19 @@
     var mixed = Math.imul((id >>> 0) ^ Math.floor(id / 4294967296), 0x45d9f3b);
     return ((mixed ^ (mixed >>> 16)) >>> 0) % designs.length;
   }
-  function bulgarianHouse(f, vertices, origin, map) {
+  var HOUSE_MIN_ZOOM = 15;   // MapLibre zoom (app zoom 16) from which footprints take a house design
+  // Whether the house layer replaces this footprint with a modelled house. The wall layer asks
+  // too, so a modelled house never also gets textured walls in the same place (they z-fight).
+  function takesHouseModel(f) {
+    var material = f.properties.material;
+    return (material === 'green' || material === 'purple') && !!houseFrame(f);
+  }
+  // The checks a footprint must pass to take a house design, and the measured frame when it does.
+  function houseFrame(f) {
     var geometry = f.geometry, height = Number(f.properties.render_height);
     if (geometry.type !== 'Polygon' || geometry.coordinates.length !== 1 ||
         geometry.coordinates[0].length !== 5 || height < 3 || height > 28 ||
-        Number(f.properties.render_min_height) !== 0) return false;
+        Number(f.properties.render_min_height) !== 0) return null;
     var ring = geometry.coordinates[0];
     var site = maplibregl.MercatorCoordinate.fromLngLat(ring[0]);
     var unit = site.meterInMercatorCoordinateUnits();
@@ -37,20 +45,26 @@
     });
     var lengths = edges.map(function (e) { return Math.hypot(e[0],e[1]); });
     var longest = Math.max.apply(null,lengths);
-    if (Math.min.apply(null,lengths) < 4 || longest > 65) return false;
-    var designs = height > 12 || longest > 26 ? apartmentDesigns : houseDesigns;
+    if (Math.min.apply(null,lengths) < 4 || longest > 65) return null;
     // Reject skewed, concave and tile-clipped outlines masquerading as houses.
     if (edges.some(function (a,i) {
       var j=(i+1)%4,b=edges[j];
       return Math.abs(a[0]*b[0]+a[1]*b[1]) > 0.14*lengths[i]*lengths[j];
-    })) return false;
+    })) return null;
     if (corners.some(function (_,i) {
       var p=maplibregl.MercatorCoordinate.fromLngLat(ring[i]);
       return [p.x,p.y].some(function (v) {
         var t=Math.round(v*16384*4096)%4096;
         return t===8 || t===4088 || t===0;
       });
-    })) return false;
+    })) return null;
+    return { ring: ring, site: site, unit: unit, corners: corners, lengths: lengths, longest: longest, height: height };
+  }
+  function bulgarianHouse(f, vertices, origin, map) {
+    var frame = houseFrame(f);
+    if (!frame) return false;
+    var ring = frame.ring, site = frame.site, unit = frame.unit, corners = frame.corners, lengths = frame.lengths;
+    var height = frame.height, designs = height > 12 || frame.longest > 26 ? apartmentDesigns : houseDesigns;
     if (lengths[1]>lengths[0]) corners.push(corners.shift());
     var center = corners.reduce(function (s,p) {return [s[0]+p[0]/4,s[1]+p[1]/4];},[0,0]);
     var elevation = map.getTerrain() ? map.queryTerrainElevation(ring[0]) || 0 : 0;
@@ -292,7 +306,7 @@
         map.on('move',moved);map.on('resize',resized);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
       },
       render:function(gl,matrix){
-        if(map.getZoom()<(canopy ? canopy.minZoom : 15) /* app zoom 16 */ || (canopy && canopy.awake ? !canopy.awake() : map.getLayoutProperty(materialLayer,'visibility')==='none')){
+        if(map.getZoom()<(canopy ? canopy.minZoom : HOUSE_MIN_ZOOM) || (canopy && canopy.awake ? !canopy.awake() : map.getLayoutProperty(materialLayer,'visibility')==='none')){
           asleep=true;return;
         }
         if (asleep) { asleep=false; dirty=true; if (view) view.invalidate(); }

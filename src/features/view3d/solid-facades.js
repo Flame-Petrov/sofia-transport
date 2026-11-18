@@ -42,7 +42,10 @@
     var STRIDE = 8;   // floats per corner: position, then u, v, bands, colour and seed with shade
     var batch = buildingBuffer(STRIDE);
     var meshCache = new Map(), previousKeys = null;
-    function forget() { previousKeys=null; meshCache.clear(); batch.reset(); }
+    // Footprints the house layer models get no walls here while it draws: the model's walls stand a few
+    // centimetres outside the footprint, and two wall sets that close z-fight as the camera zooms.
+    var houses = false, modelled = new Map();
+    function forget() { previousKeys=null; meshCache.clear(); modelled.clear(); batch.reset(); }
     function terrainChanged() { forget(); dirty = true; }
     function moved() { view.cameraMoved(); }
     function resized() { view.invalidate(); }
@@ -110,6 +113,10 @@
           var look = facadeStyles.look(props, f.id, classified, props.style == null && rings[0][0]);
           var key = look.style + '/' + look.color + '/' + f.id + '/' + base + '/' + top + '/' + footprintKey(rings);
           if (seen.has(key)) return;
+          if (houses) {
+            if (!modelled.has(key)) modelled.set(key, takesHouseModel(f));
+            if (modelled.get(key)) return;
+          }
           seen.add(key);
           if (!meshCache.has(key)) meshCache.set(key, wallMesh(rings, base, top, terrain, look));
         });
@@ -117,6 +124,7 @@
       if (sameBuildingKeys(previousKeys,seen)) return 0;
       previousKeys=seen;
       meshCache.forEach(function(_,key){ if (!seen.has(key)) meshCache.delete(key); });
+      modelled.forEach(function(skip,key){ if (!skip && !seen.has(key)) modelled.delete(key); });
       return batch.sync(gl,seen,function(key){ return meshCache.get(key); });
     }
 
@@ -169,6 +177,9 @@
         var layer=map.getLayer(materialId);
         if (!layer || map.getZoom()<(layer.minzoom || 0) || map.getLayoutProperty(materialId,'visibility')==='none') { asleep=true; return; }
         if (asleep) { asleep=false; dirty=true; view.invalidate(); }
+        // Same gate as the house layer: it is installed and the camera is close enough for it to draw.
+        var housesDrawn=!!map.getLayer(materialId+'-houses') && map.getZoom()>=HOUSE_MIN_ZOOM;
+        if (housesDrawn!==houses) { houses=housesDrawn; dirty=true; }
         gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
         // The shared query decides when the visible buildings may have changed.
         var now=performance.now(), version=view.refresh(now), due=dirty || version!==built;
