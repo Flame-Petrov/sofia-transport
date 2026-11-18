@@ -27,3 +27,9 @@ The selected bus's remaining route starts at its displayed ground position. In `
 Scheduled metro trains use the same articulated mesh as trams. In `src/features/view3d/view.js`, each carriage takes its heading from the timetable path between its ends. To check a turn, follow a metro train in 3D at zoom 16 or closer. The front should enter the bend first and the rear should straighten last, while the number stays over the center.
 
 The **3D vehicle models** switch turns the meshes off and leaves the markers: see [what the 3D view draws](3d-show-switches.md).
+
+## Stops stay on top of the models
+
+A bus or tram standing at a stop must not hide the stop. In `src/features/view3d/view.js` the all-stops symbol layer (`v3-stops`) is added after the vehicle model layer (`v3-models`) and the trees, so stop icons draw over every model. The vehicle dots, the pink route-vehicle rings and the line-number labels still draw above the stops. A tap follows the same order in `onClick()`: first a vehicle's dot, marker or number label (`vehAtPoint(p, true)` skips model bodies), then a stop icon (`stopAtPoint`), then a model's body (`vehAtPoint(p)`). A tap on the body away from any stop icon still opens the vehicle.
+
+To check, run `tests/stops-over-models-browser.py OUTPUT_DIR` (live feed, add `--phone` for the Android layout and `--no-buildings` so no building hides a model). It moves the 3D camera between busy stops until a model's body covers a stop icon, saves a crop, taps the icon and expects the stop's card, then taps the body beside it and expects the vehicle's card. With `--page` it runs an older release for comparison.

@@ -15778,10 +15778,6 @@
                  'line-width': ['interpolate', ['linear'], ['zoom'], 11, ['case', ['==', ['get', 'k'], 1], 5, 3], 15, ['case', ['==', ['get', 'k'], 1], 12, 7]] } }, under);
       m3.addLayer({ id: 'v3-rt-walk', type: 'line', source: 'v3-rt', filter: ['==', ['get', 'd'], 1], layout: round,
         paint: { 'line-color': ['get', 'c'], 'line-opacity': ['get', 'o'], 'line-width': 4, 'line-dasharray': [0.1, 2.2] } }, under);
-      // v103: all stops (from street level, as in 2D; a searched line's stops at any zoom, in its colour)
-      m3.addSource('v3-stops', { type: 'geojson', data: EMPTY });
-      m3.addLayer({ id: 'v3-stops', type: 'symbol', source: 'v3-stops',
-        layout: { 'icon-image': ['get', 'img'], 'icon-size': ['case', ['==', ['get', 'sel'], 1], 1.6 * U, U], 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'symbol-sort-key': ['get', 'sel'] } });
       // the vehicles: over everything else on the map (only the markers are above them)
       m3.addSource('v3-veh', { type: 'geojson', data: EMPTY, buffer: 16 });
       var transport = m3.getStyle().layers.find(function (l) { return l['source-layer'] === 'transportation'; });
@@ -15792,6 +15788,11 @@
       // Trees: under the vehicles, depth-tested against the buildings.
       try { m3.addLayer(trees.layer({ id: 'v3-trees', budget: IS_IOS ? 6000 : 12000 })); } catch (e) { console.warn('3D trees failed:', e); }
       m3.addLayer(vehicleModelLayer(function () { return drawn; }));
+      // v103: all stops (from street level, as in 2D; a searched line's stops at any zoom, in its colour).
+      // Above the vehicle models and trees, so a bus or tram standing at a stop never hides its icon.
+      m3.addSource('v3-stops', { type: 'geojson', data: EMPTY });
+      m3.addLayer({ id: 'v3-stops', type: 'symbol', source: 'v3-stops',
+        layout: { 'icon-image': ['get', 'img'], 'icon-size': ['case', ['==', ['get', 'sel'], 1], 1.6 * U, U], 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'symbol-sort-key': ['get', 'sel'] } });
       var LZ = LABEL_ZOOM - 1, faded = function (a) { return ['case', ['==', ['get', 'pk'], 1], a, 1]; };
       var label = function (size) {
         return { 'text-field': ['get', 't'], 'text-font': fontB, 'text-size': size * U, 'text-offset': ['case', ['==', ['get', 'model'], 1], ['literal', [0, -30 / size]], ['literal', [0, 0]]], 'icon-image': ['concat', 'v3pill-', ['get', 'c']],
@@ -16282,7 +16283,8 @@
     // A tap: the closest drawn vehicle within reach wins (as on the 2D map): 12 px around a dot, the size of its
     // label when labels show. Worked out from the drawn positions, not queryRenderedFeatures: on a symbol layer
     // whose data changes 15 times a second, MapLibre 4.7 can throw "feature index out of bounds" there.
-    function vehAtPoint(p) {
+    // a vehicle under point p; with skipBodies only its marker or number counts, not a 3D model's body
+    function vehAtPoint(p, skipBodies) {
       var lbl = labelsBySearch || viewZoom() >= LABEL_ZOOM, best = null, bd = Infinity;
       var all = drawn.concat(farDrawn);
       for (var i = 0; i < all.length; i++) {
@@ -16297,7 +16299,7 @@
           var bodyDistance = Math.hypot(p.x-rear.x-t*vx, p.y-rear.y-t*vy);
           var labelPoint = q;
           var labelHit = Math.abs(labelPoint.x - p.x) <= rx && Math.abs(labelPoint.y - 30 * ui - p.y) <= ry;
-          if (!labelHit && bodyDistance > 18 * ui) continue;
+          if (!labelHit && (skipBodies || bodyDistance > 18 * ui)) continue;
           dx = labelHit ? Math.abs(labelPoint.x - p.x) : bodyDistance; dy = 0;
         } else if (dx > rx || dy > ry) continue;
         var d = dx * dx + dy * dy;
@@ -16915,10 +16917,14 @@
       if (Date.now() - dragAt < 300) return;   // v102: the end of a drag (even a short one) isn't a tap, as in Leaflet
       var oe = e && e.originalEvent;
       if (downXY && oe && typeof oe.clientX === 'number' && Math.abs(oe.clientX - downXY[0]) + Math.abs(oe.clientY - downXY[1]) > 6) return;
-      var v = e && e.point ? vehAtPoint(e.point) : null;   // v101: a vehicle under the finger
+      // The order follows what is drawn on top: vehicle dots and number labels, then stop icons (above the 3D
+      // models), then a model's body.
+      var v = e && e.point ? vehAtPoint(e.point, true) : null;   // v101: a vehicle under the finger
       if (v) { openVeh(v); return; }
       var sm = e && e.point ? stopAtPoint(e.point) : null;   // v103: a stop of the all-stops layer
       if (sm) { stopTap(sm); return; }
+      v = e && e.point ? vehAtPoint(e.point) : null;
+      if (v) { openVeh(v); return; }
       cancelFocusCard();
       if (pop) { closePop(); return; }                    // this tap only closes the open card
       if (sheetStop || sheetVeh || sheetRoute) { closeSheet(); return; }
