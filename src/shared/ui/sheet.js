@@ -87,6 +87,33 @@
     if (body && top) body.scrollTop = top;
     return true;
   }
+  // release 109: a stop's card on the map (2D popup, 3D card) keeps STOP_CARD_GAP px clear of the map's top and
+  // bottom edge, so the browser's toolbar never covers its head. Its height is capped at 55% of the window; when
+  // the stop sits too close to the edge the card is opening towards, only the card list gets shorter (it scrolls).
+  var STOP_CARD_GAP = 12, STOP_CARD_MIN = 160;
+  function stopCardCap() { return Math.max(220, Math.round(window.innerHeight * 0.55)); }
+  function fitStopCard(el) {
+    var box = el && el.isConnected && el.closest('.leaflet-popup, .maplibregl-popup');
+    if (!box) return;
+    var area = (box.closest('.leaflet-container, .maplibregl-map') || document.documentElement).getBoundingClientRect();
+    var r = box.getBoundingClientRect(), h = el.getBoundingClientRect().height;
+    // a Leaflet popup always opens upwards; a MapLibre card opens downwards when it is anchored at its top
+    var down = /maplibregl-popup-anchor-top/.test(box.className);
+    var room = down ? (area.bottom - STOP_CARD_GAP) - r.bottom : r.top - (area.top + STOP_CARD_GAP);
+    var max = Math.max(STOP_CARD_MIN, Math.min(stopCardCap(), Math.floor(h + room))) + 'px';
+    if (el.style.maxHeight === max) return;
+    var body = el.querySelector('.sp-body'), top = body ? body.scrollTop : 0;
+    el.style.maxHeight = max;
+    if (body && top) body.scrollTop = top;
+  }
+  function fitStopCards() {
+    if (openStopMk && openStopMk.isPopupOpen()) fitStopCard(openStopMk._spEl);
+    var sm = view3d.on && view3d.popStop ? view3d.popStop() : null;
+    if (sm) fitStopCard(sm._spEl);
+  }
+  map.on('moveend', fitStopCards);
+  window.addEventListener('resize', function () { setTimeout(fitStopCards, 0); });
+
   function refreshStopViews() {
     var mk = openStopMk;
     if (mk && mk.isPopupOpen() && mk._spEl && patchStop(mk._spEl, mk._stop)) {
@@ -94,11 +121,12 @@
       // which can lose the card list's scroll position, so put it back.
       var body = mk._spEl.querySelector('.sp-body'), top = body ? body.scrollTop : 0;
       mk.getPopup().update();
+      fitStopCard(mk._spEl);
       if (body && top) body.scrollTop = top;
     }
     if (sheetStop) patchStop(sheetBody, sheetStop);
     var sm = view3d.on && view3d.popStop ? view3d.popStop() : null;   // v101: a stop's card on the 3D map
-    if (sm && sm._spEl) patchStop(sm._spEl, sm._stop);
+    if (sm && sm._spEl && patchStop(sm._spEl, sm._stop)) fitStopCard(sm._spEl);
   }
 
   // vehicle popups on phones: never open underneath the search panel

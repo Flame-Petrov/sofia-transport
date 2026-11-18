@@ -21,7 +21,7 @@
       el.className = 'sp';
       // no Leaflet maxHeight: the popup itself never scrolls, only its card list does (long lists scroll)
       mk.bindPopup(function () {
-        el.style.maxHeight = Math.max(220, Math.round(window.innerHeight * 0.55)) + 'px';
+        el.style.maxHeight = stopCardCap() + 'px';   // fitStopCard() shortens it once the popup is placed
         patchStop(el, st);
         return el;
       }, { className: 'stop-pop', autoPan: false, offset: [0, -16], closeButton: false, minWidth: 348, maxWidth: 348 });   // 380 px with the margins
@@ -34,7 +34,7 @@
           if (map.hasLayer(mk)) mk.openPopup();
         });
       });
-      mk.on('popupopen', function () { openStopMk = mk; markSel(mk, true); });
+      mk.on('popupopen', function () { openStopMk = mk; markSel(mk, true); fitStopCard(el); });
       mk.on('popupclose', function () {
         markSel(mk, false);
         if (openStopMk === mk) { openStopMk = null; expandedStop = null; }

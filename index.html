@@ -6037,7 +6037,7 @@
       el.className = 'sp';
       // no Leaflet maxHeight: the popup itself never scrolls, only its card list does (long lists scroll)
       mk.bindPopup(function () {
-        el.style.maxHeight = Math.max(220, Math.round(window.innerHeight * 0.55)) + 'px';
+        el.style.maxHeight = stopCardCap() + 'px';   // fitStopCard() shortens it once the popup is placed
         patchStop(el, st);
         return el;
       }, { className: 'stop-pop', autoPan: false, offset: [0, -16], closeButton: false, minWidth: 348, maxWidth: 348 });   // 380 px with the margins
@@ -6050,7 +6050,7 @@
           if (map.hasLayer(mk)) mk.openPopup();
         });
       });
-      mk.on('popupopen', function () { openStopMk = mk; markSel(mk, true); });
+      mk.on('popupopen', function () { openStopMk = mk; markSel(mk, true); fitStopCard(el); });
       mk.on('popupclose', function () {
         markSel(mk, false);
         if (openStopMk === mk) { openStopMk = null; expandedStop = null; }
@@ -6148,6 +6148,33 @@
     if (body && top) body.scrollTop = top;
     return true;
   }
+  // release 109: a stop's card on the map (2D popup, 3D card) keeps STOP_CARD_GAP px clear of the map's top and
+  // bottom edge, so the browser's toolbar never covers its head. Its height is capped at 55% of the window; when
+  // the stop sits too close to the edge the card is opening towards, only the card list gets shorter (it scrolls).
+  var STOP_CARD_GAP = 12, STOP_CARD_MIN = 160;
+  function stopCardCap() { return Math.max(220, Math.round(window.innerHeight * 0.55)); }
+  function fitStopCard(el) {
+    var box = el && el.isConnected && el.closest('.leaflet-popup, .maplibregl-popup');
+    if (!box) return;
+    var area = (box.closest('.leaflet-container, .maplibregl-map') || document.documentElement).getBoundingClientRect();
+    var r = box.getBoundingClientRect(), h = el.getBoundingClientRect().height;
+    // a Leaflet popup always opens upwards; a MapLibre card opens downwards when it is anchored at its top
+    var down = /maplibregl-popup-anchor-top/.test(box.className);
+    var room = down ? (area.bottom - STOP_CARD_GAP) - r.bottom : r.top - (area.top + STOP_CARD_GAP);
+    var max = Math.max(STOP_CARD_MIN, Math.min(stopCardCap(), Math.floor(h + room))) + 'px';
+    if (el.style.maxHeight === max) return;
+    var body = el.querySelector('.sp-body'), top = body ? body.scrollTop : 0;
+    el.style.maxHeight = max;
+    if (body && top) body.scrollTop = top;
+  }
+  function fitStopCards() {
+    if (openStopMk && openStopMk.isPopupOpen()) fitStopCard(openStopMk._spEl);
+    var sm = view3d.on && view3d.popStop ? view3d.popStop() : null;
+    if (sm) fitStopCard(sm._spEl);
+  }
+  map.on('moveend', fitStopCards);
+  window.addEventListener('resize', function () { setTimeout(fitStopCards, 0); });
+
   function refreshStopViews() {
     var mk = openStopMk;
     if (mk && mk.isPopupOpen() && mk._spEl && patchStop(mk._spEl, mk._stop)) {
@@ -6155,11 +6182,12 @@
       // which can lose the card list's scroll position, so put it back.
       var body = mk._spEl.querySelector('.sp-body'), top = body ? body.scrollTop : 0;
       mk.getPopup().update();
+      fitStopCard(mk._spEl);
       if (body && top) body.scrollTop = top;
     }
     if (sheetStop) patchStop(sheetBody, sheetStop);
     var sm = view3d.on && view3d.popStop ? view3d.popStop() : null;   // v101: a stop's card on the 3D map
-    if (sm && sm._spEl) patchStop(sm._spEl, sm._stop);
+    if (sm && sm._spEl && patchStop(sm._spEl, sm._stop)) fitStopCard(sm._spEl);
   }
 
   // vehicle popups on phones: never open underneath the search panel
@@ -15578,6 +15606,7 @@
         if (selfMove) { if (now - lastRender > 1000) { lastRender = now; renderStops(); } return; }
         camBusy = false; userMoving = false; lastRender = now;
         if (view3d.on) render(false);
+        if (pop && popKind === 'stop') fitStopCard(popRef._spEl);   // release 109: the card stays clear of the map's edges
       });
       // dragging takes over from a following camera once the map has moved DRAG_TAKEOVER_PX (as in 2D)
       // a finger or the mouse on the map pauses the follow cameras: their jumpTo every frame would stop MapLibre's
@@ -16822,7 +16851,7 @@
       else if (kind === 'veh') { var el = vehPopupEl(ref); patchVeh(el, ref); p.setLngLat(vehicleAnchor(ref)).setDOMContent(el); }
       else {
         var st = ref._stop, se = ref._spEl;
-        se.style.maxHeight = Math.max(220, Math.round(window.innerHeight * 0.55)) + 'px';
+        se.style.maxHeight = stopCardCap() + 'px';
         patchStop(se, st);
         p.setLngLat([st.lon, st.lat]).setDOMContent(se);
         expandedStop = null;
@@ -16831,7 +16860,7 @@
       var ce = p.getElement() && p.getElement().querySelector('.maplibregl-popup-content');
       if (ce && kind !== 'pin') ce.style.width = (kind === 'veh' ? vpW() + 36 : 348) + 'px';
       popKind = kind; popRef = ref; pop = p;
-      if (kind === 'stop') markSel(ref, true);
+      if (kind === 'stop') { markSel(ref, true); fitStopCard(ref._spEl); }
       if (kind === 'veh') {   // as v100's card in 2D: body.vp-card, and the map buttons it runs under step aside
         document.body.classList.add('vp-card');
         clearInterval(cardEdgeTimer); cardEdgeTimer = setInterval(vpClearEdge, 250); vpClearEdge();

@@ -240,6 +240,7 @@
         if (selfMove) { if (now - lastRender > 1000) { lastRender = now; renderStops(); } return; }
         camBusy = false; userMoving = false; lastRender = now;
         if (view3d.on) render(false);
+        if (pop && popKind === 'stop') fitStopCard(popRef._spEl);   // release 109: the card stays clear of the map's edges
       });
       // dragging takes over from a following camera once the map has moved DRAG_TAKEOVER_PX (as in 2D)
       // a finger or the mouse on the map pauses the follow cameras: their jumpTo every frame would stop MapLibre's
@@ -1484,7 +1485,7 @@
       else if (kind === 'veh') { var el = vehPopupEl(ref); patchVeh(el, ref); p.setLngLat(vehicleAnchor(ref)).setDOMContent(el); }
       else {
         var st = ref._stop, se = ref._spEl;
-        se.style.maxHeight = Math.max(220, Math.round(window.innerHeight * 0.55)) + 'px';
+        se.style.maxHeight = stopCardCap() + 'px';
         patchStop(se, st);
         p.setLngLat([st.lon, st.lat]).setDOMContent(se);
         expandedStop = null;
@@ -1493,7 +1494,7 @@
       var ce = p.getElement() && p.getElement().querySelector('.maplibregl-popup-content');
       if (ce && kind !== 'pin') ce.style.width = (kind === 'veh' ? vpW() + 36 : 348) + 'px';
       popKind = kind; popRef = ref; pop = p;
-      if (kind === 'stop') markSel(ref, true);
+      if (kind === 'stop') { markSel(ref, true); fitStopCard(ref._spEl); }
       if (kind === 'veh') {   // as v100's card in 2D: body.vp-card, and the map buttons it runs under step aside
         document.body.classList.add('vp-card');
         clearInterval(cardEdgeTimer); cardEdgeTimer = setInterval(vpClearEdge, 250); vpClearEdge();
