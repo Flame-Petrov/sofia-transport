@@ -9,7 +9,7 @@
   /* popups: the parts inside Leaflet's box, which Leaflet measures and places itself */
   .leaflet-popup-content-wrapper, .leaflet-popup-tip-container { zoom: var(--ui); }
   /* map markers: vehicle labels and stop icons (centred on their spot, so they shrink around it) */
-  .veh .pill, .stop-ic { zoom: var(--ui); }
+  .veh .pill, .stop-ic, .stop-post { zoom: var(--ui); }
   .leaflet-popup-content { font-size: 13px; line-height: 1.45; }
   .leaflet-popup-content b { font-size: 15px; }
 

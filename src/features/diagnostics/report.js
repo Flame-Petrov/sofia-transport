@@ -59,6 +59,7 @@
     var s = function (ms) { return (Math.round(ms / 100) / 10) + ' s'; };
     return 'positions every ' + s(pollDelay()) + ' · trip updates every ' + s(TU_REFRESH_MS);
   }
+  var DIAG_BADGE = /[?&]debug/.test(location.search);   // release 109: the issue count only for developers
   function renderDiag() {
     var keys = Object.keys(vehicles), withLine = 0, viaPos = 0, viaTu = 0, parked = 0;
     keys.forEach(function (k) {
@@ -71,7 +72,7 @@
     // issue counter on the closed row: errors win over warnings
     var issues = diagIssues(keys.length, withLine);
     var nErr = issues.filter(function (i) { return i.level === 'err'; }).length, nWarn = issues.length - nErr;
-    drawOnce('diagCount', nErr ? '<span class="c-err">' + nErr + (nErr === 1 ? ' error' : ' errors') + '</span>'
+    drawOnce('diagCount', !DIAG_BADGE ? '' : nErr ? '<span class="c-err">' + nErr + (nErr === 1 ? ' error' : ' errors') + '</span>'
       : nWarn ? '<span class="c-warn">' + nWarn + (nWarn === 1 ? ' warning' : ' warnings') + '</span>' : '');
     if (!diagOpen) return;   // the rest is only drawn while Diagnostics is open
 

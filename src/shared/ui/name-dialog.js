@@ -6,7 +6,7 @@
     document.getElementById('pinDlgT').textContent = title;
     var sub = document.getElementById('pinDlgSub');
     sub.textContent = opt.sub || ''; sub.hidden = !opt.sub;   // v85: e.g. the size of an offline area
-    pinName.placeholder = opt.placeholder || 'e.g. Home, Work, Grandma';
+    pinName.placeholder = opt.placeholder || t('e.g. Home, Work, Grandma');
     pinName.value = value || '';
     pinDlgCb = cb;
     pinDlg.hidden = false;

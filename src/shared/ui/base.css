@@ -10,3 +10,14 @@
   /* Keep pinches on the map while touch handling switches between Leaflet and the 3D canvas. */
   #map { position: fixed; inset: 0; touch-action: none; }
 
+
+  /* Segmented choice (release 109): the 3D buildings level and the language. A radio group of buttons in one pill;
+     the chosen one is white and raised. 44 px tall for touch. */
+  .seg { display: flex; gap: 2px; padding: 3px; border-radius: 12px; background: var(--chip); }
+  .seg button {
+    flex: 1 1 0; min-width: 0; min-height: 46px; padding: 0 10px; border: 0; border-radius: 9px; background: none;
+    color: var(--fg); font: 500 14px/1 var(--font); cursor: pointer; white-space: nowrap;
+  }
+  .seg button[hidden] { display: none; }
+  .seg button[aria-checked="true"] { background: #fff; font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.14); }
+  .seg button:focus-visible { outline: 2px solid var(--muted); outline-offset: 1px; }

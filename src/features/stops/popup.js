@@ -1,20 +1,23 @@
   // ---------- Stop details: one card per line + destination, upcoming times as chips ----------
   var MAX_CARDS = 6, MAX_CHIPS = 5;
   var expandedStop = null, openStopMk = null;   // "Show N more lines" pressed for this stop; open desktop stop popup
-  var KIND_WORD = { live: 'live', est: 'estimated', sched: 'timetable' };
+  var KIND_WORD = { live: 'live', est: 'estimated', sched: 'timetable' };   // translated where used (t)
+  var TERMINATES = 'Terminates here';   // a group's destination when the run ends at this stop
   var SIGNAL_SVG = '<svg class="sig" viewBox="0 0 12 12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" d="M1.8 4.6a6 6 0 0 1 8.4 0M3.7 6.7a3.3 3.3 0 0 1 4.6 0"/><circle cx="6" cy="9.2" r="1.3" fill="currentColor"/></svg>';
   var CLOSE_SVG = '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="#555" stroke-width="1.8" stroke-linecap="round" d="M3 3l8 8M11 3l-8 8"/></svg>';
 
   // Feed names are ALL CAPS: "БЛ. 325, Ж.К. МЛАДОСТ 3" → "Бл. 325, ж.к. Младост 3".
   // Latin line / vehicle codes (X9, A1210) are left as they are.
+  // In English the result is written in Latin letters (feedText, shared/ui/i18n.js).
   function titleCaseBg(s) {
-    return String(s || '').split(/(\s+)/).map(function (w) {
+    var out = String(s || '').split(/(\s+)/).map(function (w) {
       if (/^[A-Z0-9]*[0-9][A-Z0-9]*$/.test(w) && /[A-Z]/.test(w)) return w;
       return w.toLocaleLowerCase('bg').replace(/(^|[\-\/(."])(\p{L})/gu, function (m, p, c) { return p + c.toLocaleUpperCase('bg'); });
     }).join('')
       .replace(/(\d)(\p{L})(?!\p{L})/gu, function (m, d, c) { return d + c.toLocaleUpperCase('bg'); })   // "1А" in "Младост 1А"
       .replace(/(^|[\s(])Ж\.К\./g, '$1ж.к.')
       .replace(/(\s)Бл\./g, '$1бл.');   // "Бл." only at the start
+    return typeof feedText === 'function' ? feedText(out) : out;
   }
 
   // Line colour → badge text colour, tracked-card tint (~8 % on white) and a darker shade for "Tracking",
@@ -48,16 +51,16 @@
   function chipClock(t) { return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); }
   var metroClock = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Sofia', hour: '2-digit', minute: '2-digit' });
   function chipTime(a, first) {
-    if (!a.t) return 'on the way';
+    if (!a.t) return t('on the way');
     var min = Math.round((a.t - Date.now()) / 60000), pre = a.kind === 'est' ? '~' : '';
-    if (min <= 0) return 'now';
+    if (min <= 0) return t('now');
     if (min >= 60) return pre + chipClock(a.t);
-    return pre + min + (first ? ' min' : '');
+    return first ? t('{n} min', { n: pre + min }) : pre + min;
   }
   function timeWords(a) {
-    if (!a.t) return 'on the way';
+    if (!a.t) return t('on the way');
     var min = Math.round((a.t - Date.now()) / 60000);
-    return (min <= 0 ? 'now' : min + ' min') + ', ' + chipClock(a.t);
+    return (min <= 0 ? t('now') : t('{n} min', { n: min })) + ', ' + chipClock(a.t);
   }
 
   function stopPopupHtml(st) {
@@ -81,7 +84,7 @@
       if (a.kind === 'sched' && !a.t) return;   // no vehicle and no time: nothing to show
       var line = (a.kind === 'live' ? (v.d.line || v.d.label) : ((r && r.short) || (v && v.d.line))) || '?';
       var dest = (a.kind === 'live' && v.d.headsign) || info.headsign || '';
-      if (a.terminates) dest = 'Terminates here';
+      if (a.terminates) dest = TERMINATES;   // shown translated (cardHtml), not as a feed name
       var gk = (info.route_id || line) + '|' + dest, g = groups[gk];
       if (!g) {
         g = groups[gk] = {
@@ -106,32 +109,33 @@
     });
     order.sort(function (x, y) { return (y.tracked - x.tracked) || byTime(x.items[0], y.items[0]); });
 
-    var html = '<div class="sp-head"><div class="sp-title"><div class="sp-name">' + esc(titleCaseBg(st.name) || 'Stop') + '</div>' +
-      (st.code ? '<div class="sp-code">Stop ' + esc(st.code) + '</div>' : '') + '</div>' +
-      '<button type="button" class="sp-x" data-sp-close aria-label="Close" title="Close">' + CLOSE_SVG + '</button></div>';
-    if (!order.length) return html + '<div class="sp-body"><div class="sp-none">No departures in the next hour</div></div>';
+    var html = '<div class="sp-head"><div class="sp-title"><div class="sp-name">' + esc(titleCaseBg(st.name) || t('Stop')) + '</div>' +
+      (st.code ? '<div class="sp-code">' + t('Stop {code}', { code: esc(st.code) }) + '</div>' : '') + '</div>' +
+      '<button type="button" class="sp-x" data-sp-close aria-label="' + t('Close') + '" title="' + t('Close') + '">' + CLOSE_SVG + '</button></div>';
+    if (!order.length) return html + '<div class="sp-body"><div class="sp-none">' + t('No departures in the next hour') + '</div></div>';
     var shown = expandedStop === st.id ? order : order.slice(0, MAX_CARDS), used = {};
     var more = order.length - shown.length;
     return html + '<div class="sp-body">' +
       shown.map(function (g) { return cardHtml(g, st, used); }).join('') +
-      (more > 0 ? '<button type="button" class="sp-more" data-sp-more="' + esc(st.id) + '">Show ' + more + ' more line' + (more > 1 ? 's' : '') + '</button>' : '') +
+      (more > 0 ? '<button type="button" class="sp-more" data-sp-more="' + esc(st.id) + '">' + tp(more, 'Show {n} more line', 'Show {n} more lines') + '</button>' : '') +
       legendHtml(used) + '</div>';
   }
 
   function cardHtml(g, st, used) {
-    var tone = lineTones(g.color), dest = titleCaseBg(g.dest);
-    var label = typeInfo(g.type).name + ' ' + g.line + (dest ? ' to ' + dest : '');
+    var tone = lineTones(g.color), dest = g.dest === TERMINATES ? t(TERMINATES) : titleCaseBg(g.dest);
+    var label = typeInfo(g.type).name + ' ' + g.line;
+    if (dest) label = t('{line} to {dest}', { line: label, dest: dest });
     var chips = g.items.map(function (a, i) {
       used[a.kind] = true;
-      var txt = esc(chipTime(a, i === 0)), full = esc(label + ', ' + KIND_WORD[a.kind] + ', ' + timeWords(a));
+      var txt = esc(chipTime(a, i === 0)), full = esc(label + ', ' + t(KIND_WORD[a.kind]) + ', ' + timeWords(a));
       if (a.metroSchedule) {
         var clock = metroClock.format(a.t), mins = Math.round((a.t - Date.now()) / 60000);
-        var wait = mins > 0 ? mins + ' min' : 'now';
+        var wait = mins > 0 ? t('{n} min', { n: mins }) : t('now');
         txt = esc(clock + (i === 0 ? ' · ' + wait : ''));
-        full = esc(label + ', timetable, ' + clock + ' Sofia time, ' + wait);
+        full = esc(t('{label}, timetable, {clock} Sofia time, {wait}', { label: label, clock: clock, wait: wait }));
       }
       if (a.metroSchedule && a.key) return '<button type="button" class="sp-chip metro-time" data-follow-arrival data-veh="' +
-        esc(a.key) + '" data-stop="' + esc(a.sid) + '" aria-label="Follow train, ' + full + '" title="Follow train, ' + full + '">' + txt + '</button>';
+        esc(a.key) + '" data-stop="' + esc(a.sid) + '" aria-label="' + t('Follow train, {what}', { what: full }) + '" title="' + t('Follow train, {what}', { what: full }) + '">' + txt + '</button>';
       if (a.kind === 'sched') return '<span class="sp-sched" title="' + full + '" aria-label="' + full + '">' + txt + '</span>';
       var attrs = ' data-follow-arrival data-veh="' + esc(a.key) + '" data-stop="' + esc(a.sid || st.id) + '"';   // its own twin (v77)
       var ret = a.kind === 'est' && !a.guess.sameWay;   // comes after turning round at the end of its current run
@@ -139,7 +143,7 @@
         attrs += ' data-eta="' + (a.t || '') + '" data-same="' + (a.guess.sameWay ? 1 : 0) + '" data-onnew="' + (a.guess.stopOnNew || 0) + '"' +
           ' data-trip="' + esc(a.tripId || '') + '"';
       }
-      if (ret) { used.ret = true; full = esc(label + ', estimated, return trip: after its current run ends, ' + timeWords(a)); }
+      if (ret) { used.ret = true; full = esc(t('{label}, estimated, return trip: after its current run ends, {when}', { label: label, when: timeWords(a) })); }
       return '<button type="button" class="sp-chip ' + (a.kind === 'est' ? 'est guess' : 'live') + '" title="' + full + '" aria-label="' + full + '"' +
         attrs + '>' + (a.kind === 'live' ? SIGNAL_SVG : '') + (ret ? '<span class="ret" aria-hidden="true">&#8617;</span>' : '') + txt + '</button>';
     }).join('');
@@ -147,7 +151,7 @@
       (g.tracked ? ' style="border-color:' + g.color + ';background:' + tone.tint + '"' : '') + '>' +
       '<div class="sp-row"><span class="sp-badge" style="background:' + g.color + ';color:' + tone.ink + '">' + esc(g.line) + '</span>' +
       '<span class="sp-dest">' + esc(dest) + '</span>' +
-      (g.tracked ? '<span class="sp-track" style="color:' + tone.dark + '">Tracking</span>' : '') + '</div>' +
+      (g.tracked ? '<span class="sp-track" style="color:' + tone.dark + '">' + t('Tracking') + '</span>' : '') + '</div>' +
       '<div class="sp-chips">' + chips + '</div></section>';
   }
 
@@ -155,10 +159,10 @@
   function legendHtml(used) {
     if (!used.est && !used.sched) return '';
     var parts = [];
-    if (used.live) parts.push('<span><i class="lg-live"></i>Live</span>');
-    if (used.est) parts.push('<span><i class="lg-est"></i>Estimated</span>');
-    if (used.ret) parts.push('<span><b class="lg-ret" aria-hidden="true">&#8617;</b>Return trip (after its current run)</span>');
-    if (used.sched) parts.push('<span>Plain = timetable</span>');
+    if (used.live) parts.push('<span><i class="lg-live"></i>' + t('Live') + '</span>');
+    if (used.est) parts.push('<span><i class="lg-est"></i>' + t('Estimated') + '</span>');
+    if (used.ret) parts.push('<span><b class="lg-ret" aria-hidden="true">&#8617;</b>' + t('Return trip (after its current run)') + '</span>');
+    if (used.sched) parts.push('<span>' + t('Plain = timetable') + '</span>');
     return '<div class="sp-legend">' + parts.join('') + '</div>';
   }
 

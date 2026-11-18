@@ -227,3 +227,33 @@
     #stopProg { right: 14px; width: 64px; }
   }
 
+
+  /* ---- release 109 (UX review) ---- */
+  /* The city card opens a second line (time of the last update) on a tap */
+  #cityCard { cursor: pointer; }
+  #cityCard:focus-visible { outline: 2px solid var(--muted); outline-offset: 2px; }
+  #statusMore { margin-top: 4px; font-size: 13px; color: #6e6e73; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  #statusMore[hidden] { display: none; }
+  /* Map buttons are nearly opaque, so markers behind them don't show through the glass and look tappable */
+  .leaflet-container .leaflet-bar, #follow { background: rgba(255,255,255,.9); }
+  /* Touch screens zoom with a pinch: no + / − buttons there (one fewer pair in the right-hand stack) */
+  @media (hover: none) and (pointer: coarse) { .leaflet-control-zoom { display: none !important; } }
+  /* Map credits: on phones folded behind an (i) button (shared/map/base-map.js); open, they show above it */
+  .leaflet-control-credits { display: none; }
+  @media (max-width: 700px) {
+    .leaflet-control-credits { display: block; margin: 0 10px 10px 0 !important; clear: both; }
+    .leaflet-control-credits button {
+      width: 50px; height: 50px; border-radius: 50%; border: 1px solid var(--glass-edge); background: rgba(255,255,255,.9);
+      box-shadow: var(--glass-shadow); color: #3a3a3c; font: italic 700 17px/1 Georgia, serif; cursor: pointer; zoom: var(--ui);
+    }
+    .leaflet-control-credits button[aria-expanded="true"] { background: var(--ink); color: #fff; }
+    .leaflet-container:not(.credits-open) .leaflet-control-attribution { display: none; }
+    .leaflet-container.credits-open .leaflet-control-attribution { max-width: calc(100vw - 20px); margin: 0 10px 6px 0; padding: 6px 10px; border-radius: 12px;
+      font-size: 12px; line-height: 1.6; }
+    .leaflet-container.credits-open .leaflet-control-attribution a { display: inline-block; padding: 4px 0; }
+  }
+  /* Vehicle clusters when zoomed out (features/search/render.js): a white disc with the count, ringed in the commonest type's colour */
+  .vcl { background: none; border: 0; }
+  .vcl span { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; box-sizing: border-box; border-radius: 50%;
+    border: 3px solid #888; background: rgba(255,255,255,.95); color: var(--ink); font: 700 13px/1 var(--font); box-shadow: 0 1px 4px rgba(0,0,0,.35);
+    cursor: pointer; zoom: var(--ui); }

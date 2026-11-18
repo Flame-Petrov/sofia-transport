@@ -140,42 +140,46 @@
     var CLOUD_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 12.5h7.2a2.8 2.8 0 0 0 .4-5.6A4 4 0 0 0 4.4 6a3.3 3.3 0 0 0 .1 6.5z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><path d="M8 6.8v4M6.3 9.2L8 10.9l1.7-1.7" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg>';
     function status(a) {
       var r = rec[a.id];
-      if (now && now.id === a.id) return 'Downloading ' + Math.round(100 * now.done / Math.max(1, now.total)) + '%';
-      if (ready(a)) return mb(r.bytes) + ' · saved';
+      if (now && now.id === a.id) return t('Downloading {p}%', { p: Math.round(100 * now.done / Math.max(1, now.total)) });
+      if (ready(a)) return t('{size} · saved', { size: mb(r.bytes) });
       if (!canRun()) return '';
-      if (r && r.ver === mapVer && r.failed) return r.failed + ' tiles missing · retry';
-      if (r && r.ver && r.ver !== mapVer) return 'Updating soon';
-      return run ? 'Waiting' : 'up to ' + mb(countFor(a.b) * KB_PER_TILE * 1024);
+      if (r && r.ver === mapVer && r.failed) return t('{n} tiles missing · retry', { n: r.failed });
+      if (r && r.ver && r.ver !== mapVer) return t('Updating soon');
+      return run ? t('Waiting') : t('up to {size}', { size: mb(countFor(a.b) * KB_PER_TILE * 1024) });
     }
     function render() {
       var list = document.getElementById('offList');
       if (!list) return;
       var n = areas.filter(ready).length;
-      document.getElementById('offCount').textContent = areas.length ? n + '/' + areas.length : '';
+      // release 109: plain words instead of "0/1" — "1 area saved", "1 of 2 saved", "Not saved yet", "Saving…"
+      var cnt = !areas.length || !/^vector/.test(mapMode) ? '' : now ? t('Saving…') : !n ? t('Not saved yet')
+        : n === areas.length ? tp(n, '{n} area saved', '{n} areas saved') : t('{n} of {total} saved', { n: n, total: areas.length });
+      var cEl = document.getElementById('offCount');
+      if (cEl.textContent !== cnt) cEl.textContent = cnt;
       var h = areas.map(function (a) {
-        var nm = esc(a.name), st = status(a), busy = now && now.id === a.id;
+        var nm = esc(t(a.name)), st = status(a), busy = now && now.id === a.id;
         return '<div class="pl-item off-item' + (ready(a) ? ' ok' : '') + '" role="listitem" data-off="' + esc(a.id) + '">' +
-          '<button type="button" class="pl-go" data-off-act="show" title="Show this area on the map">' + CLOUD_SVG +
+          '<button type="button" class="pl-go" data-off-act="show" title="' + esc(t('Show this area on the map')) + '">' + CLOUD_SVG +
             '<span class="pl-n">' + nm + '</span><span class="pl-d">' + esc(st) + '</span></button>' +
           (busy ? '<i class="off-bar" style="--p:' + (now.done / Math.max(1, now.total)).toFixed(3) + '"></i>' : '') +
-          '<button type="button" class="pl-act" data-off-act="del" title="Remove from the phone" aria-label="Remove ' + nm + '">' + DEL_SVG + '</button></div>';
+          '<button type="button" class="pl-act" data-off-act="del" title="' + esc(t('Remove from the phone')) + '" aria-label="' + esc(t('Remove {name}', { name: t(a.name) })) + '">' + DEL_SVG + '</button></div>';
       }).join('');
       if (h !== html) { html = h; list.innerHTML = h; }
-      var info = !/^vector/.test(mapMode) ? (mapMode ? 'Offline areas work with the vector map only (this device is using the image map).' : '')
-        : storageOn === false ? 'This browser doesn\'t allow saving here, so areas can\'t be kept.'
-        : mapVer ? 'Map of ' + verDate(mapVer) + ' · next update ' + nextUpdate() : '';
+      var info = !/^vector/.test(mapMode) ? (mapMode ? t('Offline areas work with the vector map only (this device is using the image map).') : '')
+        : storageOn === false ? t('This browser doesn\'t allow saving here, so areas can\'t be kept.')
+        : mapVer ? t('Map of {date} · next update {when}', { date: verDate(mapVer), when: nextUpdate() }) : '';
       var el = document.getElementById('offInfo');
       if (el.textContent !== info) el.textContent = info;
     }
     function verDate(v) {   // "20261101_080013_pt" → "1 Nov 2026"
       var m = /^(\d{4})(\d{2})(\d{2})/.exec(v);
       if (!m) return v;
-      return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
+      return new Date(+m[1], +m[2] - 1, +m[3]).toLocaleDateString(LOCALE, { day: 'numeric', month: 'short', year: 'numeric' });
     }
     function nextUpdate() {
-      if (!mapVerAt) return 'in about a month';
+      if (!mapVerAt) return t('in about a month');
       var d = Math.ceil((mapVerAt + MAP_VERSION_DAYS * 864e5 - Date.now()) / 864e5);
-      return d <= 1 ? 'on the next opening' : 'in ' + d + ' days';
+      return d <= 1 ? t('on the next opening') : t('in {n} days', { n: d });
     }
     function setOpen(on) {
       reveal(document.getElementById('offBody'), on);
@@ -187,11 +191,11 @@
     document.getElementById('offAdd').onclick = function () {
       var bb = map.getBounds(), b = [bb.getWest(), bb.getSouth(), bb.getEast(), bb.getNorth()], n = countFor(b);
       if (n > AREA_MAX_TILES) {
-        toast('This view is too big to keep (up to ' + mb(n * KB_PER_TILE * 1024) + '). Zoom in and try again.');
+        toast(t('This view is too big to keep (up to {size}). Zoom in and try again.', { size: mb(n * KB_PER_TILE * 1024) }));
         return;
       }
-      openPinDlg('Keep this view offline', '', function (name) { add(name, b); },
-        { sub: 'Up to ' + mb(n * KB_PER_TILE * 1024) + ' on this phone (less outside cities) · every zoom level · updated monthly', placeholder: 'e.g. Plovdiv, Bansko, Grandma\'s' });
+      openPinDlg(t('Keep this view offline'), '', function (name) { add(name, b); },
+        { sub: t('Up to {size} on this phone (less outside cities) · every zoom level · updated monthly', { size: mb(n * KB_PER_TILE * 1024) }), placeholder: t('e.g. Plovdiv, Bansko, Grandma\'s') });
     };
     document.addEventListener('click', function (e) {
       var b = e.target && e.target.closest && e.target.closest('[data-off-act]');
@@ -207,7 +211,7 @@
         if (!b.classList.contains('confirm')) {   // first tap asks, a second one within 3 s removes
           var was = b.innerHTML;
           b.classList.add('confirm');
-          b.textContent = 'Remove?';
+          b.textContent = t('Remove?');
           setTimeout(function () { if (b.isConnected) { b.classList.remove('confirm'); b.innerHTML = was; } }, 3000);
           return;
         }
@@ -235,6 +239,27 @@
   // picks the dot drawn last, often a neighbour of the one under the pointer (hover grew the wrong dot,
   // a click could track the wrong vehicle). Here the dot closest to the pointer wins, for hover and clicks.
   var DotCanvas = L.Canvas.extend({
+    // release 109: a dot's shape tells the vehicle type (options.shape, set in features/search/render.js):
+    // 'square' for trams, 'diamond' for trolleybuses, a circle otherwise. The same area as the circle, so none looks bigger.
+    _updateCircle: function (layer) {
+      var shape = layer.options.shape;
+      if (!shape || shape === 'circle') return L.Canvas.prototype._updateCircle.call(this, layer);
+      if (!this._drawing || layer._empty()) return;
+      var p = layer._point, ctx = this._ctx, r = Math.max(Math.round(layer._radius), 1);
+      ctx.beginPath();
+      if (shape === 'square') {
+        var h = r * 0.89, k = Math.min(1.5, h * 0.3);   // half side; small rounded corners
+        ctx.moveTo(p.x - h + k, p.y - h); ctx.lineTo(p.x + h - k, p.y - h); ctx.quadraticCurveTo(p.x + h, p.y - h, p.x + h, p.y - h + k);
+        ctx.lineTo(p.x + h, p.y + h - k); ctx.quadraticCurveTo(p.x + h, p.y + h, p.x + h - k, p.y + h);
+        ctx.lineTo(p.x - h + k, p.y + h); ctx.quadraticCurveTo(p.x - h, p.y + h, p.x - h, p.y + h - k);
+        ctx.lineTo(p.x - h, p.y - h + k); ctx.quadraticCurveTo(p.x - h, p.y - h, p.x - h + k, p.y - h);
+      } else {   // diamond
+        var d = r * 1.26;
+        ctx.moveTo(p.x, p.y - d); ctx.lineTo(p.x + d, p.y); ctx.lineTo(p.x, p.y + d); ctx.lineTo(p.x - d, p.y);
+      }
+      ctx.closePath();
+      this._fillStroke(ctx, layer);
+    },
     _closestAt: function (point, e) {
       var best = null, bestD2 = Infinity, layer;
       for (var order = this._drawFirst; order; order = order.next) {

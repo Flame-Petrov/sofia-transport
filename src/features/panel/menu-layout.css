@@ -65,3 +65,36 @@
   #diagRaw { height: min(240px, calc(var(--bubble-h, 300px) - 44px)); min-height: 96px; max-height: none; }
   #panelBody::-webkit-scrollbar { display: none; width: 0; }
 
+
+  /* =====================================================================================================
+     Release 109 — UX review. Touch targets of at least 44 px (after the --ui zoom, about 0.95 on a 390 px
+     phone): the menu and clear buttons, the type filters and the suggestion chips.
+     ===================================================================================================== */
+  #fold { width: 46px; height: 46px; }
+  /* the clear button keeps its small grey circle, inside a 46 px tap area */
+  #qClear { width: 46px; height: 46px; background: radial-gradient(circle, var(--fill) 16.5px, transparent 17.5px); }
+  #types { height: 58px; }
+  .chip { height: 47px; border-radius: 24px; }
+  /* the filter dots and chip dots take their type's map shape: bus ●, tram ■, trolley ◆, metro ● */
+  #types button[data-t="0"] i, .chip i.sh-square { border-radius: 2px; }
+  #types button[data-t="11"] i, .chip i.sh-diamond { border-radius: 1px; transform: rotate(45deg) scale(.86); }
+
+  /* the search results list (features/search/render.js) */
+  #results { display: flex; flex-direction: column; max-height: min(330px, 46vh); overflow-y: auto; overscroll-behavior: contain;
+    padding: 6px; border-radius: 22px; background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
+    border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); scrollbar-width: thin; }
+  #results[hidden] { display: none; }
+  .rs-head { padding: 6px 10px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6e6e73; }
+  .rs-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 6px 10px; border: 0; border-radius: 14px;
+    background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+  .rs-row + .rs-row { border-top: 1px solid var(--hair); }
+  @media (hover: hover) { .rs-row:hover { background: rgba(255,255,255,.6); } }
+  .rs-row:active { background: rgba(120,120,128,.14); }
+  .rs-badge { flex: none; min-width: 42px; height: 28px; padding: 0 7px; border-radius: 8px; display: inline-flex; align-items: center; justify-content: center;
+    font: 700 15px/1 var(--font); }
+  .rs-txt { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+  .rs-title { font-size: 15px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rs-sub { font-size: 13px; color: #6e6e73; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .rs-late { color: #C4161C; font-weight: 600; }
+  .rs-early { color: #A86F00; font-weight: 600; }
+  .rs-ok { color: #1F8A3E; font-weight: 600; }

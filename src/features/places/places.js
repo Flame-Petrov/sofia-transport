@@ -62,26 +62,26 @@
       var choices = ['Flag', 'Home', 'Work', 'Star'].map(function (name) {
         var glyph = name === 'Flag' ? '<path d="M3 18V3m0 1c4-3 7 3 12 0v8c-5 3-8-3-12 0"/>' :
           '<path d="' + markerPaths[name] + '"/>';
-        return '<button type="button" data-pin-act="marker" data-marker="' + name + '" aria-label="' + name +
+        return '<button type="button" data-pin-act="marker" data-marker="' + name + '" aria-label="' + esc(t(name)) +
           '" aria-pressed="' + (p.marker === name) + '"><svg viewBox="0 0 18 21">' + glyph + '</svg></button>';
       }).join('');
-      return '<header><button type="button" data-pin-act="back" aria-label="Back">←</button><strong>Edit marker</strong></header>' +
-        '<div class="ticket-label">Icon</div><div class="ticket-icons" role="group" aria-label="Marker icon">' + choices + '</div>' +
-        '<div class="ticket-color"><label>Color <input type="color" data-pin-color value="' +
+      return '<header><button type="button" data-pin-act="back" aria-label="' + esc(t('Back')) + '">←</button><strong>' + t('Edit marker') + '</strong></header>' +
+        '<div class="ticket-label">' + t('Icon') + '</div><div class="ticket-icons" role="group" aria-label="' + esc(t('Marker icon')) + '">' + choices + '</div>' +
+        '<div class="ticket-color"><label>' + t('Color') + ' <input type="color" data-pin-color value="' +
         (p.color || (p.id === destId ? '#d6336c' : '#495057')) + '"></label><button type="button" data-pin-act="reset-color"' +
-        (p.color ? '' : ' disabled') + '>Reset</button></div><button type="button" class="ticket-primary" data-pin-act="save">Save changes</button>';
+        (p.color ? '' : ' disabled') + '>' + t('Reset') + '</button></div><button type="button" class="ticket-primary" data-pin-act="save">' + t('Save changes') + '</button>';
     }
     function pinPopupHtml(p) {
       var open = menuId === p.id;
-      var main = '<header><strong>' + esc(p.name) + '</strong><button type="button" data-pin-act="more" aria-label="More options" aria-expanded="' +
+      var main = '<header><strong>' + esc(p.name) + '</strong><button type="button" data-pin-act="more" aria-label="' + esc(t('More options')) + '" aria-expanded="' +
         open + '">•••</button></header><button type="button" class="ticket-primary" data-pin-act="route">' + ROUTE_SVG +
-        'Start route</button><button type="button" class="ticket-dest" data-pin-act="dest">' +
-        (p.id === destId ? 'Clear destination' : 'Set as destination') + '</button>';
-      if (open) main += '<div class="ticket-menu" role="group" aria-label="Place options">' +
-        '<button type="button" data-pin-act="edit">' + EDIT_SVG + 'Edit marker</button>' +
-        '<button type="button" data-pin-act="rename">' + EDIT_SVG + 'Rename</button>' +
-        '<button type="button" data-pin-act="move">' + MOVE_SVG + 'Move pin</button>' +
-        '<button type="button" data-pin-act="del">' + DEL_SVG + 'Delete saved place</button></div>';
+        t('Start route') + '</button><button type="button" class="ticket-dest" data-pin-act="dest">' +
+        (p.id === destId ? t('Clear destination') : t('Set as destination')) + '</button>';
+      if (open) main += '<div class="ticket-menu" role="group" aria-label="' + esc(t('Place options')) + '">' +
+        '<button type="button" data-pin-act="edit">' + EDIT_SVG + t('Edit marker') + '</button>' +
+        '<button type="button" data-pin-act="rename">' + EDIT_SVG + t('Rename') + '</button>' +
+        '<button type="button" data-pin-act="move">' + MOVE_SVG + t('Move pin') + '</button>' +
+        '<button type="button" data-pin-act="del">' + DEL_SVG + t('Delete saved place') + '</button></div>';
       return '<div class="place-ticket" data-pin="' + esc(p.id) + '">' +
         (editor && editor.id === p.id ? markerEditor(editor) : main) + '</div>';
     }
@@ -160,12 +160,12 @@
       savePlaces(); redrawPins(); drawDestLine();
     }
     function addPlace(name, ll) {
-      if (places.length >= PLACES_MAX) { toast('You have ' + PLACES_MAX + ' places — delete one to add another.'); return; }
+      if (places.length >= PLACES_MAX) { toast(t('You have {n} places — delete one to add another.', { n: PLACES_MAX })); return; }
       var p = { id: 'p' + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), name: name,
                 lat: +ll.lat.toFixed(6), lon: +ll.lng.toFixed(6) };
       places.push(p);
       setDest(p.id);   // a new flag is where you want to go
-      toast('“' + name + '” saved. It’s your destination now.', 3000);
+      toast(t('“{name}” saved. It’s your destination now.', { name: name }), 3000);
     }
     function deletePlace(p) {
       places = places.filter(function (q) { return q !== p; });
@@ -197,13 +197,13 @@
       var html = places.map(function (p) {
         var d = distFromMe(p), n = esc(p.name), isDest = p.id === destId;
         return '<div class="pl-item' + (isDest ? ' dest' : '') + '" role="listitem" data-pin="' + esc(p.id) + '">' +
-          '<button type="button" class="pl-go" data-pin-act="go" title="Show on the map and go there">' + markerSvg(p) +
+          '<button type="button" class="pl-go" data-pin-act="go" title="' + esc(t('Show on the map and go there')) + '">' + markerSvg(p) +
             '<span class="pl-n">' + n + '</span>' +
-            (d !== null ? '<span class="pl-d">' + fmtM(d) + '</span>' : isDest ? '<span class="pl-d">destination</span>' : '') + '</button>' +
-          '<button type="button" class="pl-act pl-route" data-pin-act="route" title="Start route" aria-label="Start route to ' + n + '">' + ROUTE_SVG + '</button>' +
-          '<button type="button" class="pl-act" data-pin-act="move" title="Move (tap the map)" aria-label="Move ' + n + '">' + MOVE_SVG + '</button>' +
-          '<button type="button" class="pl-act" data-pin-act="rename" title="Rename" aria-label="Rename ' + n + '">' + EDIT_SVG + '</button>' +
-          '<button type="button" class="pl-act" data-pin-act="del" title="Delete" aria-label="Delete ' + n + '">' + DEL_SVG + '</button></div>';
+            (d !== null ? '<span class="pl-d">' + fmtM(d) + '</span>' : isDest ? '<span class="pl-d">' + t('destination') + '</span>' : '') + '</button>' +
+          '<button type="button" class="pl-act pl-route" data-pin-act="route" title="' + esc(t('Start route')) + '" aria-label="' + t('Start route to {name}', { name: n }) + '">' + ROUTE_SVG + '</button>' +
+          '<button type="button" class="pl-act" data-pin-act="move" title="' + esc(t('Move (tap the map)')) + '" aria-label="' + t('Move {name}', { name: n }) + '">' + MOVE_SVG + '</button>' +
+          '<button type="button" class="pl-act" data-pin-act="rename" title="' + esc(t('Rename')) + '" aria-label="' + t('Rename {name}', { name: n }) + '">' + EDIT_SVG + '</button>' +
+          '<button type="button" class="pl-act" data-pin-act="del" title="' + esc(t('Delete')) + '" aria-label="' + t('Delete {name}', { name: n }) + '">' + DEL_SVG + '</button></div>';
       }).join('');
       if (html !== plHtml) { plHtml = html; document.getElementById('plList').innerHTML = html; }
     }
@@ -214,7 +214,7 @@
     }
     document.getElementById('plBtn').onclick = function () { setPlacesOpen(!isRevealed(document.getElementById('plBody'))); };
     document.getElementById('plAdd').onclick = function () {
-      openPinDlg('New place', '', function (name) { startPlacing({ name: name }); });
+      openPinDlg(t('New place'), '', function (name) { startPlacing({ name: name }); });
     };
     document.addEventListener('input', function (event) {
       if (!editor || !event.target.matches('[data-pin-color]')) return;
@@ -263,12 +263,12 @@
         refreshTicket(p, '[data-pin-act="more"]');
       }
       else if (act === 'move') startPlacing({ p: p });
-      else if (act === 'rename') { menuId = ''; refreshTicket(p); openPinDlg('Rename place', p.name, function (name) { p.name = name; savePlaces(); redrawPins(); renderPlaces(); refreshTicket(p); }); }
+      else if (act === 'rename') { menuId = ''; refreshTicket(p); openPinDlg(t('Rename place'), p.name, function (name) { p.name = name; savePlaces(); redrawPins(); renderPlaces(); refreshTicket(p); }); }
       else if (act === 'del') {
         if (!b.classList.contains('confirm')) {   // first tap asks, a second one within 3 s deletes
           var was = b.innerHTML;
           b.classList.add('confirm');
-          b.textContent = box.classList.contains('pl-item') ? 'Delete?' : 'Tap again to delete';
+          b.textContent = box.classList.contains('pl-item') ? t('Delete?') : t('Tap again to delete');
           setTimeout(function () { if (b.isConnected) { b.classList.remove('confirm'); b.innerHTML = was; } }, 3000);
           return;
         }
@@ -279,12 +279,12 @@
     // ---- putting a flag down: tap the map ----
     function startPlacing(job) {
       // v100: flags are put down and moved on the flat map (tapping a spot on a tilted map is imprecise)
-      if (view3d.on) { view3d.close('placing a flag'); toast('Placing a flag works in 2D.', 3000); }
+      if (view3d.on) { view3d.close('placing a flag'); toast(t('Placing a flag works in 2D.'), 3000); }
       placing = job;
       map.closePopup();
       if (sheetStop || sheetVeh) closeSheet();
       document.getElementById('map').classList.add('placing');
-      document.getElementById('placeTxt').innerHTML = 'Tap the map to place <b>' + esc(job.p ? job.p.name : job.name) + '</b>';
+      document.getElementById('placeTxt').innerHTML = t('Tap the map to place {name}', { name: '<b>' + esc(job.p ? job.p.name : job.name) + '</b>' });
       document.getElementById('placeBar').hidden = false;
       if (isPhone()) setFolded(true);   // more map to tap on
     }
@@ -307,7 +307,7 @@
     // long-press on a phone / right-click on PC: a new place right there
     map.on('contextmenu', function (e) {
       if (placing || !e.latlng) return;
-      openPinDlg('New place here', '', function (name) { addPlace(name, e.latlng); });
+      openPinDlg(t('New place here'), '', function (name) { addPlace(name, e.latlng); });
     });
 
     document.addEventListener('keydown', function (e) {

@@ -21,16 +21,16 @@
 
   // at the end of its run, or waiting at the terminus (the faded, dashed vehicle)
   function vehAtEnd(v) { return !!(v.parked || /end of the line/.test(v.pathNote || '')); }
-  function vpAge(sec) { return sec < 60 ? Math.round(sec) + ' s ago' : Math.round(sec / 60) + ' min ago'; }
+  function vpAge(sec) { return sec < 60 ? t('{n} s ago', { n: Math.round(sec) }) : t('{n} min ago', { n: Math.round(sec / 60) }); }
   function vpFresh(v) {
     var d = v.d, sec = d.ts ? Math.max(0, Date.now() / 1000 - d.ts) : (v.parkedSince ? (Date.now() - v.parkedSince) / 1000 : null);
     // v100: a dot instead of the icons; a live report just says "Live" (its age is in the tooltip)
-    if (d.metroPlan) return { cls: 'old', html: VP_CLOCK + 'Timetable estimate' };
-    if (vehAtEnd(v)) return { cls: 'delayed', html: VP_DOT + (v.parked ? 'Waiting · last seen ' : 'At terminus · ') + (sec === null ? '—' : vpAge(sec)) };
-    if (sec === null) return { cls: 'old', html: VP_DOT + 'Update time unknown' };
-    if (sec <= 30) return { cls: 'live', html: VP_DOT + 'Live', tip: 'Last report ' + vpAge(sec) };
-    if (sec <= 120) return { cls: 'delayed', html: VP_DOT + 'Delayed · ' + vpAge(sec) };
-    return { cls: 'old', html: VP_DOT + 'Last seen ' + vpAge(sec) };
+    if (d.metroPlan) return { cls: 'old', html: VP_CLOCK + t('Timetable estimate') };
+    if (vehAtEnd(v)) return { cls: 'delayed', html: VP_DOT + t(v.parked ? 'Waiting · last seen {ago}' : 'At terminus · {ago}', { ago: sec === null ? '—' : vpAge(sec) }) };
+    if (sec === null) return { cls: 'old', html: VP_DOT + t('Update time unknown') };
+    if (sec <= 30) return { cls: 'live', html: VP_DOT + t('Live'), tip: t('Last report {ago}', { ago: vpAge(sec) }) };
+    if (sec <= 120) return { cls: 'delayed', html: VP_DOT + t('Delayed · {ago}', { ago: vpAge(sec) }) };
+    return { cls: 'old', html: VP_DOT + t('Last seen {ago}', { ago: vpAge(sec) }) };
   }
   // the freshness text changes every second: only that little span is touched (not announced to screen readers)
   function fillFresh(root, v) {
@@ -42,51 +42,51 @@
     if (f.title !== (x.tip || '')) f.title = x.tip || '';
   }
   function vpLabel(v) {
-    var d = v.d;
-    return (VP_TYPE[d.type] || 'Vehicle') + ' ' + (d.line || d.label || '') + (d.headsign ? ' to ' + titleCaseBg(d.headsign) : '');
+    var d = v.d, what = t(VP_TYPE[d.type] || 'Vehicle') + ' ' + (d.line || d.label || '');
+    return d.headsign ? t('{line} to {dest}', { line: what, dest: titleCaseBg(d.headsign) }) : what;
   }
   function vpMins(eta, timetable) {
     var min = Math.round((eta - Date.now()) / 60000);
-    return (timetable ? '~' : '') + (min <= 0 ? 'now' : min + ' min');
+    return (timetable ? '~' : '') + (min <= 0 ? t('now') : t('{n} min', { n: min }));
   }
 
   function vpHead(v, end, closeBtn) {
-    var d = v.d, tone = lineTones(d.color), type = VP_TYPE[d.type] || 'Vehicle';
+    var d = v.d, tone = lineTones(d.color), type = t(VP_TYPE[d.type] || 'Vehicle');
     var badge = end ? '<span class="vp-badge end" style="border-color:' + d.color + ';color:' + tone.dark + '">'
                     : '<span class="vp-badge" style="background:' + d.color + ';color:' + tone.ink + '">';
     // v100: two lines beside the badge — "To <destination>" (at the end of the line: "At <terminus>"), and the live line under it
-    var title = end ? 'At ' + (titleCaseBg(lastStopName(v)) || 'the terminus') : d.headsign ? 'To ' + titleCaseBg(d.headsign) : type + ' ' + (d.line || d.label || '');
+    var title = end ? t('At {stop}', { stop: lastStopText(v) }) : d.headsign ? t('To {dest}', { dest: titleCaseBg(d.headsign) }) : type + ' ' + (d.line || d.label || '');
     return '<div class="vp-head">' + badge + esc(d.line || d.label || '?') + '</span>' +
       '<div class="vp-tt"><div class="vp-dest">' + esc(title) + '</div>' + vpMeta(v, end) + '</div>' +
-      (closeBtn ? '<button type="button" class="vp-x" data-vp-close aria-label="Close" title="Close">' + VP_CLOSE + '</button>' : '') + '</div>';
+      (closeBtn ? '<button type="button" class="vp-x" data-vp-close aria-label="' + t('Close') + '" title="' + t('Close') + '">' + VP_CLOSE + '</button>' : '') + '</div>';
   }
   function vpMeta(v, end) {
     var d = v.d, parts = ['<span class="vp-fresh"></span>'];
-    if (!end && typeof d.speed === 'number') parts.push(d.speed < 2 ? 'stopped' : Math.round(d.speed) + ' km/h');   // feed sends km/h
+    if (!end && typeof d.speed === 'number') parts.push(d.speed < 2 ? t('stopped') : t('{n} km/h', { n: Math.round(d.speed) }));   // feed sends km/h
     if (d.label) parts.push('#' + esc(d.label));
     return '<div class="vp-meta">' + parts.join('<span class="sep" aria-hidden="true">·</span>') + '</div>';
   }
   // v100: minutes for the headline: a big number and a smaller "min" on one baseline ("now" when due)
   function vpEta(eta, timetable) {
     var min = Math.round((eta - Date.now()) / 60000);
-    if (min <= 0) return '<span class="now"><span class="vp-u">now</span></span>';
-    return '<span><span class="vp-n">' + (timetable ? '~' : '') + min + '</span><span class="vp-u">min</span></span>';
+    if (min <= 0) return '<span class="now"><span class="vp-u">' + t('now') + '</span></span>';
+    return '<span><span class="vp-n">' + (timetable ? '~' : '') + min + '</span><span class="vp-u">' + t('min') + '</span></span>';
   }
   function vpHero(label, r) {
     return '<div class="vp-hero"><div class="vp-mid"><span class="vp-lbl">' + label + '</span>' +
-      '<span class="vp-hname">' + esc(titleCaseBg(r.stop.name) || 'Stop') + '</span></div>' +
+      '<span class="vp-hname">' + esc(titleCaseBg(r.stop.name) || t('Stop')) + '</span></div>' +
       '<div class="vp-eta">' + vpEta(r.eta, !r.realtime) + '</div></div>';
   }
   function vpMine(label, r) {
     return '<div class="vp-mine"><div class="vp-mid"><span class="vp-lbl">' + label + ' · ' + (r.realtime ? '' : '~') + chipClock(r.eta) + '</span>' +
-      '<span class="vp-mname">' + esc(titleCaseBg(r.stop.name) || 'Stop') + '</span></div>' +
+      '<span class="vp-mname">' + esc(titleCaseBg(r.stop.name) || t('Stop')) + '</span></div>' +
       '<span class="vp-mmin">' + vpMins(r.eta, !r.realtime) + '</span></div>';
   }
   function vpRow(kind, label, r, color) {
     var mine = kind === 'mine';
     return '<div class="vp-row"><span class="vp-mk' + (mine ? ' mine' : '') + '" style="border-color:' + color + '"></span>' +
       '<span class="vp-mid"><span class="vp-lbl' + (mine ? ' mine' : '') + '">' + label + '</span>' +
-      '<span class="vp-name">' + esc(titleCaseBg(r.stop.name) || 'Stop') + '</span></span>' +
+      '<span class="vp-name">' + esc(titleCaseBg(r.stop.name) || t('Stop')) + '</span></span>' +
       '<span class="vp-when"><span class="vp-min">' + vpMins(r.eta, !r.realtime) + '</span>' +
       (mine ? '<span class="vp-clock">' + chipClock(r.eta) + '</span>' : '') + '</span></div>';
   }
@@ -98,17 +98,17 @@
     if (!routeStops.length && !ret) return '';
     var next = routeStops[0], mine = focusedStop && routeStops.filter(function (r) { return r.stop.id === focusedStop.id; })[0];
     if (ret) {
-      var t = guessArrival(v, focusedStop, focusGuessEta.g, focusGuessEta.predicted) || focusGuessEta.predicted;
-      if (t) mine = { stop: focusedStop, eta: t, realtime: false, ret: true };
+      var eta = guessArrival(v, focusedStop, focusGuessEta.g, focusGuessEta.predicted) || focusGuessEta.predicted;
+      if (eta) mine = { stop: focusedStop, eta: eta, realtime: false, ret: true };
     }
     // v100: the next stop is the headline (when it is your stop too, it says so and the tinted row is left out)
-    return (next ? vpHero(mine === next ? 'Next stop · your stop' : 'Next stop', next) : '') +
-      (mine && mine !== next ? vpMine(mine.ret ? 'Your stop · after turning at ' + esc(titleCaseBg(lastStopName(v))) : 'Your stop', mine) : '');
+    return (next ? vpHero(t(mine === next ? 'Next stop · your stop' : 'Next stop'), next) : '') +
+      (mine && mine !== next ? vpMine(mine.ret ? t('Your stop') + ' · ' + t('after turning at {stop}', { stop: esc(lastStopText(v)) }) : t('Your stop'), mine) : '');
   }
   // All stops: this run's remaining stops (or the next run's, at the end of the line); tap one to make it "your stop"
   function vpAllStops(v, end) {
     var tid = end ? (v.nextRun && v.nextRun.tripId) : v.d.tripRef, color = v.d.color;
-    if (!tid) return '<div class="vp-stops vp-list"><div class="vp-empty">Stops of the next run aren\'t known yet</div></div>';
+    if (!tid) return '<div class="vp-stops vp-list"><div class="vp-empty">' + t('Stops of the next run aren\'t known yet') + '</div></div>';
     if (!tripStopsCache[tid]) {   // timetable not read yet: placeholders, refreshed when it arrives
       loadTripStops(tid).then(function () { refreshVehPopup(v); });
       return '<div class="vp-stops vp-list" aria-busy="true">' + [1, 2, 3].map(function () {
@@ -116,13 +116,13 @@
       }).join('') + '</div>';
     }
     var list = end ? computeRouteStops({ d: { tripRef: tid, curSeq: 0 } }) : routeStops;
-    if (!list.length) return '<div class="vp-stops vp-list"><div class="vp-empty">No more stops on this run</div></div>';
+    if (!list.length) return '<div class="vp-stops vp-list"><div class="vp-empty">' + t('No more stops on this run') + '</div></div>';
     return '<div class="vp-stops vp-list">' + list.map(function (r) {
       var mine = focusedStop && focusedStop.id === r.stop.id;
       return '<button type="button" class="vp-row vp-pick" data-vp-stop="' + esc(r.stop.id) + '" data-vp-eta="' + r.eta + '"' +
-        (end ? ' data-vp-run="' + esc(tid) + '"' : '') + ' title="Make this your stop">' +
+        (end ? ' data-vp-run="' + esc(tid) + '"' : '') + ' title="' + t('Make this your stop') + '">' +
         '<span class="vp-mk' + (mine ? ' mine' : '') + '" style="border-color:' + color + '"></span>' +
-        '<span class="vp-mid"><span class="vp-name">' + esc(titleCaseBg(r.stop.name) || 'Stop') + '</span></span>' +
+        '<span class="vp-mid"><span class="vp-name">' + esc(titleCaseBg(r.stop.name) || t('Stop')) + '</span></span>' +
         '<span class="vp-when"><span class="vp-min">' + vpMins(r.eta, !r.realtime) + '</span>' +
         '<span class="vp-clock">' + (r.realtime ? '' : '~') + chipClock(r.eta) + '</span></span></button>';
     }).join('') + '</div>';
@@ -130,18 +130,18 @@
   function vpNextRun(v) {
     var nr = v.nextRun, ni = nr && trips[nr.tripId];
     return '<div class="vp-next">' + VP_ARROW +
-      '<span class="vp-mid"><span class="vp-lbl">Next run' + (nr && !nr.linked ? ' · best guess' : '') + '</span>' +
-      '<span class="vp-name strong">→ ' + esc(ni ? (titleCaseBg(ni.headsign) || '?') : 'not known yet') + '</span></span>' +
+      '<span class="vp-mid"><span class="vp-lbl">' + t(nr && !nr.linked ? 'Next run · best guess' : 'Next run') + '</span>' +
+      '<span class="vp-name strong">→ ' + esc(ni ? (titleCaseBg(ni.headsign) || '?') : t('not known yet')) + '</span></span>' +
       (nr ? '<span class="vp-min">' + (nr.linked ? '' : '~') + chipClock(nr.t) + '</span>' : '') + '</div>' +
-      (v.parked ? '<div class="vp-help">The feed paused while the bus waits. It switches to the new run automatically.</div>' : '');
+      (v.parked ? '<div class="vp-help">' + t('The feed paused while the bus waits. It switches to the new run automatically.') + '</div>' : '');
   }
   function vehPopupHtml(v) {
     var end = vehAtEnd(v), mineFollow = following && v === selected;
     return vpHead(v, end, true) +
       (end ? vpNextRun(v) + (v.allStops ? vpAllStops(v, true) : '') : (v.allStops ? vpAllStops(v, false) : vpStops(v))) +
       '<div class="vp-actions">' +
-        '<button type="button" class="vp-btn vp-go" data-vp-follow aria-pressed="' + mineFollow + '">' + (mineFollow ? VP_NAV_ON + 'Following' : VP_NAV + 'Follow') + '</button>' +
-        '<button type="button" class="vp-btn vp-all" data-vp-all aria-expanded="' + !!v.allStops + '">' + VP_LIST2 + (v.allStops ? 'Hide stops' : 'All stops') + '</button>' +
+        '<button type="button" class="vp-btn vp-go" data-vp-follow aria-pressed="' + mineFollow + '">' + (mineFollow ? VP_NAV_ON + t('Following') : VP_NAV + t('Follow')) + '</button>' +
+        '<button type="button" class="vp-btn vp-all" data-vp-all aria-expanded="' + !!v.allStops + '">' + VP_LIST2 + t(v.allStops ? 'Hide stops' : 'All stops') + '</button>' +
       '</div>';
   }
   // the hover popup (PC, untracked vehicle): header and meta line only
@@ -265,7 +265,7 @@
   var vpEdgeTimer = 0;
   function vpClearEdge() {
     var el = vpCard && vpCard.getElement(), w = el ? el.querySelector('.leaflet-popup-content-wrapper') : view3d.cardEl ? view3d.cardEl() : null, r = w && w.getBoundingClientRect();   // (v101: or the 3D map's card)
-    document.querySelectorAll('#follow, #stopProg, #cityCard, .leaflet-control-locate, .leaflet-control-zoom').forEach(function (c) {
+    document.querySelectorAll('#follow, #stopProg, #cityCard, .leaflet-control-locate, .leaflet-control-zoom, .leaflet-control-recenter, .leaflet-control-3d, .leaflet-control-north, .leaflet-control-credits').forEach(function (c) {
       var b = r && r.width ? c.getBoundingClientRect() : null;
       c.classList.toggle('vp-under', !!(b && b.width && b.left < r.right + 6 && b.right > r.left - 6 && b.top < r.bottom + 6 && b.bottom > r.top - 6));
     });
@@ -281,7 +281,9 @@
     vpPadAt = now;
     if (!isPhone()) return (vpPad = 12);
     var y = map.getSize().y, top = y;
-    [document.getElementById('follow'), document.querySelector('.leaflet-control-locate'), document.querySelector('.leaflet-control-zoom')].forEach(function (el) {
+    // release 109: the whole right-hand stack (3D, recenter, compass too; the zoom buttons are hidden on touch screens)
+    [document.getElementById('follow'), document.querySelector('.leaflet-control-locate'), document.querySelector('.leaflet-control-zoom'),
+     document.querySelector('.leaflet-control-recenter'), document.querySelector('.leaflet-control-3d'), document.querySelector('.leaflet-control-north')].forEach(function (el) {
       if (!el) return;
       var r = el.getBoundingClientRect();
       if (r.height && r.top < top) top = r.top;

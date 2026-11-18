@@ -86,13 +86,13 @@
     clearTimeout(toastTimer); document.getElementById('toast').hidden = true;
     var open = document.getElementById('secOpen'), txt;
     if (HOSTED_URL) {
-      txt = 'Location needs a secure page. Open the app from its web address to use it.';
+      txt = t('Location needs a secure page. Open the app from its web address to use it.');
       open.onclick = function () { location.href = HOSTED_URL + (locate ? '#locate' : ''); };
     } else if (IS_IOS) {
-      txt = 'On iPhone, location needs the app opened from an https address (documentation, “Host it”).';
+      txt = t('On iPhone, location needs the app opened from an https address (documentation, “Host it”).');
       open.onclick = null;
     } else {
-      txt = 'Location needs the local server. Start “Sofia Transport” (Termux), then tap Open.';
+      txt = t('Location needs the local server. Start “Sofia Transport” (Termux), then tap Open.');
       open.onclick = function () { location.href = localTarget(secure.found, locate); };
     }
     open.hidden = !open.onclick;
@@ -109,17 +109,17 @@
   function startLocation() {
     if (insecurePage()) { secureFix(true); return; }   // v87: the browser would refuse without asking
     startCompass();   // first: iPhones only allow asking for the compass inside the tap itself
-    if (!navigator.geolocation) { locError('This browser has no location access.'); return; }
+    if (!navigator.geolocation) { locError(t('This browser has no location access.')); return; }
     loc.state = 'wait'; loc.err = ''; loc.first = true; loc.lastErr = '';
     permState(function (s) { loc.perm = s; });   // v84: for Diagnostics
     if (following) setFollow(false);
     setLocFollow(true);
     try {
       loc.watchId = navigator.geolocation.watchPosition(onFix, onFixError, { enableHighAccuracy: true, maximumAge: 5000 });
-    } catch (e) { locError('Location failed: ' + (e && e.message || e)); return; }
+    } catch (e) { locError(t('Location failed: {err}', { err: e && e.message || e })); return; }
     clearTimeout(loc.waitTimer);
     loc.waitTimer = setTimeout(function () {
-      if (loc.state === 'wait') toast('Still looking for you… Is location (GPS) turned on on the device?');
+      if (loc.state === 'wait') toast(t('Still looking for you… Is location (GPS) turned on on the device?'));
     }, 12000);
     clearInterval(loc.tick);
     loc.tick = setInterval(queueMeDraw, 1000);   // greys the dot / drops the beam when readings stop coming
@@ -194,11 +194,11 @@
     catch (e) { cb(''); }
   }
   function deniedAdvice(ctx, state) {
-    if (ctx.secure === false) return 'Location only works on a secure page (https or localhost). Start the local server (“Sofia Transport” shortcut or python serve.py) and open http://localhost:8080/.';
-    if (ctx.localFile) return 'Location isn’t available here: the app is opened from a file on the device (' + ctx.proto + '//…), and browsers usually don’t give location to files (there’s no site setting for them). Open it from its https address to use location (see the documentation, “Host it”).';
-    if (state === 'denied') return 'Location is blocked for this site. Allow it in the browser’s site settings (the icon left of the address), then tap the button again.';
+    if (ctx.secure === false) return t('Location only works on a secure page (https or localhost). Start the local server (“Sofia Transport” shortcut or python serve.py) and open http://localhost:8080/.');
+    if (ctx.localFile) return t('Location isn’t available here: the app is opened from a file on the device ({proto}//…), and browsers usually don’t give location to files (there’s no site setting for them). Open it from its https address to use location (see the documentation, “Host it”).', { proto: ctx.proto });
+    if (state === 'denied') return t('Location is blocked for this site. Allow it in the browser’s site settings (the icon left of the address), then tap the button again.');
     // not refused for this site, yet refused: the device's own setting for the browser, or location is off
-    return 'The device refused location to the browser. Turn location on and let the browser use it (Android: Settings → Apps → Chrome → Permissions → Location), then tap again.';
+    return t('The device refused location to the browser. Turn location on and let the browser use it (Android: Settings → Apps → Chrome → Permissions → Location), then tap again.');
   }
   function onFixError(e) {
     var code = e && e.code;
@@ -213,7 +213,7 @@
       return;
     }
     // POSITION_UNAVAILABLE / TIMEOUT: the watch keeps trying
-    if (loc.state === 'wait') toast('No location yet — is location (GPS) turned on on the device?');
+    if (loc.state === 'wait') toast(t('No location yet — is location (GPS) turned on on the device?'));
   }
 
   // Keeping you in view: you sit in the middle of the free map area (phones: between the panel and a sheet)
@@ -366,8 +366,8 @@
     locBox.classList.toggle('on', s === 'on' || s === 'wait');
     locBox.classList.toggle('follow', s === 'on' && loc.follow);
     locBox.classList.toggle('err', s === 'err');
-    var t = s === 'off' || s === 'err' ? 'Show my location' : s === 'wait' ? 'Finding your location… (tap to cancel)'
-      : loc.follow ? 'Turn off my location' : 'Back to my location';
-    a.title = t; a.setAttribute('aria-label', t);
+    var lbl = t(s === 'off' || s === 'err' ? 'Show my location' : s === 'wait' ? 'Finding your location… (tap to cancel)'
+      : loc.follow ? 'Turn off my location' : 'Back to my location');
+    a.title = lbl; a.setAttribute('aria-label', lbl);
     a.setAttribute('aria-pressed', s === 'on' && loc.follow ? 'true' : 'false');
   }

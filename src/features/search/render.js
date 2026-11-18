@@ -27,26 +27,179 @@
     if (view3d.on) view3d.feedChanged(matched);
     else renderVehicleMarkers(keys, matched);
     renderChips(toks);
+    renderResults(toks, matched);
     updateSearchStops(toks, matched);
     renderStops();
     updatePopupPadding();
-    feedStatusCount = (toks.length ? fmtN(matched.length) + ' of ' : '') + fmtN(keys.length);
+    feedStatusCount = keys.length;
     renderFeedStatus();
   }
-  var feedStatusCount = '0';
-  function renderFeedStatus() {
-    // status: Live (green) / Delayed, no new data for > 30 s (yellow) / feed failing (red) / Loading
-    var at = feedTime ? new Date(feedTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
-    if (feedFailed) setStatus('err', 'Live feed unavailable');
-    else if (!feedTime) setStatus('loading', 'Loading…');
-    else if (Date.now() - lastNewDataAt > 30000) setStatus('warn', 'Delayed · last data ' + at);
-    else setStatus('ok', 'Live · ' + feedStatusCount + ' vehicles · ' + at);
+  // ---- the city card's status line (release 109) ----
+  // Short enough for a phone: "Live · 637 vehicles". After 30 s without new data it turns yellow and says how old the
+  // last update is ("Delayed · updated 40 s ago"); red when the feed fails. A tap on the card opens a second line with
+  // the clock time of the last update. The search count is on its chip, not here.
+  var feedStatusCount = 0;
+  function feedAge(ms) {
+    var s = Math.max(0, Math.round(ms / 1000));
+    return s < 60 ? t('{n} s ago', { n: s }) : t('{n} min ago', { n: Math.round(s / 60) });
   }
+  function renderFeedStatus() {
+    var now = Date.now(), age = lastNewDataAt ? now - lastNewDataAt : null;
+    var at = feedTime ? new Date(feedTime).toLocaleTimeString(LOCALE, { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false }) : '';
+    if (feedFailed) setStatus('err', age !== null ? t('No live data · updated {age}', { age: feedAge(age) }) : t('Live feed unavailable'));
+    else if (!feedTime) setStatus('loading', t('Loading…'));
+    else if (age > 30000) setStatus('warn', t('Delayed · updated {age}', { age: feedAge(age) }));
+    else setStatus('ok', tp(feedStatusCount, 'Live · {count} vehicle', 'Live · {count} vehicles', { count: fmtCount(feedStatusCount) }));
+    var more = document.getElementById('statusMore');
+    if (more) setText(more, at ? t('Last update {time}', { time: at }) + (age !== null && age > 2000 ? ' · ' + feedAge(age) : '') : '');
+  }
+  function fmtCount(n) { return Number(n).toLocaleString(LOCALE); }
+  setInterval(function () { if (!document.hidden) renderFeedStatus(); }, 1000);   // the age keeps counting while no data comes
+  (function () {   // tap the city card: the time of the last update
+    var card = document.getElementById('cityCard'), more = document.getElementById('statusMore');
+    if (!card || !more) return;
+    function toggle() {
+      var on = more.hidden;
+      more.hidden = !on;
+      card.setAttribute('aria-expanded', on ? 'true' : 'false');
+      layoutRightEdge();
+    }
+    card.addEventListener('click', toggle);
+    card.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+  })();
+
+  // ---- search results (release 109): the vehicles a search found, as a list under the search ----
+  // Each row: the line badge, where it is going, its fleet number, its next stop and how late it is. A tap tracks
+  // that vehicle (the same as tapping it on the map). Shown while a search has 1 to RESULTS_MAX matches and no
+  // vehicle is tracked.
+  var RESULTS_MAX = 30;
+  var resultsHtml = '';
+  function vehNextStop(v) {
+    if (v.d.metroRun || typeof computeRouteStops !== 'function') return null;
+    var list = computeRouteStops(v);
+    return list && list[0] ? list[0] : null;
+  }
+  function vehDelay(v, next) {   // seconds late (negative: early), or null when the feed does not say
+    var tu = tuByTrip[v.d.tripRef];
+    if (!tu) return null;
+    if (next) {
+      for (var i = 0; i < tu.stus.length; i++) {
+        var u = tu.stus[i];
+        if ((u.stopId && u.stopId === next.stop.id) || (u.seq !== null && u.seq === next.seq)) {
+          if (u.delay !== null) return u.delay;
+          break;
+        }
+      }
+    }
+    return tu.delay;
+  }
+  function delayText(sec) {
+    if (sec === null || sec === undefined) return '';
+    var min = Math.round(sec / 60);
+    if (min === 0) return '<span class="rs-ok">' + esc(t('on time')) + '</span>';
+    return min > 0 ? '<span class="rs-late">' + esc(t('{n} min late', { n: min })) + '</span>'
+      : '<span class="rs-early">' + esc(t('{n} min early', { n: -min })) + '</span>';
+  }
+  function renderResults(toks, matched) {
+    var box = document.getElementById('results');
+    if (!box) return;
+    var show = toks.length > 0 && matched.length > 0 && matched.length <= RESULTS_MAX && !selected;
+    var html = '';
+    if (show) {
+      var list = matched.slice().sort(function (a, b) {
+        return String(a.d.line).localeCompare(String(b.d.line), 'bg', { numeric: true }) ||
+          String(a.d.headsign || '').localeCompare(String(b.d.headsign || ''), 'bg') ||
+          String(a.d.label).localeCompare(String(b.d.label), 'bg', { numeric: true });
+      });
+      html = '<div class="rs-head">' + esc(tp(list.length, '{n} vehicle found', '{n} vehicles found')) + '</div>' +
+        list.map(function (v) {
+          var d = v.d, tone = lineTones(d.color), next = vehNextStop(v), delay = vehDelay(v, next);
+          var title = d.headsign ? t('To {dest}', { dest: titleCaseBg(d.headsign) }) : typeInfo(d.type).name + ' ' + (d.line || '');
+          var bits = [];
+          if (d.label) bits.push('#' + esc(d.label));
+          if (next) {
+            var mins = Math.round((next.eta - Date.now()) / 60000);
+            bits.push(esc(t('next: {stop}', { stop: titleCaseBg(next.stop.name) })) + ' ' +
+              esc((next.realtime ? '' : '~') + (mins <= 0 ? t('now') : t('{n} min', { n: mins }))));
+          }
+          var late = delayText(delay);
+          if (late) bits.push(late);
+          if (isParked(d)) bits.push(esc(t('parked')));
+          return '<button type="button" class="rs-row" data-veh="' + esc(d.key) + '">' +
+            '<span class="rs-badge" style="background:' + d.color + ';color:' + tone.ink + '">' + esc(d.line || d.label || '?') + '</span>' +
+            '<span class="rs-txt"><span class="rs-title">' + esc(title) + '</span>' +
+            '<span class="rs-sub">' + bits.join('<span class="sep" aria-hidden="true"> · </span>') + '</span></span></button>';
+        }).join('');
+    }
+    if (html !== resultsHtml) {
+      resultsHtml = html;
+      box.innerHTML = html;
+      box.hidden = !html;
+      fitPanel();
+    }
+  }
+  document.getElementById('results').addEventListener('click', function (e) {
+    var row = e.target.closest('[data-veh]'), v = row && vehicles[row.getAttribute('data-veh')];
+    if (!v) return;
+    q.blur();
+    var mk = v.pill && v.pillInMap ? v.pill : v.dot;
+    if (!map.hasLayer(mk)) { select(v); focusOn(v.pos || [v.d.lat, v.d.lon]); }
+    else mk.fire('click');
+    renderResults(tokens(), []);
+  });
+
+  // ---- vehicle shapes and clusters (release 109) ----
+  // Away from the line labels, a vehicle is a dot whose shape says its type as well as its colour (bus and tram are
+  // red and orange): bus ●, tram ■, trolley ◆, metro ●. The canvas draws them (DotCanvas in features/offline/areas.js).
+  var DOT_SHAPE = { 3: 'circle', 0: 'square', 11: 'diamond', 1: 'circle' };
+  // Zoomed out below CLUSTER_ZOOM, crowded spots (CLUSTER_MIN or more vehicles in a CLUSTER_PX square) become one
+  // round marker with the count; a tap zooms in there. The tracked vehicle and your way's vehicles never cluster.
+  var CLUSTER_ZOOM = 12, CLUSTER_PX = 44, CLUSTER_MIN = 4;
+  var clusterLayer = L.layerGroup().addTo(map), clusterHas = null, clusterSig = '';
+  function buildClusters(matched) {
+    if (view3d.on || map.getZoom() >= CLUSTER_ZOOM) return null;
+    var cells = {}, has = {}, out = [];
+    matched.forEach(function (v) {
+      if (v === selected || routeVeh[v.d.key]) return;
+      var p = map.latLngToContainerPoint(v.pos || [v.d.lat, v.d.lon]);
+      var k = Math.floor(p.x / CLUSTER_PX) + ':' + Math.floor(p.y / CLUSTER_PX);
+      (cells[k] || (cells[k] = [])).push(v);
+    });
+    Object.keys(cells).forEach(function (k) {
+      var c = cells[k];
+      if (c.length < CLUSTER_MIN) return;
+      c.forEach(function (v) { has[v.d.key] = true; });
+      out.push(c);
+    });
+    return { has: has, list: out };
+  }
+  function drawClusters(cl) {
+    var sig = cl ? cl.list.map(function (c) { return c.length + '@' + c[0].d.key; }).join(',') + '|' + map.getZoom() : '';
+    if (sig === clusterSig) return;
+    clusterSig = sig;
+    clusterLayer.clearLayers();
+    if (!cl) return;
+    cl.list.forEach(function (c) {
+      var lat = 0, lon = 0, byType = {};
+      c.forEach(function (v) { var p = v.pos || [v.d.lat, v.d.lon]; lat += p[0]; lon += p[1]; byType[v.d.type] = (byType[v.d.type] || 0) + 1; });
+      lat /= c.length; lon /= c.length;
+      var top = Object.keys(byType).sort(function (a, b) { return byType[b] - byType[a]; })[0];
+      var size = c.length >= 30 ? 40 : c.length >= 10 ? 34 : 28;
+      var mk = L.marker([lat, lon], {
+        keyboard: false, zIndexOffset: -100,
+        icon: L.divIcon({ className: 'vcl', iconSize: [size, size],
+          html: '<span style="border-color:' + typeInfo(+top).color + '" aria-label="' + esc(tp(c.length, '{n} vehicle here', '{n} vehicles here')) + '">' + c.length + '</span>' })
+      });
+      mk.on('click', function () { map.setView([lat, lon], Math.max(CLUSTER_ZOOM, map.getZoom() + 2)); });
+      clusterLayer.addLayer(mk);
+    });
+  }
+  map.on('zoomend moveend', function () { if (!view3d.on && (clusterHas || map.getZoom() < CLUSTER_ZOOM)) render(false); });
 
   function flatMarkerView() {
     var b = viewLBounds(0.2);
     return { south: b.getSouth(), north: b.getNorth(), west: b.getWest(), east: b.getEast(),
-             labels: viewZoom() >= LABEL_ZOOM || labelsBySearch };
+             labels: viewZoom() >= LABEL_ZOOM || labelsBySearch, cluster: clusterHas };
   }
 
   function updateFlatVehicle(v, view) {
@@ -54,6 +207,11 @@
     var inside = lat >= view.south && lat <= view.north && lon >= view.west && lon <= view.east;
     var pinned = v === selected || !!routeVeh[v.d.key];
     if (!inside && !pinned && !v.dot.isPopupOpen() && !(v.pill && v.pill.isPopupOpen())) {
+      if (v.dotInMap) { dotLayer.removeLayer(v.dot); v.dotInMap = false; }
+      if (v.pillInMap) { pillLayer.removeLayer(v.pill); v.pillInMap = false; }
+      return;
+    }
+    if (view.cluster && view.cluster[v.d.key] && !pinned) {   // counted in a cluster marker instead
       if (v.dotInMap) { dotLayer.removeLayer(v.dot); v.dotInMap = false; }
       if (v.pillInMap) { pillLayer.removeLayer(v.pill); v.pillInMap = false; }
       return;
@@ -69,6 +227,7 @@
     } else {
       var pillOpen = !!(v.pill && v.pill.isPopupOpen());
       if (v.pillInMap) { pillLayer.removeLayer(v.pill); v.pillInMap = false; }
+      if (v.dot.options) v.dot.options.shape = DOT_SHAPE[v.d.type] || 'circle';
       if (!v.dotInMap) { syncMarkerPosition(v.dot, v.pos); dotLayer.addLayer(v.dot); v.dotInMap = true; }
       if (pillOpen && !v.dot.isPopupOpen()) { v.dot.openPopup(); popupClosedAt = 0; }
     }
@@ -76,6 +235,9 @@
 
   function renderVehicleMarkers(keys, matched) {
     switching = true;
+    var cl = labelsBySearch ? null : buildClusters(matched);
+    clusterHas = cl ? cl.has : null;
+    drawClusters(cl);
     var view = flatMarkerView();
     matched.forEach(function (v) { updateFlatVehicle(v, view); });
     keys.forEach(function (k) {
@@ -115,8 +277,10 @@
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'chip';
-        b.innerHTML = '<i style="background:' + g.color + '"></i>' + esc(typeInfo(g.type).name) + ' ' + esc(g.line) +
-          ' <small>' + (g.n ? '×' + g.n : 'timetable') + '</small>';
+        // release 109: "Bus 94 · 10 running" instead of "×10"; the shape of the type's map marker in the dot
+        b.innerHTML = '<i class="sh-' + (DOT_SHAPE[g.type] || 'circle') + '" style="background:' + g.color + '"></i>' + esc(typeInfo(g.type).name) + ' ' + esc(g.line) +
+          ' <small>' + esc(g.n ? tp(g.n, '{n} running', '{n} running') : t('timetable')) + '</small>';
+        b.title = g.n ? t('Show the {n} vehicles of this line', { n: g.n }) : t('No live vehicles: timetable only');
         b.onclick = function () {
           q.value = g.line;
           syncClear();

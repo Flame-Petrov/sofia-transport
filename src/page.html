@@ -1,9 +1,10 @@
 <!doctype html>
-<html lang="bg">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Sofia Live Transport</title>
+{{include shared/ui/app-icon.html}}
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
 <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css">
 <style>
@@ -33,6 +34,7 @@
 {{include features/journeys/journeys.css}}
 {{include features/view3d/view.css}}
 {{include features/vehicles/selected-card.css}}
+{{include features/language/language.css}}
 </style>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
@@ -82,10 +84,12 @@
     <div id="chips"></div>
   </div>
   <div id="panelBody">
+    <!-- release 109: the vehicles a search found (features/search/render.js, renderResults) -->
+    <div id="results" hidden role="group" aria-label="Search results"></div>
     <div id="tracking" hidden>
       <span class="tb-badge" id="trackBadge"></span>
       <span class="tb-text"><span class="tb-top" id="trackTop"></span><span class="tb-bot" id="trackBot"></span></span>
-      <button id="stopTrack" type="button">Stop</button>
+      <button id="stopTrack" type="button" data-i18n="Stop tracking" aria-label="Stop tracking">Stop</button>
     </div>
     <!-- The route card moves to the bottom dock on phones. -->
     <div id="routeCard" hidden></div>
@@ -95,6 +99,7 @@
     <div id="menuScroll">
 {{include features/places/menu.html}}
 {{include features/offline/menu.html}}
+{{include features/language/menu.html}}
 {{include features/view3d/menu.html}}
 {{include features/diagnostics/menu.html}}
     </div><!-- /menuScroll -->
@@ -104,9 +109,11 @@
 </div>
 
 <!-- bottom left: the city and the live feed's state -->
-<div id="cityCard">
+<!-- release 109: a tap opens the time of the last update (features/search/render.js) -->
+<div id="cityCard" role="button" tabindex="0" aria-expanded="false" aria-controls="statusMore">
   <div class="cc-name">Sofia</div>
   <div id="status" class="loading" role="status"><i class="sdot"></i><span id="statusTxt">Loading…</span></div>
+  <div id="statusMore" hidden></div>
 </div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -116,6 +123,18 @@
 <script id="zipLibrary" src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
 <script>
 (function () {
+{{include shared/ui/i18n.js}}
+{{include shared/ui/strings-bg.js}}
+{{include features/panel/strings-bg.js}}
+{{include features/search/strings-bg.js}}
+{{include features/view3d/strings-bg.js}}
+{{include features/offline/strings-bg.js}}
+{{include features/vehicles/strings-bg.js}}
+{{include features/stops/strings-bg.js}}
+{{include features/journeys/strings-bg.js}}
+{{include features/places/strings-bg.js}}
+{{include features/location/strings-bg.js}}
+{{include shared/ui/i18n-start.js}}
 {{include config.js}}
 {{include shared/storage/preferences.js}}
 {{include shared/transit/proxy.js}}
@@ -164,6 +183,7 @@
 {{include features/search/render.js}}
 {{include features/diagnostics/report.js}}
 {{include features/search/controls.js}}
+{{include features/language/language.js}}
 {{include shared/map/viewport-cache.js}}
 {{include shared/map/daylight.js}}
 {{include shared/ui/connection.js}}

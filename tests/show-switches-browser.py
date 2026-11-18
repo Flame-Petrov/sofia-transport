@@ -73,7 +73,7 @@ with sync_playwright() as pw:
             material: qaMap.getLayoutProperty("blocks-material", "visibility") || "visible",
             drawn: qaMap.queryRenderedFeatures({layers: ["blocks-material"]}).length,
             filter: JSON.stringify(qaMap.getFilter("blocks-material")),
-            textures: document.querySelector("#v3TextureRow").hidden,
+            textures: document.querySelector('#v3BuildLevel [aria-checked="true"]').dataset.level === "off",   // release 109: the Off / Simple / Detailed choice
             saved: ["sofia_3d_vehicle_models", "sofia_3d_buildings", "sofia_3d_landmarks"].map(k => localStorage.getItem(k)) })""")
     def shoot(name, camera=NDK):
         page.evaluate('c => qaMap.jumpTo({center:[c[0],c[1]], zoom:c[2], pitch:c[3], bearing:c[4]})', list(camera))
@@ -81,7 +81,7 @@ with sync_playwright() as pw:
         page.screenshot(path=str(args.shots / (name + '.png')))
         return state()
     for i in ('v3VehicleModels', 'v3Buildings', 'v3Landmarks'):
-        assert page.evaluate(box(i) + '.checked && !' + box(i) + '.closest("#v3ShowRow").hidden'), i
+        assert page.evaluate(box(i) + '.checked && !' + box(i) + '.closest("#v3ShowRow, #v3VehGroup").hidden'), i
     all_on = shoot('1-all-on')
     assert all_on['material'] == 'visible' and all_on['drawn'] > 50 and not all_on['textures'], all_on
     page.evaluate(box('v3Buildings') + '.click()')

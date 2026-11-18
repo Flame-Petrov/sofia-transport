@@ -3,28 +3,52 @@
       <div class="pl-hint" id="v3Note"></div>
       <button id="v3Retry" type="button">Try 3D again</button>
     </div>
-    <!-- v103: hills in the 3D view (off by default: one more download and drawing pass) -->
-    <label class="dg-switch" id="v3TerRow" hidden><span>3D view: terrain (Vitosha)</span><input type="checkbox" id="v3Terrain" role="switch"><span class="sw" aria-hidden="true"></span></label>
-    <!-- Day and night cycle: the sun, moon, sky, building and vehicle lighting follow Sofia's real time (off by default) -->
-    <div id="v3DayRow" hidden>
-      <label class="dg-switch"><span>Day and night cycle</span><input type="checkbox" id="v3Daylight" role="switch" aria-describedby="v3DayHint"><span class="sw" aria-hidden="true"></span></label>
-      <!-- Ground shadows alone: saved as sofia_3d_shadows (on unless '0'); shown while the cycle is on -->
-      <label class="dg-switch" id="v3ShadowRow" hidden><span>Shadows</span><input type="checkbox" id="v3Shadows" role="switch"><span class="sw" aria-hidden="true"></span></label>
-      <div id="v3DayHint" class="pl-hint" hidden>The sun and moon cross the sky at Sofia's real time. Light, sky and map colours follow them, windows and vehicle lamps come on after dark. Off shows a fixed afternoon.</div>
-    </div>
-    <!-- What the 3D view draws: each saved on its own (on unless '0'). Buildings off with landmarks on leaves the monuments and vehicles. -->
-    <div id="v3ShowRow" hidden>
-      <label class="dg-switch"><span>3D vehicle models</span><input type="checkbox" id="v3VehicleModels" role="switch"><span class="sw" aria-hidden="true"></span></label>
-      <label class="dg-switch"><span>3D buildings</span><input type="checkbox" id="v3Buildings" role="switch"><span class="sw" aria-hidden="true"></span></label>
-      <!-- Modelled streets and tracks at close zoom: saved as sofia_3d_roads (on unless '0'); off shows the flat street lines -->
-      <label class="dg-switch" id="v3RoadRow"><span>3D roads and tracks</span><input type="checkbox" id="v3Roads" role="switch"><span class="sw" aria-hidden="true"></span></label>
-      <label class="dg-switch" id="v3LandmarkRow"><span>Landmarks and monuments</span><input type="checkbox" id="v3Landmarks" role="switch"><span class="sw" aria-hidden="true"></span></label>
-      <!-- Mapped trees, tree rows, and parks and woods at close zoom: saved as sofia_3d_trees (on unless '0') -->
-      <label class="dg-switch" id="v3TreeRow"><span>Trees</span><input type="checkbox" id="v3Trees" role="switch"><span class="sw" aria-hidden="true"></span></label>
-    </div>
-    <div id="v3TextureRow" hidden>
-      <label class="dg-switch"><span>3D building textures</span><input type="checkbox" id="v3Textures" role="switch" aria-describedby="v3TextureKey"><span class="sw" aria-hidden="true"></span></label>
-      <div id="v3TextureKey" class="pl-hint" hidden>Plaster, panel, brick, glass and stone façades in varied colours, with tiled and flat roofs.</div>
-      <label class="dg-switch"><span>Bulgarian houses and apartments</span><input type="checkbox" id="v3HouseDesigns" role="switch" aria-describedby="v3HouseHint"><span class="sw" aria-hidden="true"></span></label>
-      <div id="v3HouseHint" class="pl-hint" hidden>Five house designs and five larger residential designs appear from zoom 16. Other models follow their mapped outline, including courtyards, towers and raised sections. Buildings with models keep their natural colors with building textures on or off.</div>
+    <!-- 3D view settings (release 109): one row, closed by default (saved as sofia_3d_menu), that opens three groups.
+         Shown on the vector map only. -->
+    <div id="v3Menu" hidden>
+    <button id="v3Btn" class="dg-row" type="button" aria-expanded="false" aria-controls="v3Body">
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1.6l5.6 3.1v6.6L8 14.4l-5.6-3.1V4.7z M2.6 4.8L8 7.9l5.4-3.1M8 7.9v6.4" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg>
+      <span class="dg-lbl">3D view settings</span>
+      <svg class="chev" viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5l4.5 4.5L6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    </button>
+    <div class="reveal closed" inert><div id="v3Body">
+      <div class="v3-group" id="v3MapGroup">
+        <div class="v3-head">Map</div>
+        <!-- v103: hills in the 3D view (off by default: one more download and drawing pass) -->
+        <label class="dg-switch" id="v3TerRow" hidden><span>Terrain (Vitosha)</span><input type="checkbox" id="v3Terrain" role="switch"><span class="sw" aria-hidden="true"></span></label>
+        <!-- Modelled streets and tracks at close zoom: saved as sofia_3d_roads (on unless '0'); off shows the flat street lines -->
+        <label class="dg-switch" id="v3RoadRow"><span>Roads and tracks</span><input type="checkbox" id="v3Roads" role="switch"><span class="sw" aria-hidden="true"></span></label>
+        <!-- Mapped trees, tree rows, and parks and woods at close zoom: saved as sofia_3d_trees (on unless '0') -->
+        <label class="dg-switch" id="v3TreeRow"><span>Trees</span><input type="checkbox" id="v3Trees" role="switch"><span class="sw" aria-hidden="true"></span></label>
+        <!-- Day and night cycle: the sun, moon, sky, building and vehicle lighting follow Sofia's real time (off by default) -->
+        <div id="v3DayRow" hidden>
+          <label class="dg-switch"><span>Day and night cycle</span><input type="checkbox" id="v3Daylight" role="switch" aria-describedby="v3DayHint"><span class="sw" aria-hidden="true"></span></label>
+          <!-- Ground shadows alone: saved as sofia_3d_shadows (on unless '0'); shown while the cycle is on -->
+          <label class="dg-switch" id="v3ShadowRow" hidden><span>Shadows</span><input type="checkbox" id="v3Shadows" role="switch"><span class="sw" aria-hidden="true"></span></label>
+          <div id="v3DayHint" class="pl-hint" hidden>The sun and moon cross the sky at Sofia's real time. Light, sky and map colours follow them, windows and vehicle lamps come on after dark. Off shows a fixed afternoon.</div>
+        </div>
+      </div>
+      <!-- Buildings: one choice instead of three dependent switches. It writes the three saved switches the
+           drawing code reads: sofia_3d_buildings, sofia_3d_building_textures, sofia_3d_house_designs. -->
+      <div class="v3-group" id="v3ShowRow" hidden>
+        <div class="v3-head" id="v3BuildLbl">Buildings</div>
+        <div class="seg" id="v3BuildLevel" role="radiogroup" aria-labelledby="v3BuildLbl">
+          <button type="button" role="radio" data-level="off" aria-checked="false">Off</button>
+          <button type="button" role="radio" data-level="simple" aria-checked="false">Simple</button>
+          <button type="button" role="radio" data-level="detailed" aria-checked="false">Detailed</button>
+        </div>
+        <div class="pl-hint" id="v3BuildHint"></div>
+        <label class="dg-switch" id="v3LandmarkRow"><span>Landmarks and monuments</span><input type="checkbox" id="v3Landmarks" role="switch"><span class="sw" aria-hidden="true"></span></label>
+        <!-- the saved switches behind the choice above (kept as inputs: the drawing code and the browser tests use them) -->
+        <div hidden>
+          <input type="checkbox" id="v3Buildings" tabindex="-1" aria-hidden="true">
+          <div id="v3TextureRow"><input type="checkbox" id="v3Textures" tabindex="-1" aria-hidden="true"><input type="checkbox" id="v3HouseDesigns" tabindex="-1" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="v3-group" id="v3VehGroup" hidden>
+        <div class="v3-head">Vehicles</div>
+        <label class="dg-switch"><span>3D vehicle models</span><input type="checkbox" id="v3VehicleModels" role="switch"><span class="sw" aria-hidden="true"></span></label>
+      </div>
+      <button id="v3HelpBtn" type="button" class="v3-link">How to move around in 3D</button>
+    </div></div>
     </div>

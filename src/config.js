@@ -48,11 +48,11 @@
   var view3d = { on: false };         // filled in by the 3D section; the 2D code asks view3d.on
 
   var TYPES = {
-    3:  { name: 'Bus',     color: getVar('--bus') },
-    0:  { name: 'Tram',    color: getVar('--tram') },
-    11: { name: 'Trolley', color: getVar('--trolley') },
-    1:  { name: 'Metro',   color: getVar('--metro') }
+    3:  { name: t('Bus'),     color: getVar('--bus') },
+    0:  { name: t('Tram'),    color: getVar('--tram') },
+    11: { name: t('Trolley'), color: getVar('--trolley') },
+    1:  { name: t('Metro'),   color: getVar('--metro') }
   };
   function getVar(n) { return getComputedStyle(document.documentElement).getPropertyValue(n).trim(); }
-  function typeInfo(t) { return TYPES[t] || { name: 'Vehicle', color: getVar('--other') }; }
+  function typeInfo(ty) { return TYPES[ty] || { name: t('Vehicle'), color: getVar('--other') }; }
 

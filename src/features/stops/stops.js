@@ -15,7 +15,7 @@
   function etaPhrase(ms) {
     var min = Math.round((ms - Date.now()) / 60000);
     var clock = new Date(ms).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false });
-    return (min <= 0 ? 'now' : 'in ' + min + ' min') + ' · ' + clock;
+    return (min <= 0 ? t('now') : t('in {n} min', { n: min })) + ' · ' + clock;
   }
   function gtfsSec(x) {
     var p = String(x || '').trim().split(':');

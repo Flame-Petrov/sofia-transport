@@ -8,7 +8,7 @@
     if (stopMarkers[focusedStop.id]) { stopLayer.removeLayer(stopMarkers[focusedStop.id]); delete stopMarkers[focusedStop.id]; }
     if (routeStopMarkers[focusedStop.id]) { routeStopLayer.removeLayer(routeStopMarkers[focusedStop.id]); delete routeStopMarkers[focusedStop.id]; }
     focusMarker = stopMarker(focusedStop, 'focus', null, 1000);
-    focusMarker.bindTooltip(esc(focusedStop.name || 'Your stop'), {
+    focusMarker.bindTooltip(esc(feedText(focusedStop.name || '') || t('Your stop')), {
       permanent: true, direction: 'top', offset: [0, -20], className: 'focus-label'
     });
     focusLayer.addLayer(focusMarker);

@@ -186,7 +186,7 @@
         feedFailed = true;
         feedFailures++;
         feedError = String(e && e.message || e);
-        setStatus('err', 'Live feed unavailable');
+        renderFeedStatus();   // release 109: red, with how long ago the last data came (features/search/render.js)
         setProgress('vehicles', 1, 'Vehicles unavailable');
         showReload(true);
         renderDiag();

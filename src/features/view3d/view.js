@@ -29,12 +29,24 @@
     var textureBox = document.getElementById('v3Textures');
     var houseBox = document.getElementById('v3HouseDesigns');
     var dayBox = document.getElementById('v3Daylight');
+    // The controls guide (release 109): shown the first time 3D opens on this device (saved as sofia_3d_help_seen) and
+    // from the menu's "How to move around in 3D". It shows the hint for this device only: the gestures on a touch
+    // screen, Ctrl + arrows with a mouse. Okay, Escape and a tap outside it all close it.
+    var HELP_KEY = 'sofia_3d_help_seen';
     var controlsHelp = document.getElementById('v3Help');
-    controlsHelp.querySelector('button').onclick = function () {
-      controlsHelp.close();
+    var touchOnly = !!(window.matchMedia && matchMedia('(hover: none) and (pointer: coarse)').matches);
+    document.getElementById('v3HelpKeys').hidden = touchOnly;
+    document.getElementById('v3HelpTouch').hidden = !touchOnly;
+    function closeHelp() {
+      if (controlsHelp.open) controlsHelp.close();
+    }
+    controlsHelp.addEventListener('close', function () {
+      store(HELP_KEY, '1');
       if (m3 && !closing) m3.getCanvas().focus({ preventScroll: true });
-    };
-    controlsHelp.addEventListener('cancel', function (event) { event.preventDefault(); });
+    });
+    controlsHelp.querySelector('button').onclick = closeHelp;
+    controlsHelp.addEventListener('click', function (event) { if (event.target === controlsHelp) closeHelp(); });   // the backdrop
+    function showHelp() { if (!controlsHelp.open) controlsHelp.showModal(); }
     // Ctrl+arrows. A tap turns 10° or tilts 5°; a key held past KEY_HOLD_MS keeps going at a steady rate. The turn still owed is
     // paid out a share each frame, so the camera eases into and out of every move instead of stepping.
     var KEY_TURN_DEG_S = 100, KEY_TILT_DEG_S = 45, KEY_EASE_MS = 90, KEY_HOLD_MS = 220;
@@ -110,22 +122,24 @@
       if (box3d.hidden === show) { box3d.hidden = !show; relayout = true; }
       if (northBox.inert === view3d.on) { northBox.inert = !view3d.on; relayout = true; }
       box3d.classList.toggle('on', view3d.on);
-      var t = view3d.on ? 'Back to the flat map' : 'Show the city in 3D';
+      var tip = view3d.on ? t('Back to the flat map') : t('Show the city in 3D');
       setText(a, view3d.on ? '2D' : '3D');
-      if (a.title !== t) { a.title = t; a.setAttribute('aria-label', t); }
+      if (a.title !== tip) { a.title = tip; a.setAttribute('aria-label', tip); }
       a.setAttribute('aria-pressed', view3d.on ? 'true' : 'false');
-      document.getElementById('v3TerRow').hidden = !/^vector/.test(mapMode);   // v103
-      document.getElementById('v3TextureRow').hidden = !show || !window.DecompressionStream || !buildingBox.checked;
+      var vector = /^vector/.test(mapMode);
+      document.getElementById('v3Menu').hidden = !vector;   // release 109: the settings row (closed by default)
+      document.getElementById('v3TerRow').hidden = !vector;   // v103
       document.getElementById('v3ShowRow').hidden = !show;
+      document.getElementById('v3VehGroup').hidden = !show;
       document.getElementById('v3LandmarkRow').hidden = !window.DecompressionStream;
-      document.getElementById('v3TreeRow').hidden = !window.DecompressionStream;
-      document.getElementById('v3RoadRow').hidden = !roadStore.available();
+      document.getElementById('v3TreeRow').hidden = !show || !window.DecompressionStream;
+      document.getElementById('v3RoadRow').hidden = !show || !roadStore.available();
       document.getElementById('v3DayRow').hidden = !show;
-      document.getElementById('v3TextureKey').hidden = !textureBox.checked;
-      document.getElementById('v3HouseHint').hidden = !houseBox.checked;
+      document.getElementById('v3HelpBtn').hidden = !show;
+      showBuildLevel();
       var m = memo(), bx = document.getElementById('v3Box');
-      bx.hidden = !m || !/^vector/.test(mapMode);
-      if (m) setText(document.getElementById('v3Note'), '3D was turned off on this device after it ran out of graphics memory (' + clockHM(m.t) + ', ' + m.why + '). It comes back by itself after a day.');
+      bx.hidden = !m || !vector;
+      if (m) setText(document.getElementById('v3Note'), t('3D was turned off on this device after it ran out of graphics memory ({time}, {why}). It comes back by itself after a day.', { time: clockHM(m.t), why: m.why }));
       if (relayout) layoutRightEdge();
     }
     document.getElementById('v3Retry').onclick = function () { unstore(MEMO_KEY); refresh(); };
@@ -189,14 +203,14 @@
       } catch (e) {
         if (el) el.remove();
         el = null; m3 = null;
-        toast('The 3D view could not start: ' + (e && e.message || e), 6000);
+        toast(t('The 3D view could not start: {err}', { err: (e && e.message || e) }), 6000);
         return;
       }
       view3d.on = true; ready = false; closing = false;
       m3.getCanvas().addEventListener('keydown', keyboardCamera, true);
       m3.getCanvas().addEventListener('keyup', keyboardCameraRelease, true);
       m3.getCanvas().addEventListener('blur', keyboardCameraRelease);
-      if (!quiet) controlsHelp.showModal();   // not when 3D comes back by itself after the phone dropped it in the background
+      if (!quiet && store(HELP_KEY) !== '1') showHelp();   // first time only; not when 3D comes back by itself after the phone dropped it in the background
       viewBounds01 = null;
       function invalidateBounds() { viewBounds01 = null; fleetDirty=true; farPending=true; }
       m3.on('move', scheduleViewportPrefetch);
@@ -217,7 +231,7 @@
       // with a note after 1.5 s
       m3.once('idle', reveal);
       revealTimer = setTimeout(reveal, 8000);
-      setTimeout(function () { if (view3d.on && !ready && !closing) toast('Loading the 3D view…', 2500); }, 1500);
+      setTimeout(function () { if (view3d.on && !ready && !closing) toast(t('Loading the 3D view…'), 2500); }, 1500);
       // v102: the follow cameras move the map every frame (jumpTo): their moveend refreshes labels and stops at most
       // once a second; a user's gesture pauses them until it ends
       m3.on('movestart', function (e) { if (e && e.originalEvent) userMoving = true; });
@@ -1005,9 +1019,9 @@
     function refreshNorth() {
       var sub = following || (loc && loc.follow), a = northBox.querySelector('a');
       northBox.classList.toggle('hu', !!(sub && headingUp && !manualVehicleBearing));
-      var t = sub ? (headingUp ? 'Heading up (tap for north up)' : 'North up (tap for heading up)') : 'North up';
-      if (following && manualVehicleBearing) t = 'Free rotation (tap to resume ' + (headingUp ? 'heading up)' : 'north up)');
-      if (a.title !== t) { a.title = t; a.setAttribute('aria-label', t); }
+      var tip = sub ? (headingUp ? t('Heading up (tap for north up)') : t('North up (tap for heading up)')) : t('North up');
+      if (following && manualVehicleBearing) tip = headingUp ? t('Free rotation (tap to resume heading up)') : t('Free rotation (tap to resume north up)');
+      if (a.title !== tip) { a.title = tip; a.setAttribute('aria-label', tip); }
     }
     view3d.refreshNorth = refreshNorth;
     view3d.followChanged = function (on) {
@@ -1117,7 +1131,7 @@
           if (seen[id] || !mk.getLatLng) return;
           seen[id] = 1;
           var src = mk.getElement(), html = src ? src.innerHTML : mk.options.icon.options.html, ll = mk.getLatLng(), m = stopMks[id];
-          if (mk.getTooltip && mk.getTooltip()) html += '<div class="v3-flabel">' + esc((mk._stop && mk._stop.name) || 'Your stop') + '</div>';
+          if (mk.getTooltip && mk.getTooltip()) html += '<div class="v3-flabel">' + esc((mk._stop && feedText(mk._stop.name)) || t('Your stop')) + '</div>';
           if (!m) {
             var e = mkEl('stop-mk', '', 2);
             e.addEventListener('click', function (ev) { ev.stopPropagation(); stopTap(mk); });
@@ -1187,7 +1201,7 @@
       cancelFocusCard();
       if (!view3d.on || closing) return;
       closing = true;
-      if (controlsHelp.open) controlsHelp.close();
+      closeHelp();
       info.lastClose = reason || 'button';
       try { if (m3 && ready && m3.getPitch() >= 20) store('sofia_3d_pitch', String(Math.round(m3.getPitch()))); } catch (e) {}   // v103
       terrainAttr(false);
@@ -1314,7 +1328,7 @@
         else headingUp = !headingUp;
         store('sofia_3d_heading', headingUp ? 'heading' : 'north');
         refreshNorth();
-        toast(headingUp ? 'Heading up: the map turns with the way ahead.' : 'North up while following.', 2200);
+        toast(headingUp ? t('Heading up: the map turns with the way ahead.') : t('North up while following.'), 2200);
         if (!headingUp) cam({ bearing: 0, duration: 600 });   // one smooth turn; the camera then keeps north up
         return;
       }
@@ -1453,8 +1467,8 @@
       addedAt = Date.now();
       var ll = L.latLng(lngLat.lat, lngLat.lng);
       close('adding a place');
-      toast('Places are added in 2D.', 2500);
-      openPinDlg('New place here', '', function (name) { savedPlaces.add(name, ll); });
+      toast(t('Places are added in 2D.'), 2500);
+      openPinDlg(t('New place here'), '', function (name) { savedPlaces.add(name, ll); });
     }
 
     // ---- popups (PC and phones: the flag's card) ----
@@ -1529,7 +1543,7 @@
       }
       store(MEMO_KEY, JSON.stringify({ t: Date.now(), why: 'graphics memory lost' }));
       close('ran out of graphics memory', true);
-      toast('3D view closed: the phone ran out of graphics memory.', 7000);
+      toast(t('3D view closed: the phone ran out of graphics memory.'), 7000);
     }
     // in the background nothing is drawn; after 10 minutes there the 3D map is closed (iOS kills hidden tabs that
     // hold a lot of graphics memory)
@@ -1638,6 +1652,65 @@
       store('sofia_3d_house_designs', this.checked ? '1' : '0');
       refresh();
       applyBuildingTextures();
+    };
+
+    // Buildings: Off / Simple / Detailed (release 109). Off = sofia_3d_buildings '0'; Simple = plain blocks; Detailed =
+    // façade textures and the Bulgarian house and apartment designs. Older saved mixes (one of the two on) read as Detailed.
+    var levelBox = document.getElementById('v3BuildLevel');
+    function levelHint(level) {   // a function, not a table: refresh() can run before this part of the script
+      return level === 'off' ? t('Only landmarks, monuments and vehicles stand up.')
+        : level === 'simple' ? t('Plain blocks in their mapped shape. Lightest on the battery.')
+        : t('Façades with windows and roofs, and Bulgarian house and apartment designs from close zoom. Uses more battery.');
+    }
+    function buildLevel() {
+      if (!buildingBox.checked) return 'off';
+      return textureBox.checked || houseBox.checked ? 'detailed' : 'simple';
+    }
+    function showBuildLevel() {
+      var level = buildLevel(), detailedOk = !!window.DecompressionStream;
+      document.getElementById('v3BuildLevel').querySelectorAll('button').forEach(function (b) {
+        var on = b.dataset.level === level;
+        b.setAttribute('aria-checked', on ? 'true' : 'false');
+        b.tabIndex = on ? 0 : -1;
+        if (b.dataset.level === 'detailed') b.hidden = !detailedOk;
+      });
+      setText(document.getElementById('v3BuildHint'), levelHint(level));
+    }
+    function setBuildLevel(level) {
+      var want = { buildings: level !== 'off', textures: level === 'detailed', houses: level === 'detailed' };
+      if (level === 'off') { want.textures = textureBox.checked; want.houses = houseBox.checked; }   // kept for the next Detailed
+      [[buildingBox, want.buildings], [textureBox, want.textures], [houseBox, want.houses]].forEach(function (p) {
+        if (p[0].checked !== p[1]) { p[0].checked = p[1]; p[0].dispatchEvent(new Event('change')); }
+      });
+      showBuildLevel();
+    }
+    levelBox.addEventListener('click', function (e) {
+      var b = e.target.closest('button[data-level]');
+      if (b) setBuildLevel(b.dataset.level);
+    });
+    levelBox.addEventListener('keydown', function (e) {   // arrow keys move along the radio group
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      var bs = Array.prototype.filter.call(levelBox.querySelectorAll('button'), function (b) { return !b.hidden; });
+      var i = bs.indexOf(document.activeElement);
+      if (i < 0) return;
+      e.preventDefault();
+      var nb = bs[(i + (e.key === 'ArrowRight' ? 1 : bs.length - 1)) % bs.length];
+      setBuildLevel(nb.dataset.level); nb.focus();
+    });
+    // The settings row: closed by default, its state saved like My places
+    function setV3MenuOpen(on) {
+      // (the menu's reveal() from features/panel/panel.js, written out: this file has its own reveal() for the 3D fade-in)
+      var w = document.getElementById('v3Body').parentNode;
+      w.classList.toggle('closed', !on);
+      if (on) w.removeAttribute('inert'); else w.setAttribute('inert', '');
+      document.getElementById('v3Btn').setAttribute('aria-expanded', on ? 'true' : 'false');
+      store('sofia_3d_menu', on ? '1' : '0');
+    }
+    document.getElementById('v3Btn').onclick = function () { setV3MenuOpen(!isRevealed(document.getElementById('v3Body'))); };
+    setV3MenuOpen(store('sofia_3d_menu') === '1');
+    document.getElementById('v3HelpBtn').onclick = function () {
+      if (view3d.on) showHelp();
+      else { unstore(HELP_KEY); open(); }   // from the flat map: open 3D, which shows the guide
     };
 
     // Day and night cycle: the clock and its subscribers live in shared/map/daylight.js and view3d/daylight-map.js.

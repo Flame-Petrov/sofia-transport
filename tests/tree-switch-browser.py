@@ -75,6 +75,10 @@ with sync_playwright() as pw:
         if page.get_attribute('#fold', 'aria-expanded') != 'true':
             page.click('#fold')
         page.wait_for_timeout(600)
+        if page.get_attribute('#v3Btn', 'aria-expanded') != 'true':   # release 109: the 3D settings row starts closed
+            page.locator('#v3Btn').scroll_into_view_if_needed()
+            page.click('#v3Btn')
+            page.wait_for_timeout(500)
         page.locator('#v3TreeRow').scroll_into_view_if_needed()
         page.wait_for_timeout(300)
     report = {}

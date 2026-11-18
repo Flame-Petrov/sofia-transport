@@ -18,8 +18,10 @@
   }
   function lastStopName(v) {
     var list = tripStopsCache[v.d.tripRef], last = list && list.length && stops[list[list.length - 1].stopId];
-    return (last && last.name) || (trips[v.d.tripRef] || {}).headsign || v.d.headsign || 'the end of the line';
+    return (last && last.name) || (trips[v.d.tripRef] || {}).headsign || v.d.headsign || '';
   }
+  // the last stop's name as riders see it ("the end of the line" when it isn't known)
+  function lastStopText(v) { return titleCaseBg(lastStopName(v)) || t('the end of the line'); }
   function clockOf(t) { return new Date(t).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false }); }
 
   // A best guess that reaches "your stop" only after turning round at the end of this run (picked

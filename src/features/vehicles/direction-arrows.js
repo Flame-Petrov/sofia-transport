@@ -172,8 +172,10 @@
     var frac = passed ? 1 : Math.max(0, Math.min(1, 1 - d.m / prog.total));
     var eta = r ? r.eta : focusGuessEta ? (guessArrival(v, focusedStop, focusGuessEta.g, focusGuessEta.predicted) || focusGuessEta.predicted) : null;
     var min = eta ? Math.round((eta - Date.now()) / 60000) : null;
-    setText(document.getElementById('pgEta'), passed ? 'passed' : min === null ? '' : (focusGuessEta ? '≈ ' : '') + (min <= 0 ? 'now' : min + ' min'));
-    setText(document.getElementById('pgDist'), passed ? '' : (d.exact ? '' : '≈ ') + (d.m >= 1000 ? (d.m / 1000).toFixed(1) + ' km' : Math.round(d.m / 10) * 10 + ' m'));
+    setText(document.getElementById('pgEta'), passed ? t('passed') : min === null ? '' : (focusGuessEta ? '≈ ' : '') + (min <= 0 ? t('now') : t('{n} min', { n: min })));
+    var km = (d.m / 1000).toFixed(1);
+    if (LANG === 'bg') km = km.replace('.', ',');   // Bulgarian decimal comma
+    setText(document.getElementById('pgDist'), passed ? '' : (d.exact ? '' : '≈ ') + (d.m >= 1000 ? t('{n} km', { n: km }) : t('{n} m', { n: Math.round(d.m / 10) * 10 })));
     var badge = document.getElementById('pgBadge');
     setText(badge, v.d.line || v.d.label || '?');
     if (badge._c !== v.d.color) {
@@ -183,11 +185,11 @@
     var pct = Math.round(frac * 1000) / 10;
     var between = passed ? [] : stopsBetween(v, r);
     drawStopDots(between, frac, prog.total);
-    if (between.length) setText(document.getElementById('pgDist'), document.getElementById('pgDist').textContent + '\n' + between.length + (between.length === 1 ? ' stop' : ' stops'));
+    if (between.length) setText(document.getElementById('pgDist'), document.getElementById('pgDist').textContent + '\n' + tp(between.length, '{n} stop', '{n} stops'));
     document.getElementById('pgFill').style.height = pct + '%';
     document.getElementById('pgBus').style.bottom = pct + '%';
     box.setAttribute('aria-valuenow', Math.round(pct));
-    box.setAttribute('aria-label', (v.d.line || '') + ' to ' + (focusedStop.name || 'your stop') + ': ' + document.getElementById('pgDist').textContent + ' ' + document.getElementById('pgEta').textContent);
+    box.setAttribute('aria-label', t('{line} to {dest}', { line: v.d.line || '', dest: titleCaseBg(focusedStop.name) || t('your stop') }) + ': ' + document.getElementById('pgDist').textContent + ' ' + document.getElementById('pgEta').textContent);
     box.hidden = false;
   }
   document.getElementById('stopProg').onclick = function () {   // tap: show the way to the stop again
@@ -207,25 +209,25 @@
     var badge = document.getElementById('trackBadge');
     setText(badge, v.d.line || v.d.label || '?');
     if (badge._c !== v.d.color) { badge._c = v.d.color; badge.style.background = v.d.color; badge.style.color = lineTones(v.d.color).ink; }
-    var top = 'Tracking', bot = '→ ' + (titleCaseBg(v.d.headsign) || typeInfo(v.d.type).name + ' ' + (v.d.line || v.d.label));
+    var top = t('Tracking'), bot = '→ ' + (titleCaseBg(v.d.headsign) || typeInfo(v.d.type).name + ' ' + (v.d.line || v.d.label));
     if (focusedStop) {
       var r = routeStops.filter(function (x) { return x.stop.id === focusedStop.id; })[0];
       if (r && focusGuessEta) focusGuessEta = null;   // the stop is now on this bus's own run: its own time
-      top = '→ ' + (titleCaseBg(focusedStop.name) || 'your stop');
+      top = '→ ' + (titleCaseBg(focusedStop.name) || t('your stop'));
       bot = r ? etaPhrase(r.eta)
         : focusGuessEta ? '≈ ' + clockOf(guessArrival(v, focusedStop, focusGuessEta.g, focusGuessEta.predicted) || focusGuessEta.predicted || Date.now()) +
-            (focusGuessEta.g.sameWay ? ' (best guess)' : ' · after turning at ' + titleCaseBg(lastStopName(v)) + ' (best guess)')
-        : (routeStops.length ? 'already passed' : '…');
+            (focusGuessEta.g.sameWay ? '' : ' · ' + t('after turning at {stop}', { stop: lastStopText(v) })) + ' ' + t('(best guess)')
+        : (routeStops.length ? t('already passed') : '…');
     } else if (v.runNote && Date.now() < v.runNoteUntil) {
-      top = 'Started next run';
+      top = t('Started next run');
     } else if (v.parked) {
-      top = 'Waiting at terminus';
-      bot = 'last seen ' + Math.max(1, Math.round((Date.now() - (v.d.ts ? v.d.ts * 1000 : v.parkedSince)) / 60000)) + ' min ago';
+      top = t('Waiting at terminus');
+      bot = t('last seen {n} min ago', { n: Math.max(1, Math.round((Date.now() - (v.d.ts ? v.d.ts * 1000 : v.parkedSince)) / 60000)) });
     } else if (/end of the line/.test(v.pathNote || '')) {
       var nr = v.nextRun, ni = nr && trips[nr.tripId];
-      top = 'End of the line';
-      bot = ni ? 'Next run → ' + (titleCaseBg(ni.headsign) || '?') + ' ≈ ' + clockOf(nr.t) + (nr.linked ? '' : ' (best guess)')
-               : 'At ' + titleCaseBg(lastStopName(v));
+      top = t('End of the line');
+      bot = ni ? t('Next run → {dest} ≈ {time}', { dest: titleCaseBg(ni.headsign) || '?', time: clockOf(nr.t) }) + (nr.linked ? '' : ' ' + t('(best guess)'))
+               : t('At {stop}', { stop: lastStopText(v) });
     }
     setText(document.getElementById('trackTop'), top);
     setText(document.getElementById('trackBot'), bot);

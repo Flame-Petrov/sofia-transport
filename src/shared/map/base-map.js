@@ -4,7 +4,8 @@
     zoomControl: false, preferCanvas: true, maxZoom: 19,
     zoomSnap: L.Browser.touch ? 0 : 1   // keep the scale where the rider lifts their fingers
   }).setView(sofiaCenter, overviewZoom);
-  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  // release 109: on touch screens (pinch zooms) the + / − buttons are hidden by CSS (.leaflet-control-zoom in theme.css)
+  L.control.zoom({ position: 'bottomright', zoomInTitle: t('Zoom in'), zoomOutTitle: t('Zoom out') }).addTo(map);
   // Your location (v75): added after the zoom buttons, so Leaflet stacks it right above them.
   // What the taps do is in the "Your location" section further down (locButton).
   var locBox = (function () {
@@ -14,7 +15,7 @@
         var box = L.DomUtil.create('div', 'leaflet-bar leaflet-control leaflet-control-locate');
         var a = L.DomUtil.create('a', '', box);
         a.href = '#'; a.setAttribute('role', 'button');
-        a.title = 'Show my location'; a.setAttribute('aria-label', 'Show my location');
+        a.title = t('Show my location'); a.setAttribute('aria-label', t('Show my location'));
         a.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="7" fill="none" stroke="currentColor" stroke-width="2"/>' +
           '<path d="M12 1.5V5M12 19v3.5M1.5 12H5M19 12h3.5" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>' +
           '<circle class="lc-in" cx="12" cy="12" r="3.2" fill="currentColor"/></svg>';
@@ -41,7 +42,7 @@
           box.hidden = cls === 'leaflet-control-3d';
         }
         var a = L.DomUtil.create('a', '', bar);
-        a.href = '#'; a.setAttribute('role', 'button'); a.title = title; a.setAttribute('aria-label', title);
+        a.href = '#'; a.setAttribute('role', 'button'); a.title = t(title); a.setAttribute('aria-label', t(title));
         a.innerHTML = html;
         L.DomEvent.disableClickPropagation(box);
         L.DomEvent.on(a, 'click', function (e) { L.DomEvent.preventDefault(e); onTap(); });
@@ -62,6 +63,35 @@
     '<svg viewBox="0 0 24 24" aria-hidden="true"><g class="nd"><path d="M12 3l3.6 9h-7.2z" fill="#E5221B"/><path d="M12 21l-3.6-9h7.2z" fill="#8e8e93"/></g></svg>',
     function () { if (view3d.north) view3d.north(); });
   var box3d = roundButton('leaflet-control-3d', 'Show the city in 3D', '3D', function () { if (view3d.toggle) view3d.toggle(); });
+  // release 109: on phones the map credits fold behind an (i) button next to them, so their small links need no precise
+  // tapping and they don't cover the map; a tap shows them, another tap (or a tap on the map) hides them again.
+  (function () {
+    var C = L.Control.extend({
+      options: { position: 'bottomright' },
+      onAdd: function () {
+        var box = L.DomUtil.create('div', 'leaflet-control leaflet-control-credits');
+        var b = L.DomUtil.create('button', '', box);
+        b.type = 'button'; b.textContent = 'i';
+        b.title = t('Map credits'); b.setAttribute('aria-label', t('Map credits')); b.setAttribute('aria-expanded', 'false');
+        L.DomEvent.disableClickPropagation(box);
+        L.DomEvent.on(b, 'click', function () {
+          var on = !map.getContainer().classList.contains('credits-open');
+          map.getContainer().classList.toggle('credits-open', on);
+          b.setAttribute('aria-expanded', on ? 'true' : 'false');
+          layoutRightEdge();
+        });
+        map.on('click', function () {
+          if (!map.getContainer().classList.contains('credits-open')) return;
+          map.getContainer().classList.remove('credits-open'); b.setAttribute('aria-expanded', 'false'); layoutRightEdge();
+        });
+        return box;
+      }
+    });
+    map.addControl(new C());
+    // the credits control sits first in the bottom-right corner, under the buttons: keep it the last child (lowest)
+    var corner = map.getContainer().querySelector('.leaflet-bottom.leaflet-right'), cr = corner && corner.querySelector('.leaflet-control-credits');
+    if (cr) corner.appendChild(cr);
+  })();
   // While a zoom (pinch or buttons) is running, Leaflet stretches the current picture and only
   // redraws at the end. Redrawing in the middle puts lines and dots in the wrong place, so all
   // animation pauses until the zoom finishes.
@@ -343,6 +373,12 @@
         set('icon-opacity', 0.5); set('text-opacity', 0.65);
       }
       if (l.type === 'symbol' && /^highway-name/.test(id)) set('text-color', '#7A746B');
+      // release 109: place and street names in the app's language only (the style shows Latin and Cyrillic together)
+      if (l.type === 'symbol' && l.layout && JSON.stringify(l.layout['text-field'] || '').indexOf('name:nonlatin') >= 0) {
+        l.layout['text-field'] = LANG === 'bg'
+          ? ['coalesce', ['get', 'name:bg'], ['get', 'name:nonlatin'], ['get', 'name']]
+          : ['coalesce', ['get', 'name:en'], ['get', 'name:latin'], ['get', 'name']];   // (name_en falls back to the Cyrillic name)
+      }
     });
   }
   function buildStyle() {

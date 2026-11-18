@@ -32,7 +32,7 @@ function app(files, globals = {}) {
     view3d: { on: false }, ...globals
   });
   // every build has the daylight clock: the 3D layers and the feed read it
-  for (const file of ['shared/map/daylight', 'features/view3d/shadows', ...files]) {
+  for (const file of ['shared/ui/i18n', 'shared/map/daylight', 'features/view3d/shadows', ...files]) {
     const filename = path.join(site, 'src', file + '.js');
     vm.runInContext(readFileSync(filename, 'utf8'), context, { filename });
   }

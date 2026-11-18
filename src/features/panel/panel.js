@@ -14,8 +14,8 @@
       if (on) s.setAttribute('inert', ''); else s.removeAttribute('inert');
     });
     btn.setAttribute('aria-expanded', on ? 'false' : 'true');
-    btn.setAttribute('aria-label', on ? 'Open menu' : 'Close menu');
-    btn.title = on ? 'Open menu (filters, My places, Diagnostics)' : 'Close menu';
+    btn.setAttribute('aria-label', on ? t('Open menu') : t('Close menu'));
+    btn.title = on ? t('Open menu (filters, My places, settings)') : t('Close menu');
     store('sofia_menu', on ? '0' : '1');   // open is the default (the filters show, as in the design)
     updatePopupPadding();
     clearTimeout(foldTimer);   // and once the sections have settled

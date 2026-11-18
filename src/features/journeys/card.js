@@ -67,9 +67,12 @@
   routeSwipe(routeDock, -1, function (target) {
     return route && !target.closest('[data-rt-close]');
   }, openRouteSheet);
-  function minsTo(sec, nowS) { var m = Math.round((sec - nowS) / 60); return m <= 0 ? 'now' : m < 60 ? 'in ' + m + ' min' : 'at ' + relClock(sec); }
-  function durTxt(sec) { var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + ('0' + m % 60).slice(-2) + ' min'; }
-  var KIND_TXT = { live: 'live', est: '≈ estimate', sched: 'timetable' };
+  function minsTo(sec, nowS) { var m = Math.round((sec - nowS) / 60); return m <= 0 ? t('now') : m < 60 ? t('in {n} min', { n: m }) : t('at {time}', { time: relClock(sec) }); }
+  function durTxt(sec) { var m = Math.max(1, Math.round(sec / 60)); return m < 60 ? t('{n} min', { n: m }) : t('{h} h {m} min', { h: Math.floor(m / 60), m: ('0' + m % 60).slice(-2) }); }
+  var KIND_TXT = { live: 'live', est: '≈ estimate', sched: 'timetable' };   // shown through t()
+  function kindTxt(kind) { return t(KIND_TXT[kind]); }
+  // "3 stops away" / "next stop" / "after its current run": where a ride's vehicle is now
+  function awayTxt(lv) { return lv.ret ? t('after its current run') : lv.away === 0 ? t('next stop') : tp(lv.away, '{n} stop away', '{n} stops away'); }
   // the attributes that make a button track a ride's vehicle to the stop where you get on (the [data-veh] handler)
   function vehAttrs(lg, cls) {
     var lv = lg.live || {};
@@ -80,7 +83,7 @@
     var color = routeColorOf(lg), tone = lineTones(color), line = (routes[tt.patRoute[lg.p]] || {}).short || '?', lv = lg.live || {};
     var attrs = '';
     if (tag === 'button' && lv.key && vehicles[lv.key]) {   // tap: the map shows that vehicle coming to your stop
-      attrs = vehAttrs(lg, 'rt-badge') + ' title="Show this vehicle on the map"';
+      attrs = vehAttrs(lg, 'rt-badge') + ' title="' + esc(t('Show this vehicle on the map')) + '"';
     } else { tag = 'span'; attrs = ' class="rt-badge"'; }
     return '<' + tag + attrs + ' style="background:' + color + ';color:' + tone.ink + '">' + esc(line) + '</' + tag + '>';
   }
@@ -92,88 +95,91 @@
   function spareHtml(sp) {
     if (sp === null || sp === undefined) return '';
     var m = Math.round(sp / 60), cls = sp < 0 ? 'miss' : sp < 180 ? 'tight' : 'ok';
-    var txt = sp < 0 ? 'you won\'t make it' : m < 1 ? 'tight — hurry' : m + ' min to spare';
+    var txt = sp < 0 ? t('you won\'t make it') : m < 1 ? t('tight — hurry') : t('{n} min to spare', { n: m });
     return '<span class="rt-slack ' + cls + '">' + txt + '</span>';
   }
-  function typeOf(lg) { return VP_TYPE[(routes[tt.patRoute[lg.p]] || {}).type] || 'Vehicle'; }
+  function typeOf(lg) { return t(VP_TYPE[(routes[tt.patRoute[lg.p]] || {}).type] || 'Vehicle'); }
+  var TRACK_TXT = { 3: 'Track this bus', 0: 'Track this tram', 11: 'Track this trolleybus', 1: 'Track this metro' };   // shown through t()
+  function trackTxt(lg) { return t(TRACK_TXT[(routes[tt.patRoute[lg.p]] || {}).type] || 'Track this vehicle'); }
   var TRACK_SVG = '<svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="5" fill="none" stroke="currentColor" stroke-width="1.6"/><circle cx="8" cy="8" r="1.8" fill="currentColor"/><path d="M8 1v2.4M8 12.6V15M1 8h2.4M12.6 8H15" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg>';
   function firstLine(way, nowS, track) {   // track (v99): add "Track this bus" (the main way's card only: the others are buttons themselves)
     var lg = way.legs.filter(function (l) { return l.kind === 'ride'; })[0];
-    if (!lg) return '<div class="rt-first">' + durTxt(way.walk) + ' on foot · ' + (way.legs[0].street ? '' : '≈ ') + fmtM(way.legs[0].street ? way.legs[0].m : (way.legs[0].m || 0) * WALK_DETOUR) + '</div>';
+    if (!lg) return '<div class="rt-first">' + t('{dur} on foot', { dur: durTxt(way.walk) }) + ' · ' + (way.legs[0].street ? '' : '≈ ') + fmtM(way.legs[0].street ? way.legs[0].m : (way.legs[0].m || 0) * WALK_DETOUR) + '</div>';
     var lv = lg.live, st = ttStop(lg.from), leave = lv.leave - nowS;
-    return '<div class="rt-first">' + esc(typeOf(lg)) + ' ' + esc((routes[tt.patRoute[lg.p]] || {}).short || '') + ' ' + minsTo(lv.dep, nowS) +
-      ' at ' + esc(titleCaseBg(st && st.name) || 'the stop') + ' · ' + KIND_TXT[lv.kind] +
-      (lv.ret ? ' · after its current run' : lv.away !== null ? ' · ' + (lv.away === 0 ? 'next stop' : lv.away + (lv.away === 1 ? ' stop' : ' stops') + ' away') : '') +
+    return '<div class="rt-first">' + t('{type} {line} {when} at {stop}', { type: esc(typeOf(lg)), line: esc((routes[tt.patRoute[lg.p]] || {}).short || ''),
+      when: minsTo(lv.dep, nowS), stop: esc(titleCaseBg(st && st.name) || t('the stop')) }) + ' · ' + kindTxt(lv.kind) +
+      (lv.ret || lv.away !== null ? ' · ' + awayTxt(lv) : '') +
       '<br>' + leaveHtml(lv, nowS) + '</div>' +
-      (track && lv.key && vehicles[lv.key] ? '<button type="button"' + vehAttrs(lg, 'rt-show') + '>' + TRACK_SVG + 'Track this ' + esc(typeOf(lg).toLowerCase()) + '</button>' : '');
+      (track && lv.key && vehicles[lv.key] ? '<button type="button"' + vehAttrs(lg, 'rt-show') + '>' + TRACK_SVG + esc(trackTxt(lg)) + '</button>' : '');
   }
   // when to set off for the first stop: by the vehicle's time minus the walk
   function leaveHtml(lv, nowS) {
     var sp = lv.spare, m = Math.floor(sp / 60);
-    if (sp < 0) return '<span class="rt-slack miss">You won\'t make it — see the other ways</span>';
-    if (sp < 60) return '<span class="rt-slack tight">Leave now — hurry</span>';
-    return '<span class="rt-slack ' + (sp < 180 ? 'tight' : 'ok') + '">Leave by ' + relClock(lv.leave) + '</span> · in ' + m + ' min';
+    if (sp < 0) return '<span class="rt-slack miss">' + t('You won\'t make it — see the other ways') + '</span>';
+    if (sp < 60) return '<span class="rt-slack tight">' + t('Leave now — hurry') + '</span>';
+    return '<span class="rt-slack ' + (sp < 180 ? 'tight' : 'ok') + '">' + t('Leave by {time}', { time: relClock(lv.leave) }) + '</span> · ' + t('in {n} min', { n: m });
   }
   function sumHtml(way, nowS) {
-    var walkMin = Math.round(way.walk / 60), meta = way.rides === 0 ? 'on foot' :
-      (way.rides === 1 ? 'no change' : (way.rides - 1) + (way.rides === 2 ? ' change' : ' changes')) + (walkMin ? ' · ' + walkMin + ' min walk' : '');
-    return '<div class="rt-sum"><b>Arrive ' + relClock(way.liveArr) + '</b><span class="rt-dur">' + durTxt(way.liveArr - nowS) + '</span>' +
-      (way.easy ? '<span class="rt-easy" title="One vehicle and the least walking">Easiest</span>' : '') + '<span class="rt-meta">' + meta + '</span></div>';   // v97
+    var walkMin = Math.round(way.walk / 60), meta = way.rides === 0 ? t('on foot') :
+      (way.rides === 1 ? t('no change') : tp(way.rides - 1, '{n} change', '{n} changes')) + (walkMin ? ' · ' + t('{n} min walk', { n: walkMin }) : '');
+    return '<div class="rt-sum"><b>' + t('Arrive {time}', { time: relClock(way.liveArr) }) + '</b><span class="rt-dur">' + durTxt(way.liveArr - nowS) + '</span>' +
+      (way.easy ? '<span class="rt-easy" title="' + esc(t('One vehicle and the least walking')) + '">' + t('Easiest') + '</span>' : '') + '<span class="rt-meta">' + meta + '</span></div>';   // v97
   }
   function chainHtml(way, nowS, place) {
-    var rows = [], t = nowS, me = loc.fix && loc.fix.ll;
+    var rows = [], at = nowS, me = loc.fix && loc.fix.ll;
     function pt(time, dot, html) { rows.push('<li class="rt-pt"><span class="rt-time">' + (time !== null ? relClock(time) : '') + '</span><span class="rt-dot ' + dot + '"></span><span class="rt-what">' + html + '</span></li>'); }
     function leg(bar, style, html) { rows.push('<li class="rt-leg"><span class="rt-time"></span><span class="rt-bar ' + bar + '"' + style + '></span><span class="rt-what">' + html + '</span></li>'); }
-    pt(t, 'me', '<b>You</b>');
+    pt(at, 'me', '<b>' + t('You') + '</b>');
     way.legs.forEach(function (lg, n) {
       if (lg.kind === 'walk') {
         var a = legLL(lg.from, me, place), b = legLL(lg.to, me, place), d = lg.street ? lg.m : a && b ? distM(a, b) * WALK_DETOUR : 0;
         var nextRide = way.legs[n + 1];
-        leg('walk', '', 'Walk ' + (lg.street ? '' : '≈ ') + fmtM(d) + ' · ' + durTxt(lg.sec) + (n === 0 && nextRide && nextRide.live ? '<small>by ' + relClock(nextRide.live.leave) + ' at the latest</small>' : '') +
-          (n > 0 && lg.to !== -2 ? '<small>change</small>' : ''));
-        t += lg.sec;
-        if (lg.to === -2) pt(t, 'dest', '<b>' + esc(place.name) + '</b>');
+        leg('walk', '', t('Walk {dist} · {dur}', { dist: (lg.street ? '' : '≈ ') + fmtM(d), dur: durTxt(lg.sec) }) +
+          (n === 0 && nextRide && nextRide.live ? '<small>' + t('by {time} at the latest', { time: relClock(nextRide.live.leave) }) + '</small>' : '') +
+          (n > 0 && lg.to !== -2 ? '<small>' + t('change') + '</small>' : ''));
+        at += lg.sec;
+        if (lg.to === -2) pt(at, 'dest', '<b>' + esc(place.name) + '</b>');
         return;
       }
       var lv = lg.live, from = ttStop(lg.from), to = ttStop(lg.to), color = routeColorOf(lg), info = trips[lg.tid] || {};
       var prev = way.legs[n - 1];
-      if (!prev || prev.kind !== 'ride') pt(lv.dep, '','<b>' + esc(titleCaseBg(from && from.name) || 'Stop') + '</b>' + (from && from.code ? ' <small>stop ' + esc(from.code) + '</small>' : ''));
-      else pt(lv.dep, '', 'Change at <b>' + esc(titleCaseBg(from && from.name) || 'the stop') + '</b>');
+      if (!prev || prev.kind !== 'ride') pt(lv.dep, '','<b>' + esc(titleCaseBg(from && from.name) || t('Stop')) + '</b>' + (from && from.code ? ' <small>' + t('stop {code}', { code: esc(from.code) }) + '</small>' : ''));
+      else pt(lv.dep, '', t('Change at {stop}', { stop: '<b>' + esc(titleCaseBg(from && from.name) || t('the stop')) + '</b>' }));
       var nStops = lg.aPos - lg.bPos;
       leg('ride', ' style="background:' + color + '"', badgeHtml(lg, 'button') + ' ' + esc(typeOf(lg)) + ' → ' + esc(titleCaseBg(info.headsign) || '') +
-        '<small>' + (n ? 'comes ' : 'arrives ') + relClock(lv.dep) + ' · ' + KIND_TXT[lv.kind] +
-        (lv.ret ? ' · after its current run' : lv.away !== null ? ' · ' + (lv.away === 0 ? 'next stop' : lv.away + (lv.away === 1 ? ' stop' : ' stops') + ' away') : '') +
+        '<small>' + (n ? t('comes {time}', { time: relClock(lv.dep) }) : t('arrives {time}', { time: relClock(lv.dep) })) + ' · ' + kindTxt(lv.kind) +
+        (lv.ret || lv.away !== null ? ' · ' + awayTxt(lv) : '') +
         (n ? ' · ' + spareHtml(lv.spare) : '') + '</small>' +
-        '<small>Ride ' + nStops + (nStops === 1 ? ' stop' : ' stops') + ' · ' + durTxt(lv.arr - lv.dep) + '</small>');
-      t = lv.arr;
+        '<small>' + tp(nStops, 'Ride {n} stop', 'Ride {n} stops') + ' · ' + durTxt(lv.arr - lv.dep) + '</small>');
+      at = lv.arr;
       var nx = way.legs[n + 1];
-      if (!nx || nx.kind === 'walk') pt(lv.arr, '', 'Get off at <b>' + esc(titleCaseBg(to && to.name) || 'the stop') + '</b>');
+      if (!nx || nx.kind === 'walk') pt(lv.arr, '', t('Get off at {stop}', { stop: '<b>' + esc(titleCaseBg(to && to.name) || t('the stop')) + '</b>' }));
     });
     return '<ol class="rt-chain">' + rows.join('') + '</ol>';
   }
   function routeHtml() {
-    var p = savedPlaces.find(route.placeId), name = p ? p.name : 'your place', nowS = tt ? (Date.now() - tt.base) / 1000 : 0;
-    var h = '<div class="rt-head"><span class="rt-flag">' + FLAG_SVG + '</span><div class="rt-tt"><div class="rt-small">Route to</div>' +
+    var p = savedPlaces.find(route.placeId), name = p ? p.name : t('your place'), nowS = tt ? (Date.now() - tt.base) / 1000 : 0;
+    var h = '<div class="rt-head"><span class="rt-flag">' + FLAG_SVG + '</span><div class="rt-tt"><div class="rt-small">' + t('Route to') + '</div>' +
       '<div class="rt-name">' + esc(name) + '</div></div>' +
-      '<button type="button" class="rt-x" data-rt-close aria-label="Close the route" title="Close the route">' + CLOSE_SVG + '</button></div>';
+      '<button type="button" class="rt-x" data-rt-close aria-label="' + esc(t('Close the route')) + '" title="' + esc(t('Close the route')) + '">' + CLOSE_SVG + '</button></div>';
     function status(txt, err) { return h + '<div class="rt-status' + (err ? ' err' : '') + '" role="status">' + (err ? '' : '<span class="rt-spin" aria-hidden="true"></span>') + esc(txt) + '</div>'; }
-    if (route.state === 'wait' && loc.state === 'err') return status(loc.err || 'Location is blocked.', true);
+    if (route.state === 'wait' && loc.state === 'err') return status(loc.err || t('Location is blocked.'), true);
     if (route.state === 'wait' && loc.state === 'off') {
-      return status(insecurePage() ? 'Location needs the app opened from its web address (see the note below).' : 'Your location is off: tap the location button (bottom right) to see the way.', true);
+      return status(insecurePage() ? t('Location needs the app opened from its web address (see the note below).') : t('Your location is off: tap the location button (bottom right) to see the way.'), true);
     }
-    if (route.state === 'wait') return status('Finding your location…');
-    if (route.state === 'err') return status(route.msg || 'Something went wrong.', true);
-    if (!route.ways.length) return status(tt ? 'Looking for the best way…' : 'Preparing today\'s timetable (once a day)…');
+    if (route.state === 'wait') return status(t('Finding your location…'));
+    if (route.state === 'err') return status(route.msg || t('Something went wrong.'), true);
+    if (!route.ways.length) return status(tt ? t('Looking for the best way…') : t('Preparing today\'s timetable (once a day)…'));
     var ways = route.ways.map(realize), main = ways[0];
     // v95: guidance — the next step on top, the chain with what's done greyed; before it starts, a Start button
     var out = h + (route.go ? courseBannerHtml(true) : '') + '<div class="rt-way main">' + sumHtml(main, nowS) + seqHtml(main) +
-      (route.go ? '' : firstLine(main, nowS, true) + '<button type="button" class="rt-go" data-rt-go>' + ROUTE_SVG + 'Start</button>') + chainHtml(main, nowS, p) + '</div>';
+      (route.go ? '' : firstLine(main, nowS, true) + '<button type="button" class="rt-go" data-rt-go>' + ROUTE_SVG + t('Start') + '</button>') + chainHtml(main, nowS, p) + '</div>';
     if (ways.length > 1) {
-      out += '<div class="rt-alts">Other ways</div>' + ways.slice(1).map(function (w) {
-        return '<button type="button" class="rt-way alt" data-rt-pick="' + esc(w.sig) + '" aria-label="Use this way">' + sumHtml(w, nowS) + seqHtml(w) + firstLine(w, nowS) + '</button>';
+      out += '<div class="rt-alts">' + t('Other ways') + '</div>' + ways.slice(1).map(function (w) {
+        return '<button type="button" class="rt-way alt" data-rt-pick="' + esc(w.sig) + '" aria-label="' + esc(t('Use this way')) + '">' + sumHtml(w, nowS) + seqHtml(w) + firstLine(w, nowS) + '</button>';
       }).join('');
     }
-    return out + '<div class="rt-foot">Updated ' + clockOf(route.at) + ' · times live where the feed has them, ≈ estimated, or from the timetable</div>';
+    return out + '<div class="rt-foot">' + t('Updated {time} · times live where the feed has them, ≈ estimated, or from the timetable', { time: clockOf(route.at) }) + '</div>';
   }
   function routeBarHtml() {   // phones with the route sheet collapsed
     if (route.go && route.ways.length) return courseBannerHtml(false);   // v95: the next step
@@ -181,11 +187,11 @@
     if (way) {
       realize(way);
       var lg = way.legs.filter(function (l) { return l.kind === 'ride'; })[0];
-      txt = 'Arrive ' + relClock(way.liveArr) + (lg ? ' · ' + badgeHtml(lg, 'span') + ' ' + minsTo(lg.live.dep, nowS) : ' · on foot');
-    } else txt = route.state === 'err' ? 'Route unavailable' : 'Finding the way…';
-    return '<button type="button" class="rt-open" data-rt-open><span class="rt-flag">' + FLAG_SVG + '</span><span class="rt-bar-t"><b>' + esc(p ? p.name : 'Route') + '</b>' +
+      txt = t('Arrive {time}', { time: relClock(way.liveArr) }) + (lg ? ' · ' + badgeHtml(lg, 'span') + ' ' + minsTo(lg.live.dep, nowS) : ' · ' + t('on foot'));
+    } else txt = route.state === 'err' ? t('Route unavailable') : t('Finding the way…');
+    return '<button type="button" class="rt-open" data-rt-open><span class="rt-flag">' + FLAG_SVG + '</span><span class="rt-bar-t"><b>' + esc(p ? p.name : t('Route')) + '</b>' +
       '<span>' + txt + '</span></span><span class="rt-more" aria-hidden="true">›</span></button>' +
-      '<button type="button" class="rt-x" data-rt-close aria-label="Close the route" title="Close the route">' + CLOSE_SVG + '</button>';
+      '<button type="button" class="rt-x" data-rt-close aria-label="' + esc(t('Close the route')) + '" title="' + esc(t('Close the route')) + '">' + CLOSE_SVG + '</button>';
   }
   // v99: the vehicles of the main way on the map (see routeVeh): their tags follow the card (every feed update and
   // minute), ridden ones drop off during guidance; the other vehicles are dimmed while there's at least one
@@ -196,8 +202,8 @@
       if (firstRide < 0) firstRide = i;
       var lv = lg.live;
       if (!lv || !lv.key || !vehicles[lv.key] || next[lv.key] || (route.go && i < route.leg)) return;
-      var m = Math.round((lv.dep - nowS) / 60), when = m <= 0 ? 'now' : m < 60 ? m + ' min' : relClock(lv.dep);
-      var tag = route.go && i === route.leg && route.phase === 'ride' ? 'On board' : (i === firstRide ? 'Board · ' : 'Change · ') + (lv.guess ? '≈ ' : '') + when;
+      var m = Math.round((lv.dep - nowS) / 60), when = m <= 0 ? t('now') : m < 60 ? t('{n} min', { n: m }) : relClock(lv.dep);
+      var tag = route.go && i === route.leg && route.phase === 'ride' ? t('On board') : (i === firstRide ? t('Board') : t('Change')) + ' · ' + (lv.guess ? '≈ ' : '') + when;
       next[lv.key] = { tag: tag, stopId: tt.stopIds[lg.from],
         guess: lv.guess ? { predicted: Math.round(tt.base + lv.dep * 1000), g: { sameWay: !!lv.guess.sameWay, stopOnNew: lv.guess.stopOnNew || 0, tripId: lg.tid } } : null };
     });

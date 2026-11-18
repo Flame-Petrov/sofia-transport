@@ -1,0 +1,32 @@
+  // Bulgarian texts for the page frame, the map controls and texts shared by several features
+  // (keyed by the English text; see shared/ui/i18n.js and docs/language.md)
+  Object.assign(BG, {
+    'Sofia Live Transport': 'София на живо — градски транспорт',
+    'Sofia': 'София',
+    'Bus': 'Автобус',
+    'Tram': 'Трамвай',
+    'Trolley': 'Тролей',
+    'Metro': 'Метро',
+    'Vehicle': 'Превозно средство',
+    'Vehicle types': 'Видове превозни средства',
+    'Search line or vehicle': 'Търсене на линия или номер',
+    'Search line or vehicle — e.g. 94, X9, A1210': 'Търсене на линия или номер — напр. 94, X9, A1210',
+    'Clear search': 'Изчисти търсенето',
+    'Open menu': 'Отвори менюто',
+    'Close menu': 'Затвори менюто',
+    'Open': 'Отвори',
+    'Collapse route details': 'Свий подробностите за маршрута',
+    'Search results': 'Резултати от търсенето',
+    'Loading…': 'Зареждане…',
+    'Zoom in': 'Приближи',
+    'Zoom out': 'Отдалечи',
+    'Map credits': 'Източници на картата',
+    'Show my location': 'Покажи местоположението ми',
+    'Recenter map on Sofia': 'Центрирай картата върху София',
+    'North up': 'Север нагоре',
+    'Show the city in 3D': 'Покажи града в 3D',
+    'Back to the flat map': 'Обратно към плоската карта',
+    'Report a problem': 'Съобщи за проблем',
+    'Stop tracking': 'Спри',
+    'Copy this report and send it with a few words about what went wrong.': 'Копирайте този отчет и го изпратете с няколко думи какво се обърка.'
+  });

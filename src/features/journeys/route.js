@@ -73,7 +73,7 @@
     var me = loc.fix && loc.state === 'on' ? loc.fix.ll : null;
     if (!me) {
       route.state = loc.state === 'err' ? 'err' : 'wait';
-      route.msg = loc.state === 'err' ? (loc.err || 'Location is blocked.') : '';
+      route.msg = loc.state === 'err' ? (loc.err || t('Location is blocked.')) : '';
       renderRoute();
       return;
     }
@@ -83,7 +83,7 @@
     routeBusy = true;
     Promise.all([ttEnsure(), loadShapes()]).then(function (r) {
       if (!route) return null;
-      if (!r[0]) { route.state = 'err'; route.msg = 'Today\'s timetable isn\'t available (' + (ttInfo.err || 'schedule not loaded') + ').'; renderRoute(); return null; }
+      if (!r[0]) { route.state = 'err'; route.msg = t('Today\'s timetable isn\'t available ({err}).', { err: ttInfo.err || t('schedule not loaded') }); renderRoute(); return null; }
       return planWays(loc.fix ? loc.fix.ll : me, p);
     }).then(function (res) {
       routeBusy = false;
@@ -104,7 +104,7 @@
     }).catch(function (e) {
       routeBusy = false;
       console.warn('Route search failed:', e);
-      if (route) { route.state = 'err'; route.msg = 'The search failed: ' + (e && e.message || e); renderRoute(); }
+      if (route) { route.state = 'err'; route.msg = t('The search failed: {err}', { err: e && e.message || e }); renderRoute(); }
     });
   }
   function pickWay(sig) {

@@ -101,7 +101,7 @@
     route.phase = legPhase(lg);
     if (route.phase === 'done') {
       var pl = savedPlaces.find(route.placeId);
-      toast('You\'ve arrived' + (pl ? ' at ' + pl.name : '') + '.', 6000);
+      toast(pl ? t('You\'ve arrived at {place}.', { place: pl.name }) : t('You\'ve arrived.'), 6000);
       buzz([200, 100, 200]);   // v96
       courseTrack();
       setTimeout(function () { if (route && route.phase === 'done') endRoute(); }, 10000);
@@ -114,7 +114,7 @@
   function courseBoard() {
     var lg = curLeg(), to = ttStop(lg.to);
     route.phase = 'ride'; route.boardHits = 0;
-    toast('On board — get off at ' + (titleCaseBg(to && to.name) || 'your stop') + '.', 4000);
+    toast(t('On board — get off at {stop}.', { stop: titleCaseBg(to && to.name) || t('your stop') }), 4000);
     courseTrack();
     renderRoute();
   }
@@ -136,7 +136,7 @@
       var ap = alongPath(meA, walkPts(lg, me, pl));
       if (ap.off > OFF_COURSE_M) {   // walking somewhere else: a new plan from here after a while
         if (!route.offAt) route.offAt = now;
-        else if (now - route.offAt > OFF_COURSE_MS) { courseReplan('You went another way — here\'s a new route.'); return; }
+        else if (now - route.offAt > OFF_COURSE_MS) { courseReplan(t('You went another way — here\'s a new route.')); return; }
       } else route.offAt = 0;
     } else if (route.phase === 'wait') {
       var lv = lg.live || {}, v = lv.key && vehicles[lv.key], sA = stopLLx(lg.from), dStop = sA ? distM(meA, sA) : 0;
@@ -150,24 +150,24 @@
       if (lv.dep && lv.dep - (now - tt.base) / 1000 <= 60 && !route.soonBuzz) { route.soonBuzz = true; buzz(250); }
       if (gone) {
         var line = (routes[tt.patRoute[lg.p]] || {}).short || '';
-        courseReplan(typeOf(lg) + ' ' + line + ' left without you — here\'s a new route.');
+        courseReplan(t('{type} {line} left without you — here\'s a new route.', { type: typeOf(lg), line: line }));
         return;
       }
     } else if (route.phase === 'ride') {
       var lv2 = lg.live || {}, v2 = lv2.key && vehicles[lv2.key], sB = stopLLx(lg.to), dTo = sB ? distM(meA, sB) : Infinity;
       if (dTo < 60 + acc && (speed < 2 || (v2 && v2.pos && distM(meA, v2.pos) > 150))) {
         var after = way.legs.slice(route.leg + 1).filter(function (l) { return l.kind === 'ride'; })[0];
-        courseNext(after ? 'Off — now to ' + typeOf(after) + ' ' + ((routes[tt.patRoute[after.p]] || {}).short || '') + '.' : 'Off — walk to ' + (pl ? pl.name : 'your place') + '.');
+        courseNext(after ? t('Off — now to {type} {line}.', { type: typeOf(after), line: (routes[tt.patRoute[after.p]] || {}).short || '' }) : t('Off — walk to {place}.', { place: pl ? pl.name : t('your place') }));
         return;
       }
       // "get off at the next stop": the vehicle's next stop is yours
       if (v2) {
         var rs = computeRouteStops(v2), tw = twinsOf(tt.stopIds[lg.to]);
         var nxt = rs.length && tw.indexOf(rs[0].stop.id) >= 0;
-        if (nxt && !route.nextOff) { route.nextOff = true; toast('Next stop: get off.', 5000); buzz([300, 150, 300]); renderRoute(); }
+        if (nxt && !route.nextOff) { route.nextOff = true; toast(t('Next stop: get off.'), 5000); buzz([300, 150, 300]); renderRoute(); }
       }
       // off somewhere else (slow, away from the line and from your stop)
-      if (speed < 1 && dTo > 250 && alongPath(meA, ridePath(lg) || []).off > 120) { courseReplan('You got off elsewhere — here\'s a new route.'); return; }
+      if (speed < 1 && dTo > 250 && alongPath(meA, ridePath(lg) || []).off > 120) { courseReplan(t('You got off elsewhere — here\'s a new route.')); return; }
     }
   }
   setInterval(courseTick, 2000);   // also between fixes (the vehicles move)
@@ -175,33 +175,34 @@
   function courseBannerHtml(inCard) {
     var way = realize(route.ways[0]), lg = way.legs[route.leg], pl = savedPlaces.find(route.placeId), me = loc.fix ? loc.fix.ll : null;
     var nowS = (Date.now() - tt.base) / 1000, top = '', bot = '', badge = '', cls = '';
-    if (route.phase === 'done' || !lg) { top = 'You\'ve arrived'; bot = pl ? esc(pl.name) : ''; cls = ' ok'; }
+    if (route.phase === 'done' || !lg) { top = t('You\'ve arrived'); bot = pl ? esc(pl.name) : ''; cls = ' ok'; }
     else if (route.phase === 'walk') {
       var ap = me ? alongPath([me.lat, me.lng], walkPts(lg, me, pl)) : { left: 0 }, mins = durTxt(ap.left / WALK_MS), next = way.legs[route.leg + 1];
-      if (lg.to === -2) { top = 'Walk to ' + esc(pl ? pl.name : 'your place'); bot = fmtM(ap.left) + ' · ' + mins + ' · arrive ' + relClock(way.liveArr); }
+      if (lg.to === -2) { top = t('Walk to {place}', { place: esc(pl ? pl.name : t('your place')) }); bot = fmtM(ap.left) + ' · ' + mins + ' · ' + t('arrive {time}', { time: relClock(way.liveArr) }); }
       else {
         var st = ttStop(lg.to);
-        top = (route.leg ? 'Change: walk to ' : 'Walk to ') + esc(titleCaseBg(st && st.name) || 'the stop');
+        var stName = esc(titleCaseBg(st && st.name) || t('the stop'));
+        top = route.leg ? t('Change: walk to {stop}', { stop: stName }) : t('Walk to {place}', { place: stName });
         bot = fmtM(ap.left) + ' · ' + mins + (next && next.live ? ' · ' + badgeHtml(next, 'span') + ' ' + minsTo(next.live.dep, nowS) + ' · ' + spareHtml(next.live.dep - nowS - ap.left / WALK_MS) : '');
       }
     } else if (route.phase === 'wait') {
       var lv = lg.live || {}, line = (routes[tt.patRoute[lg.p]] || {}).short || '', to = ttStop(lg.to);
       badge = badgeHtml(lg, 'span');
       top = esc(typeOf(lg)) + ' ' + esc(line) + ' ' + minsTo(lv.dep, nowS);
-      bot = (lv.ret ? 'after its current run' : lv.away !== null && lv.away !== undefined ? (lv.away === 0 ? 'next stop is yours' : lv.away + (lv.away === 1 ? ' stop' : ' stops') + ' away') : KIND_TXT[lv.kind]) +
-        ' · then ' + (lg.aPos - lg.bPos) + ' stops to ' + esc(titleCaseBg(to && to.name) || 'your stop');
+      bot = (lv.ret ? t('after its current run') : lv.away !== null && lv.away !== undefined ? (lv.away === 0 ? t('next stop is yours') : tp(lv.away, '{n} stop away', '{n} stops away')) : kindTxt(lv.kind)) +
+        ' · ' + tp(lg.aPos - lg.bPos, 'then {n} stop to {stop}', 'then {n} stops to {stop}', { stop: esc(titleCaseBg(to && to.name) || t('your stop')) });
       if (lv.dep - nowS < 120) cls = ' soon';
     } else {
       var lv3 = lg.live || {}, to3 = ttStop(lg.to), v3 = lv3.key && vehicles[lv3.key], left = null;
       if (v3) { var rs = computeRouteStops(v3), tw = twinsOf(tt.stopIds[lg.to]); for (var i = 0; i < rs.length; i++) if (tw.indexOf(rs[i].stop.id) >= 0) { left = i + 1; break; } }
       badge = badgeHtml(lg, 'span');
-      top = 'Get off at ' + esc(titleCaseBg(to3 && to3.name) || 'your stop');
-      bot = route.nextOff ? '<b>Next stop — get off</b>' : (left !== null ? 'in ' + left + (left === 1 ? ' stop' : ' stops') + ' · ' : '') + relClock(lv3.arr);
+      top = t('Get off at {stop}', { stop: esc(titleCaseBg(to3 && to3.name) || t('your stop')) });
+      bot = route.nextOff ? '<b>' + t('Next stop — get off') + '</b>' : (left !== null ? tp(left, 'in {n} stop', 'in {n} stops') + ' · ' : '') + relClock(lv3.arr);
       if (route.nextOff) cls = ' soon';
     }
     return '<div class="rt-banner' + cls + (inCard ? ' in-card' : '') + '" role="status" aria-live="polite">' + (badge || '<span class="rt-flag">' + FLAG_SVG + '</span>') +
       '<button type="button" class="rt-bt" ' + (inCard ? 'data-rt-me' : 'data-rt-open') + '><b>' + top + '</b><span>' + bot + '</span></button>' +
-      '<button type="button" class="rt-x" data-rt-close aria-label="End the route" title="End the route">' + CLOSE_SVG + '</button></div>';
+      '<button type="button" class="rt-x" data-rt-close aria-label="' + esc(t('End the route')) + '" title="' + esc(t('End the route')) + '">' + CLOSE_SVG + '</button></div>';
   }
   // phone back on / app back in front: fresh data and a fresh fix now, then the step from where you are
   document.addEventListener('visibilitychange', function () {
@@ -215,7 +216,7 @@
       if (woke || !route || !route.go) return;
       woke = true;
       if (away < 30000) { courseTick(); return; }
-      toast('Updated — the screen was off for ' + Math.max(1, Math.round(away / 60000)) + ' min.', 4000);
+      toast(t('Updated — the screen was off for {n} min.', { n: Math.max(1, Math.round(away / 60000)) }), 4000);
       var lg = curLeg(), me = loc.fix && loc.fix.ll;
       // still riding along the line: carry on (the next fixes tell when you get off); otherwise a new plan from here
       if (route.phase === 'ride' && me && lg && alongPath([me.lat, me.lng], ridePath(lg) || []).off < 120) { courseTick(); return; }
@@ -240,7 +241,7 @@
       keepScreenOn(true);   // v96
       document.getElementById('panel').classList.add('course');
       setLocFollow(true);
-      toast('Carrying on with your route to ' + p.name + '.', 4000);
+      toast(t('Carrying on with your route to {place}.', { place: p.name }), 4000);
     }, 0);
   })();
 

@@ -18,13 +18,18 @@
     Object.keys(LOAD).forEach(function (k) {
       var x = LOAD[k];
       realTotal += x.w * x.f;
-      parts.push(x.f >= 1 ? x.msg + ' ✓' : x.msg);
+      parts.push(x.f >= 1 ? loadMsg(x.msg) + ' ✓' : loadMsg(x.msg));
       if (k !== 'map' && x.f < 1) others = false;
     });
     document.getElementById('lmsg').textContent = parts.join(' · ');
     if (realTotal > before) realChangedAt = Date.now();
     if (realTotal >= 0.999) finishing = true;
     if (others && !allReadyAt) allReadyAt = Date.now();
+  }
+  // a step's name in the chosen language ("Lines & stops 3.2 MB": the size stays a number)
+  function loadMsg(s) {
+    var m = /^(.*) ([\d.]+) MB$/.exec(s);
+    return m ? t('{what} {n} MB', { what: t(m[1]), n: LANG === 'bg' ? m[2].replace('.', ',') : m[2] }) : t(s);
   }
   function loaderTick() {
     if (loaderGone) return;

@@ -20,6 +20,22 @@
     border: calc(3px * var(--s)) dotted currentColor; animation: stopSpin 4s linear infinite; pointer-events: none;
   }
   .stop-ic.focus::after { inset: calc(-10px * var(--s)); border-color: #00a86b; }
+  /* release 109: stop sign — the plate stands on a post; the post's foot (a small dot) is the stop's spot */
+  .stop-ic { --post: 8px; transform: translate(-50%, calc(-100% - var(--post) * var(--s))); border-radius: calc(5px * var(--s)); }
+  .stop-ic.metro { border-radius: 50%; color: var(--metro); border-color: var(--metro); }
+  .stop-ic.metro.route, .stop-ic.metro.focus { color: inherit; }
+  .stop-ic .stop-m { font: 800 calc(13px * var(--s)) / 1 system-ui, sans-serif; letter-spacing: -.02em; }
+  .stop-ic.focus .stop-m { font-size: calc(17px * var(--s)); }
+  .stop-post {
+    position: absolute; left: 0; top: 0; width: 2px; height: 9px; margin-left: -1px; transform: translateY(-100%);
+    background: #263238; border-radius: 1px; pointer-events: none;
+  }
+  .stop-post::after {   /* the foot: where the stop is */
+    content: ''; position: absolute; left: 50%; bottom: -2px; width: 6px; height: 4px; margin-left: -3px; border-radius: 50%;
+    background: rgba(38,50,56,.55);
+  }
+  .stop-post.focus { height: 9px; background: #00a86b; }
+  .stop-post.focus::after { background: rgba(0,168,107,.6); }
   .stop-ic.focus.sel::before { display: none; }
   @keyframes stopSpin { to { transform: rotate(360deg); } }
   /* hover (mouse only, so a tap on a phone doesn't leave things enlarged): the object under the pointer

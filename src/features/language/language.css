@@ -1,0 +1,5 @@
+  /* release 109: the language row in the menu — label on the left, the two-way choice on the right */
+  .lang-row { display: flex; align-items: center; gap: 12px; min-height: 56px; padding: 0 2px; border-top: 1px solid var(--hair, var(--line)); font-size: 15px; font-weight: 500; color: var(--ink, var(--fg)); }
+  .lang-row > svg { flex: none; width: 18px; height: 18px; color: #6e6e73; }
+  .lang-row .dg-lbl { flex: 1; min-width: 0; }
+  .lang-row .seg { flex: none; width: 124px; }

@@ -43,9 +43,9 @@
         snapShape(info.shape_id).then(function () { if (route && route.ways[0] === way) drawRoute(); });
       }
       var line = (routes[tt.patRoute[lg.p]] || {}).short || '?', tone = lineTones(color);
-      routeTag(ttStop(lg.from), (nRide ? 'Change → ' : 'Board ') + '<b style="background:' + color + ';color:' + tone.ink + '">' + esc(line) + '</b>', color);
+      routeTag(ttStop(lg.from), (nRide ? t('Change') + ' → ' : t('Board') + ' ') + '<b style="background:' + color + ';color:' + tone.ink + '">' + esc(line) + '</b>', color);
       var next = way.legs[n + 1], last = !way.legs.slice(n + 1).some(function (l) { return l.kind === 'ride'; });
-      if (last || (next && next.kind === 'walk')) routeTag(ttStop(lg.to), 'Get off', color, true);
+      if (last || (next && next.kind === 'walk')) routeTag(ttStop(lg.to), t('Get off'), color, true);
       nRide++;
     });
   }

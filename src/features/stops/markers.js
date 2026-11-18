@@ -1,11 +1,16 @@
   var BUS_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M4 16c0 .88.39 1.67 1 2.22V20a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1h8v1a1 1 0 0 0 1 1h1a1 1 0 0 0 1-1v-1.78c.61-.55 1-1.34 1-2.22V6c0-3.5-3.58-4-8-4s-8 .5-8 4v10zm3.5 1a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zm9 0a1.5 1.5 0 1 1 0-3 1.5 1.5 0 0 1 0 3zM18 11H6V6h12v5z"/></svg>';
+  // release 109: a stop looks like a stop sign — a white plate on a short post whose foot is on the stop — so it can't be
+  // taken for a vehicle (vehicles are filled badges with a line number, or dots). A metro station's plate is round with
+  // the metro's "M". On a route the plate's border and glyph take the line colour.
+  var METRO_M = '<b class="stop-m" aria-hidden="true">M</b>';
   function stopIcon(kind, color, st) {
     var style = color ? ' style="border-color:' + color + ';color:' + color + '"' : '';
-    var glyph = st && metroTimetable.serves(st.id) ? VEH_GLYPH[1] : BUS_SVG;
-    return L.divIcon({ className: 'stop-mk', iconSize: null, html: '<div class="stop-ic ' + (kind || '') + '"' + style + '>' + glyph + '</div>' });
+    var metro = !!(st && metroTimetable.serves(st.id));
+    return L.divIcon({ className: 'stop-mk', iconSize: null,
+      html: '<i class="stop-post ' + (kind || '') + '"></i><div class="stop-ic ' + (kind || '') + (metro ? ' metro' : '') + '"' + style + '>' + (metro ? METRO_M : BUS_SVG) + '</div>' });
   }
   function stopMarker(st, kind, color, z) {
-    var mk = L.marker([st.lat, st.lon], { icon: stopIcon(kind, color, st), title: st.name, pane: 'stopPane', zIndexOffset: z || 0, keyboard: false });
+    var mk = L.marker([st.lat, st.lon], { icon: stopIcon(kind, color, st), title: feedText(st.name || ''), pane: 'stopPane', zIndexOffset: z || 0, keyboard: false });
     mk._z = z || 0;
     mk._stop = st;
     if (isPhone()) {
