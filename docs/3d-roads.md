@@ -75,10 +75,10 @@ Materials: 0 carriageway, 1 paving, 2 sidewalk, 3 kerb face, 4 tram track in the
 - Width: `width`, else `lanes` × 3.25 m, else a default per class (see `WIDTH`).
 - Carriageways are buffered centrelines, united per tile and simplified to 12 cm. Sidewalks are a 2 m wider buffer minus the carriageway minus building outlines, for primary to residential roads unless `sidewalk` says no.
 - Markings stop 7 m plus half the road width from a junction. Major two-way roads get a solid centre line, tertiary roads a dashed one, multi-lane roads dashed lane lines. Crossing nodes get a 3 m zebra unless tagged unmarked.
-- Tram gauge is 1009 mm unless `gauge` is mapped. A tram track piece whose middle lies on a carriageway is set into the road; otherwise it gets its own bed.
+- Tram gauge is 1009 mm unless `gauge` is mapped. A tram track is first cut where it crosses a carriageway edge (`split_at`), so each piece lies wholly on or off the road; a piece on a carriageway is set into the road, any other gets its own bed with sleepers. Before 2026-11-18 a piece could straddle the edge and was classed by its middle alone: where a curve left a median for the lanes (for example on bul. Hristo Botev where a branch turns west, about 42.6970 N, 23.3153 E) the bed stopped and started in chopped patches over the asphalt. Across Sofia that was 3.2 km of bed over carriageways and 1.4 km of in-road track off them; now both are 0 m.
 - Work is done in Web Mercator with widths multiplied by the local scale (under 0.2 % from true metres across Sofia) rather than in UTM.
 
-Current output (BBBike Sofia, 2026-11-07): 1,039 tiles, 10.3 MB gzipped, largest tile 74 KB and 14,000 triangles, median tile 676 triangles. The hosted page grows by 86 KB (the tile index); the standalone page by 1.8 MB.
+Current output (BBBike Sofia, 2026-11-07, regenerated 2026-11-18): 1,039 tiles, 10.3 MB gzipped, largest tile 77 KB and 14,500 triangles, median tile 676 triangles. The hosted page grows by 86 KB (the tile index); the standalone page by 1.8 MB.
 
 ## Verify
 

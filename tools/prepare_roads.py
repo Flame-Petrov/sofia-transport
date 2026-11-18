@@ -166,6 +166,24 @@ class Line:
         self.mid = (self.p[:-1] + self.p[1:]) / 2
 
 
+def split_at(xy, edge):
+    """The polyline with a vertex added wherever it crosses `edge`, so that every piece of it
+    lies wholly on one side and a piece's midpoint tells which side that is."""
+    path = LineString(xy)
+    hits = shapely.get_coordinates(path.intersection(edge))
+    if not len(hits):
+        return xy
+    cum = np.concatenate([[0], np.cumsum(np.hypot(*np.diff(xy, axis=0).T))])
+    at = shapely.line_locate_point(path, shapely.points(hits))
+    # Crossings within a centimetre of a vertex add nothing but a sliver.
+    at = np.unique(at[np.abs(cum[None, :] - at[:, None]).min(axis=1) >= 0.01])
+    if not len(at):
+        return xy
+    where = np.searchsorted(cum, at)
+    added = np.column_stack([np.interp(at, cum, xy[:, 0]), np.interp(at, cum, xy[:, 1])])
+    return np.insert(xy, where, added, axis=0)
+
+
 def subline(xy, cum, a, b):
     """The part of a polyline between distances a and b along it."""
     if b - a < 0.5:
@@ -403,12 +421,16 @@ def build(roads, tracks, crossings, buildings, only=None):
         if way.klass == "tram":
             near = tree.query(shape, predicate="intersects")
             road = shapely.union_all(carriage[near]) if len(near) else Polygon()
-            on_road = shapely.contains_xy(road, line.mid[:, 0], line.mid[:, 1]) if not road.is_empty else np.zeros(len(line.mid), bool)
-            tiles.ribbon(line, BEDS, -g - 0.45, g + 0.45, 1, 1, TRACK_ROAD, on_road)
-            tiles.ribbon(line, BEDS, -g - 0.75, g + 0.75, 4, 4, TRACK_BED, ~on_road)
+            # Cut the track where it crosses a carriageway edge: a piece straddling the edge would
+            # be set in the road or given a bed whole, and a curve leaving a median for the lanes
+            # showed its bed stopping and starting in chopped patches over the asphalt.
+            track = Line(split_at(way.xy, road.boundary), scale) if not road.is_empty else line
+            on_road = shapely.contains_xy(road, track.mid[:, 0], track.mid[:, 1]) if not road.is_empty else np.zeros(len(track.mid), bool)
+            tiles.ribbon(track, BEDS, -g - 0.45, g + 0.45, 1, 1, TRACK_ROAD, on_road)
+            tiles.ribbon(track, BEDS, -g - 0.75, g + 0.75, 4, 4, TRACK_BED, ~on_road)
             for sign in (-1, 1):
-                tiles.ribbon(line, RAILS, sign * g - 0.07, sign * g + 0.07, 3, 3, RAIL, on_road)
-                tiles.ribbon(line, RAILS, sign * g - 0.07, sign * g + 0.07, 16, 16, RAIL, ~on_road)
+                tiles.ribbon(track, RAILS, sign * g - 0.07, sign * g + 0.07, 3, 3, RAIL, on_road)
+                tiles.ribbon(track, RAILS, sign * g - 0.07, sign * g + 0.07, 16, 16, RAIL, ~on_road)
         else:
             # Ballast: two slopes, drawn before the top that hides the far one.
             tiles.ribbon(line, BEDS, -2.3, -1.6, 0, 30, BALLAST, flags=1)
