@@ -33,6 +33,10 @@ The changes from the 2026-11-18 UX/UI review (workspace `debug images/2026-11-18
 
 Shown the first time 3D opens on a device (`sofia_3d_help_seen`), then only from the menu. It shows the touch gestures on touch screens and Ctrl + arrows (and right-drag) with a mouse. Got it, Escape or a tap outside closes it. It sits low on the screen with a light backdrop. See [3D controls](3d-controls.md).
 
+## Card shadows under the search
+
+The tracking card and the search results sit in the panel's scroll area (`#panelBody`), which clips what it holds. It left 2 px above, 14 px at the sides and 18 px below its cards, while the glass shadow reaches about 20 px up, 32 px sideways and 44 px down, so the shadow ended in a hard rectangle (2026-11-18). The area now leaves 12 / 34 / 46 px, with negative margins so the cards stay where they were (`features/panel/menu-layout.css`). That room takes no taps (`pointer-events: none`, the cards take them again), so the map beside and under the cards stays usable; before, the old 14 px strip blocked it. `fitPanel()` subtracts the bottom padding less the negative margin, so the menu bubble keeps its height (measured unchanged at 390 × 844 and 1280 × 800).
+
 ## Touch targets
 
 At 390 × 844 (the panel's `--ui` zoom 0.95): menu button 44 px, clear 44 px, filter pills 44 px tall, chips 45 px, language buttons 44 px, credits 47 px (`features/panel/menu-layout.css`, `shared/ui/base.css`, `shared/ui/theme.css`).

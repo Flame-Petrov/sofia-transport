@@ -75,7 +75,8 @@
     // bottom padding; its content scrolls inside it. (Its wrapper's top: the shell itself may be sliding.)
     var card = document.getElementById('menuCard'), sec = document.getElementById('secMenu'), body = document.getElementById('panelBody');
     if (card && sec && body) {
-      var padB = parseFloat(getComputedStyle(body).paddingBottom) * ui || 0;
+      // the content area's bottom padding hangs below the panel by its negative margin (shadow room)
+      var bs = getComputedStyle(body), padB = ((parseFloat(bs.paddingBottom) || 0) + (parseFloat(bs.marginBottom) || 0)) * ui;
       var ch = Math.max(120, (limit - padB - sec.getBoundingClientRect().top) / ui).toFixed(1) + 'px';
       if (card.style.maxHeight !== ch) { card.style.maxHeight = ch; card.style.setProperty('--bubble-h', ch); }
     }
