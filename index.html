@@ -16274,6 +16274,13 @@
         needle();
       });
       m3.on('click', onClick);
+      if (hoverMouse) {
+        // a button held is a drag: nothing grows while the map moves under the pointer
+        m3.on('mousemove', function (e) { hoverAt(e.originalEvent && e.originalEvent.buttons ? null : e.point); });
+        m3.on('mouseout', function () { hoverAt(null); });
+        m3.on('dragstart', function () { hoverAt(null); });   // MapLibre sends no mousemove during its drag
+        m3.on('move', hoverRecheck);
+      }
       m3.on('contextmenu', function (e) { cancelPress(); addHere(e.lngLat); });
       // a long press: Android and PC send their own (contextmenu, above); iPhones don't, so there it is timed here
       m3.on('touchstart', function (e) {
@@ -16401,7 +16408,7 @@
       // Above the vehicle models and trees, so a bus or tram standing at a stop never hides its icon.
       m3.addSource('v3-stops', { type: 'geojson', data: EMPTY });
       m3.addLayer({ id: 'v3-stops', type: 'symbol', source: 'v3-stops',
-        layout: { 'icon-image': ['get', 'img'], 'icon-size': ['case', ['==', ['get', 'sel'], 1], 1.6 * U, U], 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'symbol-sort-key': ['get', 'sel'] } });
+        layout: { 'icon-image': ['get', 'img'], 'icon-size': stopSize([]), 'icon-allow-overlap': true, 'icon-ignore-placement': true, 'symbol-sort-key': stopOrder(null) } });
       var LZ = LABEL_ZOOM - 1, faded = function (a) { return ['case', ['==', ['get', 'pk'], 1], a, 1]; };
       var label = function (size) {
         return { 'text-field': ['get', 't'], 'text-font': fontB, 'text-size': size * U, 'text-offset': ['case', ['==', ['get', 'model'], 1], ['literal', [0, -30 / size]], ['literal', [0, 0]]], 'icon-image': ['concat', 'v3pill-', ['get', 'c']],
@@ -16409,10 +16416,10 @@
           'text-ignore-placement': true, 'icon-ignore-placement': true, 'symbol-z-order': 'viewport-y' };
       };
       m3.addSource('v3-veh-far', { type: 'geojson', data: EMPTY, buffer: 16 });
-      var dotPaint = { 'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3, 12, 4.5, 15, 7], 'circle-color': ['get', 'c'], 'circle-stroke-color': '#fff',
+      var dotPaint = { 'circle-radius': dotRadius([]), 'circle-color': ['get', 'c'], 'circle-stroke-color': '#fff',
           'circle-stroke-width': 1.5, 'circle-opacity': faded(0.45), 'circle-stroke-opacity': faded(0.45), 'circle-pitch-alignment': 'map' };
-      m3.addLayer({ id: 'v3-veh-far', type: 'circle', source: 'v3-veh-far', paint: dotPaint });
-      m3.addLayer({ id: 'v3-veh-dot', type: 'circle', source: 'v3-veh', filter: ['==', ['get', 'm'], 0], maxzoom: LZ, paint: dotPaint });
+      m3.addLayer({ id: 'v3-veh-far', type: 'circle', source: 'v3-veh-far', layout: { 'circle-sort-key': dotOrder(null) }, paint: dotPaint });
+      m3.addLayer({ id: 'v3-veh-dot', type: 'circle', source: 'v3-veh', filter: ['==', ['get', 'm'], 0], maxzoom: LZ, layout: { 'circle-sort-key': dotOrder(null) }, paint: dotPaint });
       m3.addLayer({ id: 'v3-veh-dir', type: 'symbol', source: 'v3-veh', minzoom: LZ, filter: ['all', ['>=', ['get', 'b'], 0], ['==', ['get', 'model'], 0]],
         layout: { 'icon-image': 'v3arrow', 'icon-size': U, 'icon-rotate': ['get', 'b'], 'icon-rotation-alignment': 'map', 'icon-pitch-alignment': 'map',
           'icon-offset': [0, -17], 'icon-allow-overlap': true, 'icon-ignore-placement': true } });
@@ -16691,21 +16698,21 @@
       return segments;
     }
     // Project the number on the frame MapLibre actually paints, including camera-only moves.
-    function numberBadge(pose, ratio, cache) {
-      var key = [pose.number,pose.color,pose.ink,pose.m,ui,ratio].join('|');
+    function numberBadge(pose, ratio, cache, big) {
+      var key = [pose.number,pose.color,pose.ink,pose.m,ui,ratio,big ? 1 : 0].join('|');
       if (cache.has(key)) return cache.get(key);
-      var size=(pose.m ? 14 : 11)*ui, h=size+6*ui, pad=2*ui;
+      var u=ui*(big ? HOVER_GROW : 1), size=(pose.m ? 14 : 11)*u, h=size+6*u, pad=2*u;
       var canvas=document.createElement('canvas'), ctx=canvas.getContext('2d');
       var font='bold '+size+'px sans-serif';
       ctx.font=font;
-      var w=Math.max(h,ctx.measureText(pose.number).width+10*ui);
+      var w=Math.max(h,ctx.measureText(pose.number).width+10*u);
       canvas.width=Math.ceil((w+2*pad)*ratio);
       canvas.height=Math.ceil((h+2*pad)*ratio);
       ctx.scale(ratio,ratio);
       ctx.font=font; ctx.textAlign='center'; ctx.textBaseline='middle';
-      rr(ctx,pad,pad,w,h,6*ui);
+      rr(ctx,pad,pad,w,h,6*u);
       ctx.fillStyle=pose.color; ctx.fill();
-      ctx.lineWidth=1.5*ui; ctx.strokeStyle='#fff'; ctx.stroke();
+      ctx.lineWidth=(big ? 2.5 : 1.5)*ui; ctx.strokeStyle='#fff'; ctx.stroke();
       ctx.fillStyle=pose.ink; ctx.fillText(pose.number,pad+w/2,pad+h/2);
       var badge={canvas:canvas,width:canvas.width/ratio,height:canvas.height/ratio};
       if (cache.size >= 256) cache.delete(cache.keys().next().value);
@@ -16728,13 +16735,22 @@
         g.clearRect(0, 0, width, height);
         painted = numberPoses.length > 0;
         g.textAlign = 'center'; g.textBaseline = 'middle';
-        numberPoses.forEach(function (pose) {
+        var ratio = canvas.width / width, onTop = [];
+        function paint(pose, grow) {
           var point = map3.project(pose.c), x = point.x, y = point.y - (pose.model ? 30 * ui : 0);
           if (x < -60 || y < -30 || x > width + 60 || y > height + 30) return;
-          var badge=numberBadge(pose,canvas.width/width,badges);
+          // hovered (as 2D's .pill:hover): drawn from the crisp 1.3x badge, scaled while it grows or shrinks
+          var badge=numberBadge(pose,ratio,badges,grow > 0), s = grow > 0 ? (1 + (HOVER_GROW - 1) * grow) / HOVER_GROW : 1;
           g.globalAlpha=pose.m ? 1 : pose.opacity;
-          g.drawImage(badge.canvas,x-badge.width/2,y-badge.height/2,badge.width,badge.height);
+          if (grow > 0) { g.shadowColor = 'rgba(0,0,0,' + (0.5 * grow).toFixed(3) + ')'; g.shadowBlur = 10 * ui * grow; g.shadowOffsetY = 3 * ui * grow; }
+          g.drawImage(badge.canvas,x-badge.width*s/2,y-badge.height*s/2,badge.width*s,badge.height*s);
+          if (grow > 0) { g.shadowColor = 'transparent'; g.shadowBlur = 0; g.shadowOffsetY = 0; }
+        }
+        numberPoses.forEach(function (pose) {
+          var grow = hoverGrow('v:' + pose.k);
+          if (grow > 0) onTop.push([pose, grow]); else paint(pose, 0);
         });
+        onTop.forEach(function (h) { paint(h[0], h[1]); });
       });
     }
     var numberPoses = [], fleetDirty = true, nearMoving = false;
@@ -16854,6 +16870,7 @@
       submitPointSource('v3-veh', feats, tolerance);
       if (doFar) submitPointSource('v3-veh-far', far, tolerance);
       vehN = drawn.length; farN = farDrawn.length;
+      hoverRecheck();
       vehMs.push(performance.now() - t0);
       if (vehMs.length > 100) vehMs.shift();
       // a search that leaves few vehicles labels them at any zoom (LABEL_MAX), as in 2D
@@ -17164,19 +17181,110 @@
         var st = item.stop, mk = st._mk;
         var sel = mk && (mk === sheetMarker || (pop && popKind === 'stop' && popRef === mk)) ? 1 : 0;
         var img = metroTimetable.serves(st.id) ? 'v3stop-metro' : 'v3stop-' + (item.color || 'x');
-        feats.push({ type: 'Feature', properties: { img: img, sel: sel }, geometry: { type: 'Point', coordinates: [st.lon, st.lat] } });
+        feats.push({ type: 'Feature', properties: { img: img, sel: sel, sid: String(st.id) }, geometry: { type: 'Point', coordinates: [st.lon, st.lat] } });
         stopsDrawn.push({ item: item, c: [st.lon, st.lat] });
       });
       submitPointSource('v3-stops', feats);
     }
     function stopAtPoint(p) {
+      var best = stopItemAt(p);
+      return best && ordinaryStopMarker(best.stop, best.color);
+    }
+    function stopItemAt(p) {
       var best = null, bd = Infinity, rad = 14 * ui;
       for (var i = 0; i < stopsDrawn.length; i++) {
         var q = m3.project(stopsDrawn[i].c), dx = q.x - p.x, dy = q.y - p.y, d = dx * dx + dy * dy;
         if (Math.abs(dx) <= rad && Math.abs(dy) <= rad && d < bd) { bd = d; best = stopsDrawn[i].item; }
       }
-      return best && ordinaryStopMarker(best.stop, best.color);
+      return best;
     }
+    // ---- 3D hover (mouse only, as 2D's markers.css and hover.js): the vehicle number, dot or stop icon under the
+    // pointer grows over 0.2 s (numbers and stops 1.3 times, dots 1.8 times as 2D's 5 to 9 px), gets a shadow (numbers)
+    // and comes to the front; it shrinks back the same way. MapLibre layers and a canvas draw them, so CSS :hover can't.
+    // The same order as a click: a vehicle's number or dot, then a stop, then a 3D model's body.
+    var HOVER_GROW = 1.3, HOVER_DOT = 1.8, HOVER_MS3 = 200;
+    var hoverMouse = !!(window.matchMedia && matchMedia('(hover: hover)').matches);
+    function hoverFresh() { return { at: null, cur: null, prev: null, k: 0, pk: 0, t: 0, raf: 0, checked: 0, sig: '' }; }
+    var hov = hoverFresh();
+    function hoverKeyAt(p) {
+      if (!p || !m3) return null;
+      var v = vehAtPoint(p, true);
+      if (!v) { var s = stopItemAt(p); if (s) return 's:' + s.stop.id; v = vehAtPoint(p); }
+      return v ? 'v:' + v.d.key : null;
+    }
+    // how far key has grown, 0 to 1 (eased out)
+    function hoverGrow(key) {
+      var k = key === hov.cur ? hov.k : key === hov.prev ? hov.pk : 0;
+      return k > 0 ? 1 - (1 - k) * (1 - k) : 0;
+    }
+    function hoverList(kind) {
+      var out = [];
+      [hov.cur, hov.prev].forEach(function (key) {
+        var g = key && key.charAt(0) === kind ? hoverGrow(key) : 0;
+        if (g > 0) out.push([key.slice(2), Math.round(g * 1000) / 1000]);
+      });
+      return out;
+    }
+    var DOT_R = [[9, 3], [12, 4.5], [15, 7]];
+    function dotRadius(list) {
+      var e = ['interpolate', ['linear'], ['zoom']];
+      DOT_R.forEach(function (zr) {
+        if (!list.length) { e.push(zr[0], zr[1]); return; }
+        var c = ['case'];
+        list.forEach(function (h) { c.push(['==', ['to-string', ['get', 'k']], h[0]], zr[1] * (1 + (HOVER_DOT - 1) * h[1])); });
+        c.push(zr[1]); e.push(zr[0], c);
+      });
+      return e;
+    }
+    function dotOrder(key) { return key ? ['case', ['==', ['to-string', ['get', 'k']], key], 1, 0] : 0; }
+    function stopSize(list) {
+      var c = ['case', ['==', ['get', 'sel'], 1], 1.6 * ui];
+      list.forEach(function (h) { c.push(['==', ['get', 'sid'], h[0]], ui * (1 + (HOVER_GROW - 1) * h[1])); });
+      c.push(ui);
+      return c;
+    }
+    function stopOrder(key) { return key ? ['case', ['==', ['get', 'sid'], key], 2, ['get', 'sel']] : ['get', 'sel']; }
+    function hoverApply() {
+      if (!m3 || !m3.getLayer('v3-stops')) return;
+      var dots = hoverList('v'), stops = hoverList('s'), sig = JSON.stringify([dots, stops]);
+      if (sig !== hov.sig) {
+        hov.sig = sig;
+        ['v3-veh-dot', 'v3-veh-far'].forEach(function (id) { if (m3.getLayer(id)) m3.setPaintProperty(id, 'circle-radius', dotRadius(dots)); });
+        m3.setLayoutProperty('v3-stops', 'icon-size', stopSize(stops));
+      }
+      m3.triggerRepaint();   // the number badges
+    }
+    function hoverTick(now) {
+      hov.raf = 0;
+      if (!m3) return;
+      var step = Math.max(0, now - hov.t) / HOVER_MS3;
+      hov.t = now;
+      hov.k = Math.min(1, hov.k + step); hov.pk = Math.max(0, hov.pk - step);
+      if (!hov.pk) hov.prev = null;
+      hoverApply();
+      if ((hov.cur && hov.k < 1) || hov.prev) hov.raf = requestAnimationFrame(hoverTick);
+    }
+    function hoverSet(key) {
+      if (key === hov.cur) return;
+      if (key && key === hov.prev) { hov.prev = hov.cur; var k = hov.pk; hov.pk = hov.k; hov.k = k; }   // back onto the one shrinking
+      else { hov.prev = hov.cur; hov.pk = hov.k; hov.k = 0; }
+      hov.cur = key;
+      var v = key && key.charAt(0) === 'v' ? key.slice(2) : null, s = key && key.charAt(0) === 's' ? key.slice(2) : null;
+      ['v3-veh-dot', 'v3-veh-far'].forEach(function (id) { if (m3.getLayer(id)) m3.setLayoutProperty(id, 'circle-sort-key', dotOrder(v)); });
+      if (m3.getLayer('v3-stops')) m3.setLayoutProperty('v3-stops', 'symbol-sort-key', stopOrder(s));
+      var cv = m3.getCanvas();
+      if (cv) cv.style.cursor = key ? 'pointer' : '';
+      hov.t = performance.now();
+      if (!hov.raf) hov.raf = requestAnimationFrame(hoverTick);
+    }
+    function hoverAt(p) {
+      if (!m3) return;
+      hov.at = p; hov.checked = performance.now();
+      hoverSet(p ? hoverKeyAt(p) : null);
+    }
+    // vehicles move under a resting pointer and the camera glides: look again, at most 10 times a second
+    function hoverRecheck() { if (hov.at && performance.now() - hov.checked > 100) hoverAt(hov.at); }
+    function hoverReset() { cancelAnimationFrame(hov.raf); hov = hoverFresh(); }
     view3d.counts = function () {
       var lbl = labelsBySearch || viewZoom() >= LABEL_ZOOM;
       return { dots: lbl ? farN : vehN + farN, labels: lbl ? vehN : 0, stops: stopsDrawn.length + Object.keys(stopMks).length };
@@ -17232,6 +17340,7 @@
         view3d.on = false; closing = false; ready = false; camBusy = false;
         daylightMap.detach();
         landmarkLift.detach();
+        hoverReset();
         m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
         roads = null; roadRailVersion = -1;
