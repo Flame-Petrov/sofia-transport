@@ -23,8 +23,14 @@ The list can be put away without clearing the search (`resultsOpen`, `setResults
 - **The chip of the search on screen** toggles it: the first tap on "Bus 94 · 10 running" applies that line and type as before and keeps the list; each further tap hides or shows it. Chips that can list (1 to 30 running) carry an arrow, down while the list is hidden and up while it is open (`.chip.open`, `aria-expanded`).
 - **A tap anywhere else** (the map, the menu, the tracking card, the status card) hides it. Taps in the list, the search row, the chips and the type filters do not (a capture-phase `pointerdown` on `document`, so the map cannot swallow it).
 - **Typing** in the search, or **a tap in the search box**, shows it again.
+- **The list and the menu close each other** (later the same day). The menu is the chevron at the right of the search (the type filters and the menu card). Opening the menu hides the list (`setFolded(false)` in `features/panel/panel.js` calls `hideResultsList()`). A list the rider asks for folds the menu: typing, a chip, or a tap in the search (`renderResults(…, asked)`). That fold is not saved as the rider's menu choice (`setFolded(true, true)` leaves `sofia_menu` alone). A list that would appear by itself while the menu is open stays hidden until asked for, for example after a live update or a type filter tapped in the menu. Typing counts as asking until the search runs 250 ms later (`typedAsk`), so a live update in between does not hide the new list.
 
-Verify: `old/osm-work/venv/Scripts/python site/tests/search-results-hide-browser.py` (live feed; desktop 1280 × 800 and an Android phone 390 × 844 with touch; 30 checks, shots under `debug images/<date>-search-results-hide/`).
+Verify: run `old/osm-work/venv/Scripts/python site/tests/search-results-hide-browser.py` from the workspace.
+- It uses the live feed, a desktop window (1280 × 800) and an Android phone (390 × 844, touch).
+- It runs 48 checks. Step 7 covers the menu.
+- It saves shots under `debug images/<date>-search-results-hide/`.
+- It waits for the loading screen to close, because the timetable can take a minute to load.
+- A map tap can land on a moving bus. If it does, the test tries another spot.
 
 ## Status card
 

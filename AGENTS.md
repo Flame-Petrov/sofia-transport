@@ -29,6 +29,21 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 ## Current roadmap and handoff
 
+**2026-11-19 — [The vehicle list and the menu close each other](docs/ux-review-109.md#hiding-the-results-list-2026-11-19).**
+
+The rider asked: “when the list of vehicles is open the searchbar dropdown should not be able to open – when we open one dropdown menu it should close the other one … vice versa”.
+
+What changed:
+- Opening the menu (chevron or swipe) hides the vehicle list (`setFolded()` in `features/panel/panel.js` calls `hideResultsList()`).
+- A list the rider asks for folds the menu (`renderResults(…, asked)` in `features/search/render.js`). Asking means typing, a chip or a tap in the search.
+- That automatic fold is not saved in `sofia_menu`.
+- A list that would appear by itself while the menu is open stays hidden (live update, type filter).
+- `typedAsk` keeps a live update during the 250 ms typing delay from hiding a list the rider just typed for.
+
+Results: release stays 110 (rebuilt). All 89 Node tests and the build check passed. `tests/search-results-hide-browser.py` passed 48 of 48 with no page errors (live feed, desktop 1280 × 800 and Android phone 390 × 844, new step 7). The test now waits for the loading screen and retries a map tap that lands on a moving bus. Shots are in `debug images/2026-11-19-results-menu-exclusive/`.
+
+Not verified: a physical Android phone or iPhone.
+
 **2026-11-19 — [Search results can be hidden](docs/ux-review-109.md#hiding-the-results-list-2026-11-19); [a paused 3D keeps its button](docs/3d-button-availability.md).** The rider asked: “there is no way to hide [the found vehicles list] – add an X … when i click the bubble with the "Bus X 10 running" the list appears and hides again and if i click outside it it should hide”, then “when the 3d isnt rendering and there is issue with graphics memory dont hide the 3d button – instead add a dot … a popup should … say exactly what is the issue and a button for the retry”.
 - Search (`features/search/render.js`, `menu-layout.css`): a ✕ in the list's header; the chip of the shown search toggles the list (arrow down/up, `aria-expanded`); a tap outside the list, search row, chips and type filters hides it; typing or a tap in the search shows it again.
 - 3D (`features/view3d/view.js`, `view.css`, new `issue-dialog.html`): after an on-screen context loss, a death in 3D or a failed start (new memo `could not start`), the button stays grey with a red dot; a tap opens `#v3Issue` with the exact reason, the time, when it comes back, **Try 3D again** (clears the memo, opens 3D) and **Not now**. The menu note uses the same text.

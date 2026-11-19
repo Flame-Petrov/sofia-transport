@@ -6,7 +6,11 @@ On the live Sofia feed, desktop (1280 x 800) and an Android phone (390 x 844, to
   3. tap the chip again: the list hides (arrow down); once more: it shows;
   4. tap the list's X: it hides; the chip shows it again;
   5. tap the map outside the panel: it hides (no vehicle opened);
-  6. tap in the search box: it shows; type a character: it shows for the new search.
+  6. tap in the search box: it shows; type a character: it shows for the new search;
+  7. the list and the menu (chevron by the search) close each other: the shown list has folded the menu; the chevron
+     opens the menu and hides the list; the chip brings the list back and folds the menu; a type filter tapped in the
+     open menu does not bring the list up; a tap in the search does and folds the menu. The automatic fold is not saved
+     as the rider's menu choice (sofia_menu stays '1').
 Screenshots per step. Needs network access to gtfs.sofiatraffic.bg. Run from site/ with the Playwright venv:
   ../old/osm-work/venv/Scripts/python tests/search-results-hide-browser.py [--page 110_public-transport.html]
 """
@@ -54,6 +58,10 @@ def shown(page):
     return page.evaluate("() => { var r = document.getElementById('results'); return !r.hidden && r.querySelectorAll('.rs-row').length; }")
 
 
+def menu_open(page):
+    return page.evaluate("() => !document.getElementById('panel').classList.contains('folded')")
+
+
 def run(p, label, phone):
     opts = dict(viewport={'width': 390, 'height': 844}, device_scale_factor=3, is_mobile=True, has_touch=True,
                 user_agent=ANDROID_UA) if phone else dict(viewport={'width': 1280, 'height': 800})
@@ -64,6 +72,7 @@ def run(p, label, phone):
     page.on('pageerror', lambda e: errors.append(str(e)))
     page.goto(url)
     page.wait_for_function("() => /Live|На живо/.test(document.getElementById('statusTxt').textContent)", timeout=60000)
+    page.wait_for_function("() => !document.getElementById('loader')", timeout=120000)   # the timetable can be slow
     page.wait_for_timeout(1500)
     n = [0]
 
@@ -119,11 +128,21 @@ def run(p, label, phone):
     check(label + ': chip brings it back after X', bool(shown(page)))
 
     # the map well away from the panel (right side on desktop, lower part on the phone)
+    # A live vehicle can drive under the chosen spot; the tap then also opens it (taps outside the list still reach the
+    # map), so try the next spot.
     box = page.locator('#results').bounding_box()
-    xy = (1000, 650) if not phone else (300, int(min(800, box['y'] + box['height'] + 60)))
-    tap(xy)
-    check(label + ': tap outside hides the list', not shown(page))
-    check(label + ': no vehicle got tracked by that tap', page.evaluate("() => document.getElementById('tracking').hidden"))
+    below = int(min(800, box['y'] + box['height'] + 60))
+    spots = [(1000, 650), (1150, 300), (700, 720), (900, 150)] if not phone else [(300, below), (80, below), (200, min(820, below + 90)), (340, min(820, below + 150))]
+    for xy in spots:
+        tap(xy)
+        hid = not shown(page)
+        clean = page.evaluate("() => document.getElementById('tracking').hidden")
+        if clean: break
+        page.evaluate("() => document.getElementById('stopTrack').click()")
+        page.wait_for_timeout(300)
+        tap('#q')
+    check(label + ': tap outside hides the list', hid)
+    check(label + ': no vehicle got tracked by that tap', clean)
     shot('outside-hid')
 
     tap('#q')
@@ -132,11 +151,37 @@ def run(p, label, phone):
 
     tap(xy)
     check(label + ': hidden again', not shown(page))
+    # that map tap may land on a moving vehicle and track it (tracking turns the list off): stop tracking
+    page.evaluate("() => { var t = document.getElementById('tracking'); if (!t.hidden) document.getElementById('stopTrack').click(); }")
+    page.wait_for_timeout(300)
     page.locator('#q').press('End')
     page.keyboard.type(' ')
     page.wait_for_timeout(800)
     check(label + ': typing shows it again', bool(shown(page)))
     shot('typing-showed')
+
+    # 7. the list and the menu close each other
+    check(label + ': the shown list keeps the menu folded', not menu_open(page))
+    tap('#fold')
+    page.wait_for_timeout(400)
+    check(label + ': chevron opens the menu', menu_open(page))
+    check(label + ': ... and hides the list', not shown(page))
+    shot('menu-opened-list-hid')
+    tap(chip)
+    check(label + ': chip shows the list', bool(shown(page)))
+    check(label + ': ... and folds the menu', not menu_open(page))
+    shot('chip-list-folded-menu')
+    tap('#fold')
+    page.wait_for_timeout(400)
+    check(label + ': chevron again: menu open, list hidden', menu_open(page) and not shown(page))
+    tap('#types button[data-t="0"]')
+    tap('#types button[data-t="0"]')
+    check(label + ': type filters in the open menu do not bring the list up', menu_open(page) and not shown(page))
+    shot('menu-filters-no-list')
+    tap('#q')
+    check(label + ': tap in the search shows the list and folds the menu', bool(shown(page)) and not menu_open(page))
+    check(label + ': automatic fold not saved as the menu choice', page.evaluate("() => localStorage.getItem('sofia_menu')") == '1')
+    shot('search-tap-list-folded-menu')
 
     check(label + ': no page errors', not errors, '; '.join(errors[:3]))
     browser.close()

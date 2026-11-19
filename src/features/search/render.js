@@ -27,7 +27,7 @@
     if (view3d.on) view3d.feedChanged(matched);
     else renderVehicleMarkers(keys, matched);
     renderChips(toks);
-    renderResults(toks, matched);
+    renderResults(toks, matched, fit);   // fit: the rider typed or tapped a chip, so the list may fold the menu
     updateSearchStops(toks, matched);
     renderStops();
     updatePopupPadding();
@@ -76,7 +76,13 @@
   var resultsHtml = '';
   // 2026-11-19: the list can be put away. Its ✕, a tap on the chip of the search shown (a second tap brings it back)
   // or a tap anywhere outside the list, the search row and the chips hides it; typing in the search shows it again.
-  var resultsOpen = true, resultsListable = false;
+  // The list and the menu (the chevron by the search) close each other: opening the menu hides the list, and a list
+  // the rider asks for (typing, a chip, a tap in the search) folds the menu. A list that would appear by itself while
+  // the menu is open (a live update, a type filter in the menu) stays hidden until asked for.
+  // typedAsk: typed but not yet searched (the search waits 250 ms; a live update in between must not count as unasked).
+  var resultsOpen = true, resultsListable = false, typedAsk = false;
+  function menuIsOpen() { return !document.getElementById('panel').classList.contains('folded'); }
+  function hideResultsList() { if (resultsHtml) setResultsOpen(false); }
   function vehNextStop(v) {
     if (v.d.metroRun || typeof computeRouteStops !== 'function') return null;
     var list = computeRouteStops(v);
@@ -103,11 +109,16 @@
     return min > 0 ? '<span class="rs-late">' + esc(t('{n} min late', { n: min })) + '</span>'
       : '<span class="rs-early">' + esc(t('{n} min early', { n: -min })) + '</span>';
   }
-  function renderResults(toks, matched) {
+  function renderResults(toks, matched, asked) {
     var box = document.getElementById('results');
     if (!box) return;
     resultsListable = toks.length > 0 && matched.length > 0 && matched.length <= RESULTS_MAX && !selected;
     var show = resultsListable && resultsOpen;
+    if (show && menuIsOpen()) {
+      if (asked || typedAsk) setFolded(true, true);
+      else { resultsOpen = false; show = false; }
+    }
+    if (asked) typedAsk = false;
     var html = '';
     if (show) {
       var list = matched.slice().sort(function (a, b) {
@@ -150,7 +161,7 @@
     if (resultsOpen === on) return;
     resultsOpen = on;
     var toks = tokens();
-    renderResults(toks, Object.keys(vehicles).map(function (k) { return vehicles[k]; }).filter(function (v) { return matches(v.d, toks); }));
+    renderResults(toks, Object.keys(vehicles).map(function (k) { return vehicles[k]; }).filter(function (v) { return matches(v.d, toks); }), on);
   }
   // the chip of the search on screen says whether its list is open (aria-expanded, .open)
   function chipShown(b) {
@@ -165,7 +176,7 @@
       b.setAttribute('aria-expanded', on ? 'true' : 'false');
     });
   }
-  q.addEventListener('input', function () { resultsOpen = true; });
+  q.addEventListener('input', function () { resultsOpen = true; typedAsk = true; });
   q.addEventListener('click', function () { if (resultsListable) setResultsOpen(true); });   // a tap in the search: back
   // a tap outside the list, the search row and the chips puts the list away (capture: the map stops some events)
   document.addEventListener('pointerdown', function (e) {

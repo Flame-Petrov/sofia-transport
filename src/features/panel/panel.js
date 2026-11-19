@@ -3,7 +3,11 @@
   // menu card (My places, Diagnostics) fold away with the "Menu motion" transitions in the style sheet.
   // Folded sections are inert: no focus, no clicks, hidden from screen readers.
   var foldTimer = 0;
-  function setFolded(on) {
+  // 2026-11-19: the menu and the search's vehicle list never show together. Opening the menu hides the list
+  // (hideResultsList() in features/search/render.js); a list the rider asks for folds the menu with auto = true,
+  // which is not saved as the rider's menu choice.
+  function setFolded(on, auto) {
+    if (!on) hideResultsList();
     var panel = document.getElementById('panel'), btn = document.getElementById('fold');
     if (on) {   // focus inside a section that is going away goes to the toggle instead of being lost
       var a = document.activeElement;
@@ -16,7 +20,7 @@
     btn.setAttribute('aria-expanded', on ? 'false' : 'true');
     btn.setAttribute('aria-label', on ? t('Open menu') : t('Close menu'));
     btn.title = on ? t('Open menu (filters, My places, settings)') : t('Close menu');
-    store('sofia_menu', on ? '0' : '1');   // open is the default (the filters show, as in the design)
+    if (!auto) store('sofia_menu', on ? '0' : '1');   // open is the default (the filters show, as in the design)
     updatePopupPadding();
     clearTimeout(foldTimer);   // and once the sections have settled
     foldTimer = setTimeout(updatePopupPadding, 320);
