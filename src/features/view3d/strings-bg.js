@@ -40,5 +40,10 @@
     'Places are added in 2D.': 'Местата се добавят в 2D.',
     '3D view closed: the phone ran out of graphics memory.': '3D изгледът се затвори: графичната памет на телефона свърши.',
     'New place here': 'Ново място тук',
-    'Your stop': 'Вашата спирка'
+    'Your stop': 'Вашата спирка',
+    'Landmark': 'Забележителност',
+    'Stadium': 'Стадион',
+    'University': 'Университет',
+    'Shopping centre': 'Търговски център',
+    'Monument': 'Паметник'
   });

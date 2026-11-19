@@ -91,3 +91,14 @@
 #v3BuildLevel { margin: 4px 0 2px; }
 #v3BuildHint { padding: 0 2px 4px; }
 .v3-link { align-self: flex-start; min-height: 44px; padding: 0 2px; border: 0; background: none; color: #285599; font: 500 14px var(--font); cursor: pointer; }
+/* release 110: the card over a landmark that lifted off (landmark-lift.js), zoomed out */
+.lm-card { position: absolute; left: 0; top: 0; z-index: 7; box-sizing: border-box; width: max-content; max-width: min(280px, calc(100% - 16px)); padding: 10px 13px 11px; border-radius: 14px; border: 1px solid var(--glass-edge); background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-shadow); color: var(--ink); font: 13px/1.38 var(--font, system-ui, sans-serif); pointer-events: none; opacity: 0; transition: opacity .22s ease; will-change: transform, opacity; }
+.lm-card.on { opacity: 1; }
+.lm-card[hidden] { display: none; }
+.lm-card .lm-name { display: block; font-size: 15px; font-weight: 650; letter-spacing: -.01em; line-height: 1.25; }
+.lm-card .lm-kind { display: block; margin-top: 2px; font-size: 12px; color: var(--muted, #6e6e73); }
+.lm-card .lm-text { margin: 6px 0 0; color: var(--ink-2, #3c3c43); }
+.lm-card .lm-text[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .lm-card { transition: none; } }
+/* release 110: an HTML marker under a model in the air (landmark-lift.js) fades out, so the model covers it */
+.maplibregl-marker.lm-under { opacity: 0 !important; pointer-events: none !important; transition: opacity .15s ease; }

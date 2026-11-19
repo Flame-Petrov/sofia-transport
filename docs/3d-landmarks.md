@@ -42,6 +42,8 @@ Monuments under 10 m appear from MapLibre zoom 15 (`z` on the site; 16 on the fl
 
 The **Landmarks and monuments** switch turns the landmark and monument models off, and malls follow **3D buildings**: see [what the 3D view draws](3d-show-switches.md).
 
+Zoomed out (MapLibre 12 to 14), a model under the mouse or tapped lifts off, spins and shows a short card: see [landmarks lift off](3d-landmark-lift.md).
+
 ## Verify
 
 - `node --test tests/*.test.cjs`: `tests/monuments.test.cjs` checks that every monument has a known form and a finite mesh on the ground near its point and within its height, that small ones wait for zoom 15 and that the switch hides them. `tests/landmarks.test.cjs` checks that every mesh is finite and stays on its site, landmark heights, mall heights and lit windows, both filter syntaxes and view culling.

@@ -79,6 +79,11 @@
       map3.addLayer(models, layer.id);
       if (!landmarkLayers.has(map3)) landmarkLayers.set(map3, []);
       landmarkLayers.get(map3).push(models);
+      // A lifted landmark (landmark-lift.js) is drawn by this layer at the top of the style, over everything else.
+      // landmarks.raise() moves it back to the top when a model lifts off, after later layers were added.
+      var lifted = models.id + '-lifted';
+      if (!map3.getLayer(lifted)) map3.addLayer({ id: lifted, type: 'custom', renderingMode: '3d', render: function (gl, matrix) { models.drawMoving(gl, matrix); } });
+      if (landmarks.liftLayers.indexOf(lifted) < 0) landmarks.liftLayers.push(lifted);
 
     }
 

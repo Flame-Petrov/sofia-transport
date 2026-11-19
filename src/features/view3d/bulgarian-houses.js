@@ -234,7 +234,8 @@
   // `canopy` is a fixed-model source (metro roofs, landmarks): { suffix, minZoom, visible(bounds), vertices(map, origin, visible) }.
   // A source with awake() decides for itself whether it is drawn; the others follow the building layer's visibility.
   function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
-    var map, program, buffer, matrixLoc, anchorLoc, position, color, normal, emitLoc, lightLocs, shadowProgram, origin;
+    var map, program, buffer, matrixLoc, anchorLoc, spinLoc, raiseLoc, position, color, normal, emitLoc, lightLocs, shadowProgram, origin;
+    var ranges = null;   // fixed models: where each site sits in the buffer (landmarks.js), for turning one alone
     var dirty=true, count=0, lastBuild=0, terrain, view, built=-1, asleep=false;
     var previousKeys = null, meshCache = new Map(), batch = buildingBuffer(10);
     function moved(){ if (canopy) dirty=true; else view.cameraMoved(); }
@@ -281,8 +282,48 @@
       count=batch.count();
       return null;
     }
+    // Shared by render() and drawMoving(): the program, camera, light and vertex layout.
+    function begin(gl,matrix){
+      gl.useProgram(program);gl.disable(gl.CULL_FACE);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
+      var anchor=[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];});
+      gl.uniform4fv(anchorLoc,anchor);
+      gl.uniformMatrix4fv(matrixLoc,false,Float32Array.from(matrix,function(v){return v*origin.unit;}));
+      var light=daylight.lighting();
+      gl.uniform3fv(lightLocs[0],light.dir);gl.uniform3fv(lightLocs[1],light.color);gl.uniform3fv(lightLocs[2],light.ambient);gl.uniform1f(lightLocs[3],light.lit);
+      [position,color,normal,emitLoc].forEach(function(a){gl.enableVertexAttribArray(a);});
+      gl.vertexAttribPointer(position,3,gl.FLOAT,false,40,0);gl.vertexAttribPointer(color,3,gl.FLOAT,false,40,12);
+      gl.vertexAttribPointer(normal,3,gl.FLOAT,false,40,24);gl.vertexAttribPointer(emitLoc,1,gl.FLOAT,false,40,36);
+      return anchor;
+    }
+    // Fixed models that are moving (landmark-lift.js): their buffer range and pose, in buffer order.
+    function movingList(){
+      var moving=[], poses=canopy && canopy.poses ? canopy.poses() : null;
+      if (poses && ranges) poses.forEach(function(pose,i){var r=ranges.get(i); if(r) moving.push({r:r,pose:pose});});
+      return moving.sort(function(a,b){return a.r.first-b.r.first;});
+    }
+    function drawPoses(gl,moving){
+      moving.forEach(function(m){
+        gl.uniform4f(spinLoc,m.r.x,m.r.y,Math.cos(m.pose.angle),Math.sin(m.pose.angle));gl.uniform3f(raiseLoc,m.r.z,m.pose.rise*m.r.k,m.pose.scale||1);
+        gl.drawArrays(gl.TRIANGLES,m.r.first,m.r.count);
+      });
+    }
+    var overlaid=false;   // a layer on top of the style draws the moving models (drawMoving)
     return {
       id:materialLayer+(canopy ? canopy.suffix : '-houses'),type:'custom',renderingMode:'3d',
+      // Called by a custom layer at the very top of the style: the moving models over everything else drawn on the
+      // map (labels, vehicle dots, stop icons, other models). The depth buffer is cleared first, so they hide
+      // nothing of themselves but nothing drawn before covers them.
+      drawMoving:function(gl,matrix){
+        overlaid=true;
+        if (asleep || !count || !origin || !program) return;
+        var moving=movingList();
+        if (!moving.length) return;
+        gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+        gl.depthMask(true);gl.clearDepth(1);gl.clear(gl.DEPTH_BUFFER_BIT);
+        begin(gl,matrix);
+        drawPoses(gl,moving);
+        [position,color,normal,emitLoc].forEach(function(a){gl.disableVertexAttribArray(a);});
+      },
       refresh:function(){dirty=true;},   // the fixed-model source changed what it shows
       onAdd:function(owner,gl){
         map=owner;
@@ -294,18 +335,22 @@
           if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(shader));
           gl.attachShader(program,shader);gl.deleteShader(shader);
         }
-        attach(gl.VERTEX_SHADER,'attribute vec3 pos,rgb,nrm; attribute float emit; uniform vec4 anchor; uniform mat4 offsetMatrix; uniform vec3 sunDir,sunColor,ambient; varying vec3 tint; varying float lampOn; void main(){gl_Position=anchor+offsetMatrix*vec4(pos,0.0);tint=rgb*(ambient+sunColor*max(dot(nrm,sunDir),0.0));lampOn=emit;}');
+        // spin = (centre x, centre y, cos, sin) turns a model about its upright axis; raise = (its ground, rise, scale)
+        // lifts and grows it from its foot (landmark-lift.js). Every other draw passes (0, 0, 1, 0) and (0, 0, 1).
+        attach(gl.VERTEX_SHADER,'attribute vec3 pos,rgb,nrm; attribute float emit; uniform vec4 anchor,spin; uniform vec3 raise; uniform mat4 offsetMatrix; uniform vec3 sunDir,sunColor,ambient; varying vec3 tint; varying float lampOn; mat2 turn(){return mat2(spin.z,spin.w,-spin.w,spin.z);} void main(){vec3 p=vec3(spin.xy+turn()*(pos.xy-spin.xy)*raise.z,raise.x+(pos.z-raise.x)*raise.z+raise.y);vec3 n=vec3(turn()*nrm.xy,nrm.z);gl_Position=anchor+offsetMatrix*vec4(p,0.0);tint=rgb*(ambient+sunColor*max(dot(n,sunDir),0.0));lampOn=emit;}');
         attach(gl.FRAGMENT_SHADER,'precision mediump float; varying vec3 tint; varying float lampOn; uniform float lit; void main(){float on=step(0.001,lampOn)*step(lampOn,lit);gl_FragColor=vec4(mix(tint,vec3(1.0,0.76,0.42)*(0.7+0.5*fract(lampOn*57.3)),0.9*on),1.0);}');
         gl.linkProgram(program);
         if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
         position=gl.getAttribLocation(program,'pos');color=gl.getAttribLocation(program,'rgb');normal=gl.getAttribLocation(program,'nrm');emitLoc=gl.getAttribLocation(program,'emit');
         lightLocs=['sunDir','sunColor','ambient','lit'].map(function(k){return gl.getUniformLocation(program,k);});
         matrixLoc=gl.getUniformLocation(program,'offsetMatrix');anchorLoc=gl.getUniformLocation(program,'anchor');
+        spinLoc=gl.getUniformLocation(program,'spin');raiseLoc=gl.getUniformLocation(program,'raise');
         buffer=gl.createBuffer();
         try { shadowProgram=shadows.create(gl); } catch (e) { console.warn('3D shadows failed:', e); }
         map.on('move',moved);map.on('resize',resized);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
       },
       render:function(gl,matrix){
+        if (canopy && canopy.frame) canopy.frame(matrix, map);
         if(map.getZoom()<(canopy ? canopy.minZoom : HOUSE_MIN_ZOOM) || (canopy && canopy.awake ? !canopy.awake() : map.getLayoutProperty(materialLayer,'visibility')==='none')){
           asleep=true;return;
         }
@@ -321,23 +366,22 @@
           var data = rebuild(gl);
           if (data !== null) {
             count = data.length / 10;
+            ranges = data.ranges || null;
             gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
           }
           lastBuild=now;dirty=false;terrain=currentTerrain;built=version;
         } else if(due) map.triggerRepaint();
         if(!count)return;
-        gl.useProgram(program);gl.disable(gl.CULL_FACE);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
-        var anchor=[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];});
-        gl.uniform4fv(anchorLoc,anchor);
-        gl.uniformMatrix4fv(matrixLoc,false,Float32Array.from(matrix,function(v){return v*origin.unit;}));
-        var light=daylight.lighting();
-        gl.uniform3fv(lightLocs[0],light.dir);gl.uniform3fv(lightLocs[1],light.color);gl.uniform3fv(lightLocs[2],light.ambient);gl.uniform1f(lightLocs[3],light.lit);
-        [position,color,normal,emitLoc].forEach(function(a){gl.enableVertexAttribArray(a);});
-        gl.vertexAttribPointer(position,3,gl.FLOAT,false,40,0);gl.vertexAttribPointer(color,3,gl.FLOAT,false,40,12);
-        gl.vertexAttribPointer(normal,3,gl.FLOAT,false,40,24);gl.vertexAttribPointer(emitLoc,1,gl.FLOAT,false,40,36);
-        gl.drawArrays(gl.TRIANGLES,0,count);
+        var anchor=begin(gl,matrix), moving=movingList();
+        // Moving models (a lifted landmark) are left out here: the layer on top of the style draws them (drawMoving).
+        // Without that layer they are drawn here, each with its own turn and rise.
+        function still(draw){var at=0;moving.forEach(function(m){if(m.r.first>at)draw(at,m.r.first-at);at=m.r.first+m.r.count;});if(count>at)draw(at,count-at);}
+        gl.uniform4f(spinLoc,0,0,1,0);gl.uniform3f(raiseLoc,0,0,1);
+        still(function(first,n){gl.drawArrays(gl.TRIANGLES,first,n);});
+        if (!overlaid) drawPoses(gl,moving);
         [position,color,normal,emitLoc].forEach(function(a){gl.disableVertexAttribArray(a);});
-        shadows.pass(gl,shadowProgram,map,anchor,Float32Array.from(matrix,function(v){return v*origin.unit;}),40,function(){gl.drawArrays(gl.TRIANGLES,0,count);});
+        // a model in the air casts no ground shadow here
+        shadows.pass(gl,shadowProgram,map,anchor,Float32Array.from(matrix,function(v){return v*origin.unit;}),40,function(){still(function(first,n){gl.drawArrays(gl.TRIANGLES,first,n);});});
       },
       onRemove:function(owner,gl){
         owner.off('move',moved);owner.off('resize',resized);owner.off('sourcedata',sourceChanged);owner.off('terrain',resetGeometry);

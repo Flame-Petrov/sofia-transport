@@ -623,6 +623,13 @@
       if (meshes.has(site)) return meshes.get(site);
       var local = [];
       builders[site.k](kit(local), outline(site), site);
+      // The model's box in its own frame (u, v, up), for picking it on screen (landmark-lift.js).
+      var box = [Infinity, -Infinity, Infinity, -Infinity, 0];
+      for (var j = 0; j < local.length; j += 10) {
+        box[0] = Math.min(box[0], local[j]); box[1] = Math.max(box[1], local[j]);
+        box[2] = Math.min(box[2], local[j + 1]); box[3] = Math.max(box[3], local[j + 1]); box[4] = Math.max(box[4], local[j + 2]);
+      }
+      site.box = local.length ? box : [0, 0, 0, 0, 0];
       var b = site.b * Math.PI / 180, s = Math.sin(b), c = Math.cos(b), data = new Float32Array(local.length);
       for (var i = 0; i < local.length; i += 10) {
         data[i] = local[i] * s - local[i + 1] * c; data[i + 1] = -(local[i] * c + local[i + 1] * s); data[i + 2] = local[i + 2];
@@ -645,23 +652,38 @@
       });
       return seen;
     }
+    // The vertices also carry `ranges`: per site its first vertex, vertex count, centre in the layer's frame and
+    // metres-to-frame scale, so the layer can turn and raise one site (landmark-lift.js) without rebuilding.
     function vertices(map, origin, seen) {
-      var parts = [], size = 0;
+      var parts = [], size = 0, ranges = new Map();
       (seen || visible(map.getBounds(), map.getZoom())).forEach(function (i) {
         var site = landmarkSites[i], data = mesh(site), part = new Float32Array(data);
         var at = maplibregl.MercatorCoordinate.fromLngLat(site.at), unit = at.meterInMercatorCoordinateUnits();
         var x = (at.x - origin.x) / origin.unit, y = (at.y - origin.y) / origin.unit, k = unit / origin.unit;
         var lift = map.getTerrain() ? map.queryTerrainElevation(site.at) || 0 : 0;
         for (var j = 0; j < part.length; j += 10) { part[j] = x + part[j] * k; part[j + 1] = y + part[j + 1] * k; part[j + 2] = (part[j + 2] + lift) * k; }
+        ranges.set(i, { first: size / 10, count: part.length / 10, x: x, y: y, z: lift * k, k: k });
         parts.push(part); size += part.length;
       });
       var all = new Float32Array(size), offset = 0;
       parts.forEach(function (part) { all.set(part, offset); offset += part.length; });
+      all.ranges = ranges;
+      shownNow = Array.from(ranges.keys());
       return all;
     }
+    var shownNow = [];   // the sites in the layer's last upload: the ones that can be picked
     // Builders in other files (monument-models.js) register here; meshes are built on first use.
     function define(kind, builder) { builders[kind] = builder; }
+    // The fixed-model layer reports its projection each frame it draws, and asks which sites are moving and how.
+    var lastFrame = null;
+    function frame(matrix, map) { lastFrame = { matrix: Float64Array.from(matrix), at: performance.now(), map: map }; }
     return { suffix: '-landmarks', minZoom: 12, visible: visible, vertices: vertices, filter: filter, mesh: mesh, sites: landmarkSites, define: define,
+      frame: frame, lastFrame: function () { return lastFrame; }, shown: function () { return shownNow; },
+      liftLayers: [],   // ids of the layers that draw lifted models over everything (building-materials.js)
+      raise: function (map) {
+        this.liftLayers.forEach(function (id) { try { if (map.getLayer(id)) map.moveLayer(id); } catch (e) {} });
+      },
+      poses: function () { return typeof landmarkLift !== 'undefined' ? landmarkLift.poses() : null; },
       colors: { GLASS: GLASS, GOLD: GOLD, COPPER: COPPER, LEAD: LEAD, STONE: STONE, GRANITE: GRANITE, DARK: DARK, BRONZE: BRONZE },
       setShown: setShown, awake: function () { return shown.landmarks || shown.malls; } };
   })();

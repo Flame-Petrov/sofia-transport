@@ -1390,6 +1390,17 @@
 #v3BuildLevel { margin: 4px 0 2px; }
 #v3BuildHint { padding: 0 2px 4px; }
 .v3-link { align-self: flex-start; min-height: 44px; padding: 0 2px; border: 0; background: none; color: #285599; font: 500 14px var(--font); cursor: pointer; }
+/* release 110: the card over a landmark that lifted off (landmark-lift.js), zoomed out */
+.lm-card { position: absolute; left: 0; top: 0; z-index: 7; box-sizing: border-box; width: max-content; max-width: min(280px, calc(100% - 16px)); padding: 10px 13px 11px; border-radius: 14px; border: 1px solid var(--glass-edge); background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur); box-shadow: var(--glass-shadow); color: var(--ink); font: 13px/1.38 var(--font, system-ui, sans-serif); pointer-events: none; opacity: 0; transition: opacity .22s ease; will-change: transform, opacity; }
+.lm-card.on { opacity: 1; }
+.lm-card[hidden] { display: none; }
+.lm-card .lm-name { display: block; font-size: 15px; font-weight: 650; letter-spacing: -.01em; line-height: 1.25; }
+.lm-card .lm-kind { display: block; margin-top: 2px; font-size: 12px; color: var(--muted, #6e6e73); }
+.lm-card .lm-text { margin: 6px 0 0; color: var(--ink-2, #3c3c43); }
+.lm-card .lm-text[hidden] { display: none; }
+@media (prefers-reduced-motion: reduce) { .lm-card { transition: none; } }
+/* release 110: an HTML marker under a model in the air (landmark-lift.js) fades out, so the model covers it */
+.maplibregl-marker.lm-under { opacity: 0 !important; pointer-events: none !important; transition: opacity .15s ease; }
   /* =====================================================================================================
      v100 — The selected vehicle's card (design images/selected-vehicle-popup-reference.png). A warm ivory
      card hangs below the vehicle, its pointer rising to the round marker: line badge and destination with
@@ -1923,7 +1934,12 @@
     'Places are added in 2D.': 'Местата се добавят в 2D.',
     '3D view closed: the phone ran out of graphics memory.': '3D изгледът се затвори: графичната памет на телефона свърши.',
     'New place here': 'Ново място тук',
-    'Your stop': 'Вашата спирка'
+    'Your stop': 'Вашата спирка',
+    'Landmark': 'Забележителност',
+    'Stadium': 'Стадион',
+    'University': 'Университет',
+    'Shopping centre': 'Търговски център',
+    'Monument': 'Паметник'
   });
   // Bulgarian texts for features/offline (keyed by the English text; see shared/ui/i18n.js)
   Object.assign(BG, {
@@ -12332,6 +12348,13 @@
       if (meshes.has(site)) return meshes.get(site);
       var local = [];
       builders[site.k](kit(local), outline(site), site);
+      // The model's box in its own frame (u, v, up), for picking it on screen (landmark-lift.js).
+      var box = [Infinity, -Infinity, Infinity, -Infinity, 0];
+      for (var j = 0; j < local.length; j += 10) {
+        box[0] = Math.min(box[0], local[j]); box[1] = Math.max(box[1], local[j]);
+        box[2] = Math.min(box[2], local[j + 1]); box[3] = Math.max(box[3], local[j + 1]); box[4] = Math.max(box[4], local[j + 2]);
+      }
+      site.box = local.length ? box : [0, 0, 0, 0, 0];
       var b = site.b * Math.PI / 180, s = Math.sin(b), c = Math.cos(b), data = new Float32Array(local.length);
       for (var i = 0; i < local.length; i += 10) {
         data[i] = local[i] * s - local[i + 1] * c; data[i + 1] = -(local[i] * c + local[i + 1] * s); data[i + 2] = local[i + 2];
@@ -12354,23 +12377,38 @@
       });
       return seen;
     }
+    // The vertices also carry `ranges`: per site its first vertex, vertex count, centre in the layer's frame and
+    // metres-to-frame scale, so the layer can turn and raise one site (landmark-lift.js) without rebuilding.
     function vertices(map, origin, seen) {
-      var parts = [], size = 0;
+      var parts = [], size = 0, ranges = new Map();
       (seen || visible(map.getBounds(), map.getZoom())).forEach(function (i) {
         var site = landmarkSites[i], data = mesh(site), part = new Float32Array(data);
         var at = maplibregl.MercatorCoordinate.fromLngLat(site.at), unit = at.meterInMercatorCoordinateUnits();
         var x = (at.x - origin.x) / origin.unit, y = (at.y - origin.y) / origin.unit, k = unit / origin.unit;
         var lift = map.getTerrain() ? map.queryTerrainElevation(site.at) || 0 : 0;
         for (var j = 0; j < part.length; j += 10) { part[j] = x + part[j] * k; part[j + 1] = y + part[j + 1] * k; part[j + 2] = (part[j + 2] + lift) * k; }
+        ranges.set(i, { first: size / 10, count: part.length / 10, x: x, y: y, z: lift * k, k: k });
         parts.push(part); size += part.length;
       });
       var all = new Float32Array(size), offset = 0;
       parts.forEach(function (part) { all.set(part, offset); offset += part.length; });
+      all.ranges = ranges;
+      shownNow = Array.from(ranges.keys());
       return all;
     }
+    var shownNow = [];   // the sites in the layer's last upload: the ones that can be picked
     // Builders in other files (monument-models.js) register here; meshes are built on first use.
     function define(kind, builder) { builders[kind] = builder; }
+    // The fixed-model layer reports its projection each frame it draws, and asks which sites are moving and how.
+    var lastFrame = null;
+    function frame(matrix, map) { lastFrame = { matrix: Float64Array.from(matrix), at: performance.now(), map: map }; }
     return { suffix: '-landmarks', minZoom: 12, visible: visible, vertices: vertices, filter: filter, mesh: mesh, sites: landmarkSites, define: define,
+      frame: frame, lastFrame: function () { return lastFrame; }, shown: function () { return shownNow; },
+      liftLayers: [],   // ids of the layers that draw lifted models over everything (building-materials.js)
+      raise: function (map) {
+        this.liftLayers.forEach(function (id) { try { if (map.getLayer(id)) map.moveLayer(id); } catch (e) {} });
+      },
+      poses: function () { return typeof landmarkLift !== 'undefined' ? landmarkLift.poses() : null; },
       colors: { GLASS: GLASS, GOLD: GOLD, COPPER: COPPER, LEAD: LEAD, STONE: STONE, GRANITE: GRANITE, DARK: DARK, BRONZE: BRONZE },
       setShown: setShown, awake: function () { return shown.landmarks || shown.malls; } };
   })();
@@ -12838,6 +12876,520 @@
       }
     });
   })();
+  // What the lift-off card (landmark-lift.js) says about a landmark: its name, kind and a sentence or two, in English
+  // and Bulgarian ([en, bg]). Keyed by the OpenStreetMap key of a monument (landmark-data.js `key`) or by the site's
+  // name (`n`) for the hand-built landmarks, stadiums, universities and malls. It covers every site that stands when
+  // the map is zoomed out (no `z` in landmark-data.js); a site without a row shows its name and kind only.
+  // Facts come from Wikipedia, the Sofia monument register (registersofia.bg) and OpenStreetMap tags; see
+  // docs/3d-landmark-lift.md. Keep each text short: the card is small.
+  var landmarkInfo = {
+    'Alexander Nevsky Cathedral': {
+      name: ['Alexander Nevsky Cathedral', 'Храм-паметник „Св. Александър Невски“'],
+      kind: ['Orthodox cathedral · 1882–1912', 'Православна катедрала · 1882–1912'],
+      text: ['Sofia’s best-known landmark, built in memory of the Russian soldiers who died in the war of 1877–78 that freed Bulgaria. Its gilded domes sit beside a 53 m bell tower.',
+        'Най-известният символ на София, издигнат в памет на руските воини, загинали в Освободителната война 1877–1878 г. Позлатените куполи стоят до 53-метрова камбанария.'] },
+    'National Palace of Culture': {
+      name: ['National Palace of Culture (NDK)', 'Национален дворец на културата (НДК)'],
+      kind: ['Congress and culture centre · 1981', 'Конгресен и културен център · 1981'],
+      text: ['Opened for the 1300th anniversary of the Bulgarian state, it is the largest congress centre in South-Eastern Europe.',
+        'Открит за 1300-годишнината на българската държава, най-големият конгресен център в Югоизточна Европа.'] },
+    'Ivan Vazov National Theatre': {
+      name: ['Ivan Vazov National Theatre', 'Народен театър „Иван Вазов“'],
+      kind: ['Theatre · 1906', 'Театър · 1906'],
+      text: ['Bulgaria’s oldest theatre, designed by the Viennese architects Fellner and Helmer. It faces the City Garden.',
+        'Най-старият театър в България, по проект на виенските архитекти Фелнер и Хелмер. Гледа към Градската градина.'] },
+    'Sveta Nedelya Cathedral': {
+      name: ['Sveta Nedelya Cathedral', 'Катедрала „Света Неделя“'],
+      kind: ['Orthodox cathedral · 1863', 'Православна катедрала · 1863'],
+      text: ['A church has stood here since the Middle Ages. Rebuilt after the bombing of 1925, it keeps the relics of the Serbian king Stefan Milutin.',
+        'Тук има храм още от Средновековието. Възстановена след атентата от 1925 г., в нея се пазят мощите на сръбския крал Стефан Милутин.'] },
+    'Banya Bashi Mosque': {
+      name: ['Banya Bashi Mosque', 'Джамия „Баня баши“'],
+      kind: ['Mosque · 16th century', 'Джамия · XVI век'],
+      text: ['Sofia’s only working mosque, from the Ottoman era and credited to the architect Mimar Sinan. Its name means “many baths”, after the mineral springs beside it.',
+        'Единствената действаща джамия в София, от османско време, приписвана на архитект Мимар Синан. Името ѝ означава „много бани“ – до нея извират минерални извори.'] },
+    'Russian Church of St Nicholas': {
+      name: ['Russian Church of St Nicholas', 'Руска църква „Св. Николай Чудотворец“'],
+      kind: ['Russian Orthodox church · 1914', 'Руска православна църква · 1914'],
+      text: ['Built for the Russian embassy in the style of 17th-century Moscow churches, with gilded onion domes and green tiles.',
+        'Построена за руското посолство в стила на московските църкви от XVII век, с позлатени луковични куполи и зелени керемиди.'] },
+    'Largo (former Party House)': {
+      name: ['Former Party House, the Largo', 'Бившият Партиен дом, Ларгото'],
+      kind: ['Administrative building · 1955', 'Административна сграда · 1955'],
+      text: ['The centre of the Largo ensemble of the 1950s, once the Communist Party’s headquarters with a red star on its spire. Today it holds offices of the National Assembly.',
+        'Център на ансамбъла „Ларгото“ от 50-те години, някога седалище на Комунистическата партия с червена звезда на шпила. Днес в нея са служби на Народното събрание.'] },
+    'Sofia TV Tower': {
+      name: ['Sofia TV Tower', 'Телевизионната кула в София'],
+      kind: ['TV tower · 1959', 'Телевизионна кула · 1959'],
+      text: ['Sofia’s first television tower, 106 m tall, at the edge of Borisova Gradina.',
+        'Първата телевизионна кула на София, висока 106 м, в края на Борисовата градина.'] },
+    'Sofia Synagogue': {
+      name: ['Sofia Synagogue', 'Софийската синагога'],
+      kind: ['Synagogue · 1909', 'Синагога · 1909'],
+      text: ['The largest Sephardic synagogue in Europe, designed by the Austrian architect Friedrich Grünanger in a Moorish Revival style.',
+        'Най-голямата сефарадска синагога в Европа, по проект на австрийския архитект Фридрих Грюнангер в мавритански стил.'] },
+    'Monument to the Tsar Liberator': {
+      name: ['Monument to the Tsar Liberator', 'Паметник на Цар Освободител'],
+      kind: ['Equestrian monument · 1907', 'Конен паметник · 1907'],
+      text: ['Russian Emperor Alexander II on horseback, by the Italian sculptor Arnoldo Zocchi, in honour of Bulgaria’s liberation in 1878. It faces the National Assembly.',
+        'Руският император Александър II на кон, дело на италианския скулптор Арнолдо Дзоки, в чест на Освобождението на България през 1878 г. Гледа към Народното събрание.'] },
+    'Statue of Sveta Sofia': {
+      name: ['Statue of Sveta Sofia', 'Паметник на Света София'],
+      kind: ['Statue · 2000', 'Статуя · 2000'],
+      text: ['A 24 m column crowned by Holy Wisdom in bronze and copper, by Georgi Chapkanov. It stands where a statue of Lenin once did.',
+        'Висока 24 м колона със статуя на Света София от бронз и мед, дело на Георги Чапкънов. Стои на мястото на някогашния паметник на Ленин.'] },
+    'Monument to Vasil Levski': {
+      name: ['Monument to Vasil Levski', 'Паметник на Васил Левски'],
+      kind: ['Monument · 1895', 'Паметник · 1895'],
+      text: ['A granite obelisk on the spot where Bulgaria’s national hero Vasil Levski was hanged in 1873.',
+        'Гранитен обелиск на мястото, където през 1873 г. е обесен националният герой Васил Левски.'] },
+
+    'Vasil Levski National Stadium': {
+      name: ['Vasil Levski National Stadium', 'Национален стадион „Васил Левски“'],
+      kind: ['National stadium · 1953', 'Национален стадион · 1953'],
+      text: ['Bulgaria’s largest stadium, with over 40,000 seats, home of the national football team, in Borisova Gradina.',
+        'Най-големият стадион в България, с над 40 000 места, дом на националния отбор по футбол, в Борисовата градина.'] },
+    'Bulgarian Army Stadium': {
+      name: ['Bulgarian Army Stadium', 'Стадион „Българска армия“'],
+      kind: ['Football stadium · 1967', 'Футболен стадион · 1967'],
+      text: ['The home ground of CSKA Sofia, in Borisova Gradina.',
+        'Домът на ЦСКА София, в Борисовата градина.'] },
+    'Georgi Asparuhov Stadium': {
+      name: ['Georgi Asparuhov Stadium', 'Стадион „Георги Аспарухов“'],
+      kind: ['Football stadium · 1963', 'Футболен стадион · 1963'],
+      text: ['The home ground of Levski Sofia, named after the club’s legendary forward Georgi Asparuhov – Gundi.',
+        'Домът на Левски София, наречен на легендарния нападател на клуба Георги Аспарухов – Гунди.'] },
+    'Lokomotiv Stadium': {
+      name: ['Lokomotiv Stadium', 'Стадион „Локомотив“'],
+      kind: ['Football stadium', 'Футболен стадион'],
+      text: ['The home ground of Lokomotiv Sofia, with a running track around the pitch.',
+        'Домът на Локомотив София, с лекоатлетическа писта около терена.'] },
+    'Slavia Stadium': {
+      name: ['Slavia Stadium', 'Стадион „Славия“'],
+      kind: ['Football stadium', 'Футболен стадион'],
+      text: ['The home ground of Slavia Sofia, one of Bulgaria’s oldest football clubs (1913), in Ovcha Kupel.',
+        'Домът на Славия София, един от най-старите футболни клубове в България (1913), в Овча купел.'] },
+
+    'Sofia University (Rectorate)': {
+      name: ['Sofia University, the Rectorate', 'Софийски университет, Ректорат'],
+      kind: ['University · 1888', 'Университет · 1888'],
+      text: ['Bulgaria’s oldest university, St Kliment Ohridski. The rectorate, finished in 1934, was paid for by the brothers Evlogi and Hristo Georgiev, whose statues stand at its front.',
+        'Най-старият университет в България, „Св. Климент Охридски“. Ректоратът, завършен през 1934 г., е построен с дарение на братя Евлоги и Христо Георгиеви, чиито статуи стоят отпред.'] },
+    'Technical University, Block 1': {
+      name: ['Technical University of Sofia', 'Технически университет – София'],
+      kind: ['University · 1945', 'Университет · 1945'],
+      text: ['Bulgaria’s largest engineering university. Block 1 is its main building.',
+        'Най-големият инженерен университет в България. Блок 1 е основната му сграда.'] },
+    'UACEG, new building': {
+      name: ['University of Architecture, Civil Engineering and Geodesy', 'Университет по архитектура, строителство и геодезия'],
+      kind: ['University · 1942', 'Университет · 1942'],
+      text: ['Bulgaria’s school for architects, civil engineers and surveyors, on Hristo Smirnenski Boulevard.',
+        'Училището на българските архитекти, строители и геодезисти, на бул. „Христо Смирненски“.'] },
+    'New Bulgarian University, Building 3': {
+      name: ['New Bulgarian University', 'Нов български университет'],
+      kind: ['University · 1991', 'Университет · 1991'],
+      text: ['A private university founded in 1991, with its campus in Ovcha Kupel.',
+        'Частен университет, основан през 1991 г., с кампус в Овча купел.'] },
+    'National Academy of Arts': {
+      name: ['National Academy of Arts', 'Национална художествена академия'],
+      kind: ['Art academy · 1896', 'Художествена академия · 1896'],
+      text: ['Bulgaria’s oldest art school, founded as the State Drawing School. Its main building is on Shipka Street.',
+        'Най-старото художествено училище в България, основано като Държавно рисувално училище. Сградата ѝ е на ул. „Шипка“.'] },
+
+    'Silver Center': { name: ['Silver Center', 'Силвър Център'], kind: ['Shopping centre', 'Търговски център'], text: ['Shops and services under one roof.', 'Магазини и услуги под един покрив.'] },
+    'Мини Мол': { name: ['Mini Mall', 'Мини Мол'], kind: ['Shopping centre', 'Търговски център'], text: ['Shops and services under one roof.', 'Магазини и услуги под един покрив.'] },
+    'Serdika Center': { name: ['Serdika Center', 'Сердика Център'], kind: ['Shopping centre · 2010', 'Търговски център · 2010'],
+      text: ['A shopping centre on Sitnyakovo Boulevard, named after Serdica, the Roman city under Sofia.', 'Търговски център на бул. „Ситняково“, наречен на Сердика – римския град под днешна София.'] },
+    'Park Center Sofia': { name: ['Park Center Sofia', 'Парк Център София'], kind: ['Shopping centre', 'Търговски център'],
+      text: ['A shopping centre on Arsenalski Boulevard, near the South Park.', 'Търговски център на бул. „Арсеналски“, до Южния парк.'] },
+    'Mall of Sofia': { name: ['Mall of Sofia', 'Мол оф София'], kind: ['Shopping centre · 2006', 'Търговски център · 2006'],
+      text: ['A shopping centre with a cinema on Aleksandar Stamboliyski Boulevard, near the city centre.', 'Търговски център с кино на бул. „Александър Стамболийски“, близо до центъра.'] },
+    'SkyCity': { name: ['SkyCity', 'Скай Сити'], kind: ['Shopping centre', 'Търговски център'], text: ['Shops and services under one roof.', 'Магазини и услуги под един покрив.'] },
+    'TZUM': { name: ['TZUM', 'ЦУМ'], kind: ['Department store · 1957', 'Универсален магазин · 1957'],
+      text: ['Sofia’s Central Department Store, part of the Largo ensemble.', 'Централният универсален магазин на София, част от ансамбъла „Ларгото“.'] },
+    'РУМ Младост': { name: ['RUM Mladost', 'РУМ Младост'], kind: ['Shopping centre', 'Търговски център'], text: ['The district department store of Mladost.', 'Районният универсален магазин на Младост.'] },
+    'Princess Outlet Center': { name: ['Princess Outlet Center', 'Принцес Аутлет Център'], kind: ['Outlet centre', 'Аутлет център'], text: ['Brand shops at outlet prices.', 'Маркови магазини на аутлет цени.'] },
+    'Sofia Ring Mall': { name: ['Sofia Ring Mall', 'София Ринг Мол'], kind: ['Shopping centre', 'Търговски център'],
+      text: ['A large shopping centre by the Ring Road.', 'Голям търговски център до Околовръстния път.'] },
+    'Bulgaria Mall': { name: ['Bulgaria Mall', 'България Мол'], kind: ['Shopping centre · 2012', 'Търговски център · 2012'],
+      text: ['A shopping centre on Bulgaria Boulevard.', 'Търговски център на бул. „България“.'] },
+    'Paradise Center': { name: ['Paradise Center', 'Парадайс Център'], kind: ['Shopping centre · 2013', 'Търговски център · 2013'],
+      text: ['One of the largest shopping centres in Bulgaria, on Cherni Vrah Boulevard.', 'Един от най-големите търговски центрове в България, на бул. „Черни връх“.'] },
+    'The Mall': { name: ['The Mall', 'Дъ Мол'], kind: ['Shopping centre · 2010', 'Търговски център · 2010'],
+      text: ['A large shopping centre on Tsarigradsko Shose.', 'Голям търговски център на бул. „Цариградско шосе“.'] },
+    'Metro City': { name: ['Metro City', 'Метро Сити'], kind: ['Shopping centre', 'Търговски център'], text: ['Shops and services under one roof.', 'Магазини и услуги под един покрив.'] },
+    'Sofia Outlet Center': { name: ['Sofia Outlet Center', 'София Аутлет Център'], kind: ['Outlet centre', 'Аутлет център'], text: ['Brand shops at outlet prices.', 'Маркови магазини на аутлет цени.'] },
+    'Trade House West': { name: ['Trade House West', 'Търговски дом Запад'], kind: ['Shopping centre', 'Търговски център'], text: ['Shops and services under one roof.', 'Магазини и услуги под един покрив.'] },
+    'Търговски център Надежда': { name: ['Nadezhda Shopping Centre', 'Търговски център Надежда'], kind: ['Shopping centre', 'Търговски център'], text: ['The shopping centre of the Nadezhda district.', 'Търговският център на квартал Надежда.'] },
+    'West Mall': { name: ['West Mall', 'Уест Мол'], kind: ['Shopping centre', 'Търговски център'], text: ['A shopping centre in western Sofia.', 'Търговски център в западната част на София.'] },
+    'Shopping Center Sopharma Business Towers': { name: ['Sopharma Business Towers', 'Софарма Бизнес Тауърс'], kind: ['Shopping centre and offices', 'Търговски център и офиси'],
+      text: ['Shops at the foot of two office towers.', 'Магазини в основата на две офис кули.'] },
+
+    n4722201300: { name: ['Monument to Bulgarian Aviation', 'Паметник на българската авиация'], kind: ['Memorial · 2012', 'Паметник · 2012'],
+      text: ['A 10.6 m granite-clad shaft topped by a brass eagle, with two stone wings at its foot, honouring Bulgarian military aviation.',
+        'Облицована с гранит колона, висока 10,6 м, увенчана с месингов орел и с две каменни крила в основата си, в чест на българската военна авиация.'] },
+    n5431216098: { name: ['Memorial to the Victims of the Communist Regime', 'Мемориал на жертвите на комунистическия режим'], kind: ['Memorial · 1999', 'Мемориал · 1999'],
+      text: ['A black granite wall about 58 m long, inscribed with the names of 7,526 victims of the communist regime in Bulgaria.',
+        'Стена от черен гранит, дълга около 58 м, с имената на 7526 жертви на комунистическия режим в България.'] },
+    r16537164: { name: ['Monument to the Soviet Army', 'Паметник на Съветската армия'], kind: ['Monument · 1954', 'Паметник · 1954'],
+      text: ['Its sculptures were taken down in December 2023. The bare stone shaft still stands in the Knyazheska Garden.',
+        'Скулптурите му са свалени през декември 2023 г. Голият каменен пилон все още стои в Княжеската градина.'] },
+    w167323812: { name: ['Monument to the Siege of Adrianople', 'Паметник на Одринската епопея'], kind: ['Monument', 'Паметник'],
+      text: ['A 12 m granite obelisk crowned by a stone soldier with a rifle, for the siege of Adrianople (Edirne) in 1913.',
+        'Гранитен обелиск, висок 12 м, увенчан с каменен опълченец с пушка, за обсадата на Одрин през 1913 г.'] },
+    w330097270: { name: ['Soldiers’ Monument', 'Войнишки паметник'], kind: ['War memorial', 'Военен паметник'],
+      text: ['A memorial to fallen soldiers.', 'Паметник на загиналите войници.'] },
+    w584413761: { name: ['Monument to the Revolutionaries of Macedonia and Adrianople', 'Паметник на революционерите от Македония, Беломорието и Одринско'], kind: ['Monument · 2016', 'Паметник · 2016'],
+      text: ['Two white stone wings carved with 150 names, for those who died for the freedom of Macedonia, the Aegean coast and Adrianople Thrace.',
+        'Две бели каменни крила със 150 имена, за загиналите за свободата на Македония, Беломорието и Одринско.'] },
+    w663225242: { name: ['The Roman Fountain', 'Римската чешма'], kind: ['Fountain monument', 'Чешма паметник'],
+      text: ['A stone fountain known as the Roman Fountain.', 'Каменна чешма, известна като Римската чешма.'] },
+    w696756848: { name: ['Doctors’ Monument', 'Докторски паметник'], kind: ['Memorial · 1884', 'Паметник · 1884'],
+      text: ['A stone pyramid in the Doctors’ Garden for the doctors and nurses who died in the Russo-Turkish War of 1877–78.',
+        'Каменна пирамида в Докторската градина за лекарите и санитарите, загинали в Руско-турската война 1877–1878 г.'] },
+    w867938756: { name: ['Bratska Mogila', 'Братска могила'], kind: ['Monument · 1956', 'Паметник · 1956'],
+      text: ['A 41 m granite obelisk in Borisova Gradina, with partisan figures and bronze reliefs at its foot.',
+        'Гранитен обелиск, висок 41 м, в Борисовата градина, с фигури на партизани и бронзови релефи в основата.'] },
+    w1212179844: { name: ['Georgi Asparuhov – Gundi', 'Георги Аспарухов – Гунди'], kind: ['Statue · 2023', 'Статуя · 2023'],
+      text: ['A bronze statue of Levski Sofia’s legendary forward by Lyubomir Grigorov, beside the club’s stadium.',
+        'Бронзова статуя на легендарния нападател на Левски, дело на Любомир Григоров, до стадиона на клуба.'] },
+    w1217583044: { name: ['Artwork', 'Произведение на изкуството'], kind: ['Public art', 'Обществено изкуство'], text: ['A sculpture in a public space.', 'Скулптура на открито.'] },
+    w1287290326: { name: ['Wall installation', 'Стенна инсталация'], kind: ['Public art', 'Обществено изкуство'], text: ['An artwork in the form of a wall.', 'Произведение на изкуството във формата на стена.'] },
+    w1344630922: { name: ['Alley of Sports Glory', 'Алея на спортната слава'], kind: ['Installation', 'Инсталация'],
+      text: ['A wall listing Bulgaria’s sports medallists.', 'Стена с имената на българските спортни медалисти.'] },
+    w1433086220: { name: ['The Bells', 'Камбаните'], kind: ['Monument · 1979', 'Паметник · 1979'],
+      text: ['A 37 m tower built for the International Children’s Assembly “Banner of Peace”, ringed by over 100 bells sent from around the world.',
+        'Кула, висока 37 м, издигната за Международната детска асамблея „Знаме на мира“, заобиколена от над 100 камбани от цял свят.'] },
+    w1456454864: { name: ['Mother', 'Майка'], kind: ['Monument · 1976', 'Паметник · 1976'],
+      text: ['A tall faceted pylon with a seated mother and her children, by Velichko Minekov, in front of Sofia Central Station.',
+        'Висок пилон с фигура на седнала майка с деца, дело на Величко Минеков, пред Централна гара София.'] }
+  };
+  // Landmarks lift off (release 110). When the 3D map is zoomed out so far that only the landmark and monument
+  // models stand (MapLibre zoom 12 up to where the buildings stand), a model under the mouse rises off the ground and
+  // spins, and lands again facing the way it is mapped when the mouse leaves. On a touch screen a tap does the same,
+  // and a second tap (on it, another model or the empty map) lands it. A small card above the model names it and
+  // says a sentence or two about it (landmark-info.js). The fixed-model layer in bulgarian-houses.js draws each moving
+  // model with its own turn and rise (poses()); landmarks.js reports the layer's projection, used here for picking.
+  // See docs/3d-landmark-lift.md.
+  var landmarkLift = (function () {
+    var RISE_PX = 44;            // how high a model's foot rises on screen, at least
+    var PICK_PAD_PX = 8;         // the pointer may be this far outside a model's outline on screen
+    var GROW_PX = 110, GROW_MIN = 1.4, GROW_MAX = 7;   // while up a model grows to about this size on screen, within these factors
+    var TURN_S = 3.2;            // seconds a turn while up
+    var RISE_RATE = 6;           // spring rate of the rise, 1/s (critically damped: up in about a second)
+    var SPIN_RATE = 2.4;         // how fast the spin gathers speed, 1/s
+    var LAND_MIN = 0.8, LAND_MAX = 2.2;   // seconds a landing takes, by how far the model must still turn
+    var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+    var map = null, cont = null, card = null, blocked = null, raf = 0, last = 0;
+    var states = new Map();      // site index -> { level, vel, angle, spin, riseM, grow, land }
+    var hoverI = -1, tapI = -1, shownI = -1, mouseAt = null, pointer = 'mouse', recheck = false;
+
+    function gateOpen() {
+      if (!map) return false;
+      var z = map.getZoom();
+      return z >= landmarks.minZoom && z < VIEW3D_BUILDING_ZOOM - 1 && landmarks.awake();
+    }
+
+    // ---- picking: each drawn model's box (a cylinder up to its lifted top while it moves) on screen ----
+    function project(M, x, y, z, w, h) {
+      var cw = M[3] * x + M[7] * y + M[11] * z + M[15];
+      if (cw <= 1e-9) return null;
+      return [((M[0] * x + M[4] * y + M[8] * z + M[12]) / cw + 1) / 2 * w, (1 - (M[1] * x + M[5] * y + M[9] * z + M[13]) / cw) / 2 * h, cw];
+    }
+    // A point of the site in metres along its axis (u), to its left (v) and up (z), in Mercator units.
+    function world(site, u, v, z) {
+      var at = site._merc || (site._merc = maplibregl.MercatorCoordinate.fromLngLat(site.at)), unit = at.meterInMercatorCoordinateUnits();
+      var b = site.b * Math.PI / 180, s = Math.sin(b), c = Math.cos(b);
+      var ground = map && map.getTerrain() ? map.queryTerrainElevation(site.at) || 0 : 0;
+      return [at.x + (u * s - v * c) * unit, at.y - (u * c + v * s) * unit, (z + ground) * unit];
+    }
+    function hull(points) {
+      points.sort(function (a, b) { return a[0] - b[0] || a[1] - b[1]; });
+      function cross(o, a, b) { return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]); }
+      var lower = [], upper = [];
+      points.forEach(function (p) { while (lower.length > 1 && cross(lower[lower.length - 2], lower[lower.length - 1], p) <= 0) lower.pop(); lower.push(p); });
+      for (var i = points.length - 1; i >= 0; i--) { var p = points[i]; while (upper.length > 1 && cross(upper[upper.length - 2], upper[upper.length - 1], p) <= 0) upper.pop(); upper.push(p); }
+      return lower.slice(0, -1).concat(upper.slice(0, -1));
+    }
+    // A hull grown outwards by `pad` pixels, so a model only a dozen pixels across is still easy to point at.
+    function padded(poly, pad) {
+      if (poly.length < 3) return poly;
+      var cx = 0, cy = 0;
+      poly.forEach(function (p) { cx += p[0]; cy += p[1]; });
+      cx /= poly.length; cy /= poly.length;
+      return poly.map(function (p) {
+        var dx = p[0] - cx, dy = p[1] - cy, d = Math.hypot(dx, dy) || 1;
+        return [p[0] + dx / d * pad, p[1] + dy / d * pad, p[2]];
+      });
+    }
+    function insideHull(poly, p) {
+      if (poly.length < 3) return false;
+      for (var i = 0; i < poly.length; i++) {
+        var a = poly[i], b = poly[(i + 1) % poly.length];
+        if ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0]) < 0) return false;
+      }
+      return true;
+    }
+    function outlineOnScreen(i, M, w, h) {
+      var site = landmarks.sites[i];
+      if (!site.box) landmarks.mesh(site);
+      var box = site.box, st = states.get(i), pts = [], points3 = [];
+      if (st) {   // moving: the whole circle it sweeps, from the ground to its lifted top
+        var grown = scaleOf(st), r = grown * Math.max(Math.hypot(box[0], box[2]), Math.hypot(box[0], box[3]), Math.hypot(box[1], box[2]), Math.hypot(box[1], box[3]), 4);
+        for (var k = 0; k < 12; k++) {
+          var g = k * Math.PI / 6;
+          points3.push([r * Math.cos(g), r * Math.sin(g), 0], [r * Math.cos(g), r * Math.sin(g), box[4] * grown + st.riseM * st.level]);
+        }
+      } else {
+        [box[0], box[1]].forEach(function (u) { [box[2], box[3]].forEach(function (v) { points3.push([u, v, 0], [u, v, Math.max(box[4], 1)]); }); });
+      }
+      for (var j = 0; j < points3.length; j++) {
+        var q = world(site, points3[j][0], points3[j][1], points3[j][2]), s = project(M, q[0], q[1], q[2], w, h);
+        if (!s) return null;
+        pts.push(s);
+      }
+      return { poly: padded(hull(pts), PICK_PAD_PX), depth: pts.reduce(function (d, p) { return Math.min(d, p[2]); }, Infinity) };
+    }
+    // The drawn site under a screen point, or -1. A site already moving wins over one behind it.
+    function pick(p) {
+      var f = landmarks.lastFrame();
+      if (!gateOpen() || !f || f.map !== map) return -1;
+      var c = map.getCanvas(), w = c.clientWidth, h = c.clientHeight, best = -1, bestDepth = Infinity, keep = -1;
+      landmarks.shown().forEach(function (i) {
+        var o = outlineOnScreen(i, f.matrix, w, h);
+        if (!o || !insideHull(o.poly, [p.x, p.y])) return;
+        if (i === hoverI || i === tapI) keep = i;
+        if (o.depth < bestDepth) { bestDepth = o.depth; best = i; }
+      });
+      return keep >= 0 ? keep : best;
+    }
+
+    // ---- motion ----
+    // Pixels on screen per metre straight up at the site, from the layer's projection (horizontal as a floor, for a
+    // camera looking straight down, where height barely shows).
+    function scaleOf(st) { return 1 + (st.grow - 1) * Math.max(0, Math.min(1, st.level)); }
+    // How high a site rises (metres) and how much it grows, from how big it looks now.
+    function riseFor(i) {
+      var site = landmarks.sites[i], f = landmarks.lastFrame(), box = site.box || [0, 0, 0, 0, 10], top = box[4];
+      if (!f) return { rise: Math.max(30, top * 0.35), grow: 1 };
+      var c = map.getCanvas(), w = c.clientWidth, h = c.clientHeight;
+      var a = world(site, 0, 0, 0), b = world(site, 0, 0, 10), e = world(site, 10, 0, 0);
+      var pa = project(f.matrix, a[0], a[1], a[2], w, h), pb = project(f.matrix, b[0], b[1], b[2], w, h), pe = project(f.matrix, e[0], e[1], e[2], w, h);
+      if (!pa || !pb || !pe) return { rise: Math.max(30, top * 0.35), grow: 1 };
+      var up = Math.hypot(pb[0] - pa[0], pb[1] - pa[1]) / 10, across = Math.hypot(pe[0] - pa[0], pe[1] - pa[1]) / 10;
+      var looks = across * Math.max(box[1] - box[0], box[3] - box[2], top);
+      return { rise: Math.max(RISE_PX / Math.max(up, across * 0.35, 1e-6), top * 0.35),
+        grow: reduce ? 1 : Math.max(GROW_MIN, Math.min(GROW_MAX, GROW_PX / Math.max(looks, 1))) };
+    }
+    function liftOff(i) {
+      if (i < 0) return;
+      var st = states.get(i);
+      if (!st) { var size = riseFor(i); st = { level: 0, vel: 0, angle: 0, spin: 0, riseM: size.rise, grow: size.grow, land: null }; states.set(i, st); }
+      else if (st.land) {   // caught on its way down: carry on from where it is, at the speed it has
+        var now = landing(st, 1 / 1e6);
+        st.vel = now.levelVel; st.spin = now.spin; st.land = null;
+      }
+      landmarks.raise(map);   // its layer back on top of the style, over everything drawn since
+      run();
+    }
+    function setDown(i) {
+      var st = states.get(i);
+      if (!st || st.land) return;
+      var w = st.spin, turn = 2 * Math.PI, at = ((st.angle % turn) + turn) % turn;
+      var ahead = turn - at;
+      if (ahead < 1e-4) ahead = 0;
+      if (ahead < w * LAND_MIN / 3 - 1e-6) ahead += turn;   // never slow so hard that it runs back
+      var d = ahead;
+      if (w < 0.5 && at > 1e-4 && at < ahead) d = -at;     // barely turning: go back the short way
+      var T = Math.min(LAND_MAX, Math.max(LAND_MIN, w > 0.1 ? 2 * Math.abs(d) / w : LAND_MIN + Math.abs(d) / Math.PI));
+      st.land = { t: 0, T: T, from: st.angle, d: d, w0: w, l0: st.level, v0: st.vel };
+      run();
+    }
+    // Where a landing is after `dt` more seconds: Hermite curves from the current angle, speed, height and climb to
+    // the next whole turn and the ground, both at rest. With d = w0 T / 2 the spin slows down evenly.
+    function landing(st, dt) {
+      var L = st.land, t = Math.min(L.T, L.t + dt), s = t / L.T, T = L.T;
+      var h1 = s - 2 * s * s + s * s * s, h2 = 3 * s * s - 2 * s * s * s, h0 = 1 - h2;
+      var d1 = (1 - 4 * s + 3 * s * s) / T, d2 = (6 * s - 6 * s * s) / T;
+      return { t: t, done: s >= 1, angle: L.from + L.w0 * T * h1 + L.d * h2, spin: L.w0 * T * d1 + L.d * d2,
+        level: Math.max(0, L.l0 * h0 + L.v0 * T * h1), levelVel: -L.l0 * d2 + L.v0 * T * d1 };
+    }
+    function step(dt) {
+      var target = reduce ? 0 : 2 * Math.PI / TURN_S;
+      states.forEach(function (st, i) {
+        if (st.land) {
+          var now = landing(st, dt);
+          st.land.t = now.t; st.angle = now.angle; st.spin = now.spin; st.level = now.level; st.vel = now.levelVel;
+          if (now.done) states.delete(i);
+          return;
+        }
+        for (var left = dt; left > 1e-6; left -= 1 / 120) {
+          var h = Math.min(left, 1 / 120);
+          st.vel += (RISE_RATE * RISE_RATE * (1 - st.level) - 2 * RISE_RATE * st.vel) * h;
+          st.level += st.vel * h;
+          st.spin += (target - st.spin) * (1 - Math.exp(-SPIN_RATE * h));
+          st.angle += st.spin * h;
+        }
+      });
+    }
+
+    // ---- the card ----
+    function info(site) {
+      var row = (typeof landmarkInfo !== 'undefined' && (landmarkInfo[site.key] || landmarkInfo[site.n])) || null, k = LANG === 'bg' ? 1 : 0;
+      var kinds = { stadium: 'Stadium', university: 'University', mall: 'Shopping centre', monument: 'Monument' };
+      return { name: row && row.name ? row.name[k] : feedText(site.n),
+        kind: row && row.kind ? row.kind[k] : t(kinds[site.k] || 'Landmark'),
+        text: row && row.text ? row.text[k] : '' };
+    }
+    function showCard(i) {
+      if (!card) return;
+      if (i !== shownI) {
+        shownI = i;
+        if (i >= 0) {
+          var about = info(landmarks.sites[i]);
+          card.querySelector('.lm-name').textContent = about.name;
+          card.querySelector('.lm-kind').textContent = about.kind;
+          var text = card.querySelector('.lm-text');
+          text.textContent = about.text; text.hidden = !about.text;
+          card.hidden = false;
+          void card.offsetWidth;   // start the fade from the hidden state
+        }
+        card.classList.toggle('on', i >= 0);
+      }
+      if (i >= 0) placeCard(i);
+    }
+    // Above the model's lifted top, kept inside the map; under its foot when there is no room above.
+    function placeCard(i) {
+      var f = landmarks.lastFrame(), st = states.get(i), site = landmarks.sites[i];
+      if (!f || !site.box) return;
+      var c = map.getCanvas(), w = c.clientWidth, h = c.clientHeight, rise = st ? st.riseM * st.level : 0;
+      var top = world(site, 0, 0, site.box[4] * (st ? scaleOf(st) : 1) + rise), foot = world(site, 0, 0, 0);
+      var a = project(f.matrix, top[0], top[1], top[2], w, h), b = project(f.matrix, foot[0], foot[1], foot[2], w, h);
+      if (!a || !b) return;
+      var cw = card.offsetWidth, ch = card.offsetHeight, gap = 14, y = a[1] - gap - ch;
+      if (y < 8) y = Math.min(h - ch - 8, b[1] + gap);
+      var x = Math.max(8, Math.min(w - cw - 8, a[0] - cw / 2));
+      card.style.transform = 'translate(' + Math.round(x) + 'px,' + Math.round(y) + 'px)';
+    }
+
+    // ---- the frame loop: runs while anything moves or the card is up ----
+    function run() { if (!raf && map) { last = performance.now(); raf = requestAnimationFrame(frame); } }
+    function frame(now) {
+      raf = 0;
+      if (!map) return;
+      var dt = Math.min(0.05, Math.max(0, (now - last) / 1000));
+      last = now;
+      if (!gateOpen()) { hoverI = tapI = -1; states.forEach(function (_, i) { setDown(i); }); }
+      if (recheck && mouseAt) { recheck = false; hoverTo(mouseAt); }
+      var focus = hoverI >= 0 ? hoverI : tapI;
+      if (focus >= 0 && landmarks.shown().indexOf(focus) < 0) { if (hoverI === focus) hoverI = -1; if (tapI === focus) tapI = -1; setDown(focus); focus = -1; }
+      step(dt);
+      showCard(focus);
+      coverMarkers();
+      if (states.size) map.triggerRepaint();
+      if (states.size || focus >= 0) raf = requestAnimationFrame(frame);
+    }
+
+    // HTML markers (metro stations, saved places, the tracked vehicle) sit above the map's canvas: those under a
+    // model in the air fade out, so the model covers them like everything else on the map.
+    function coverMarkers() {
+      if (!cont) return;
+      var f = landmarks.lastFrame(), hulls = [];
+      if (f) states.forEach(function (st, i) {
+        if (st.level < 0.05) return;
+        var site = landmarks.sites[i], box = site.box, c = map.getCanvas(), w = c.clientWidth, h = c.clientHeight, pts = [];
+        var grown = scaleOf(st), r = grown * Math.max(Math.hypot(box[0], box[2]), Math.hypot(box[0], box[3]), Math.hypot(box[1], box[2]), Math.hypot(box[1], box[3]), 4);
+        var low = st.riseM * st.level, high = low + box[4] * grown;
+        for (var k = 0; k < 12; k++) {
+          var g = k * Math.PI / 6;
+          [low, high].forEach(function (z) {
+            var q = world(site, r * Math.cos(g), r * Math.sin(g), z), s = project(f.matrix, q[0], q[1], q[2], w, h);
+            if (s) pts.push(s);
+          });
+        }
+        if (pts.length > 2) hulls.push(hull(pts));
+      });
+      var marks = cont.querySelectorAll('.maplibregl-marker'), at = cont.getBoundingClientRect();
+      for (var m = 0; m < marks.length; m++) {
+        var el = marks[m], under = false;
+        if (hulls.length) {
+          var b = el.getBoundingClientRect(), p = [b.left + b.width / 2 - at.left, b.top + b.height / 2 - at.top];
+          under = hulls.some(function (poly) { return insideHull(poly, p); });
+        }
+        if (el.classList.contains('lm-under') !== under) el.classList.toggle('lm-under', under);
+      }
+    }
+
+    // ---- input ----
+    // A vehicle dot or stop right under the pointer wins over a model that is still on the ground; a model already up
+    // stays up while the pointer is on it, even when a vehicle glides under it.
+    function hoverTo(p) {
+      var i = p ? pick(p) : -1;
+      if (i >= 0 && i !== hoverI && blocked && blocked(p)) i = -1;
+      if (i === hoverI) return;
+      if (hoverI >= 0 && hoverI !== tapI) setDown(hoverI);
+      hoverI = i;
+      if (cont) cont.style.cursor = i >= 0 ? 'pointer' : '';
+      if (i >= 0) liftOff(i);
+      run();
+    }
+    function onMouseMove(e) {
+      if (pointer !== 'mouse' || (e.originalEvent && e.originalEvent.buttons)) return;
+      mouseAt = e.point; recheck = true; run();
+    }
+    function onMouseOut() { mouseAt = null; recheck = false; hoverTo(null); }
+    function onMove() { if (mouseAt) { recheck = true; run(); } else if (tapI >= 0) run(); }
+    function onPointerDown(e) { pointer = e.pointerType || 'mouse'; if (pointer !== 'mouse' && hoverI >= 0) hoverTo(null); }
+    // A tap on the 3D map, after vehicles and stops had their turn. True when it was the lift's.
+    function tap(p) {
+      if (!map) return false;
+      var i = pick(p);
+      if (pointer === 'mouse') return i >= 0;   // the hover already shows it; a click on it does nothing else
+      if (i >= 0 && i === tapI) { setDown(i); tapI = -1; run(); return true; }
+      if (i >= 0) { if (tapI >= 0) setDown(tapI); tapI = i; liftOff(i); return true; }
+      if (tapI >= 0) { setDown(tapI); tapI = -1; run(); return true; }   // a tap beside it only sets it down
+      return false;
+    }
+
+    function attach(m3, opts) {
+      detach();
+      map = m3; cont = m3.getCanvasContainer(); blocked = opts && opts.blocked;
+      card = document.createElement('div');
+      card.className = 'lm-card'; card.hidden = true;
+      card.setAttribute('role', 'status'); card.setAttribute('aria-live', 'polite');
+      card.innerHTML = '<b class="lm-name"></b><span class="lm-kind"></span><p class="lm-text"></p>';
+      card.addEventListener('transitionend', function () { if (!card.classList.contains('on')) card.hidden = true; });
+      m3.getContainer().appendChild(card);
+      m3.on('mousemove', onMouseMove);
+      m3.on('mouseout', onMouseOut);
+      m3.on('move', onMove);
+      cont.addEventListener('pointerdown', onPointerDown, true);
+    }
+    function detach() {
+      if (raf) cancelAnimationFrame(raf);
+      raf = 0;
+      if (map) {
+        try { map.off('mousemove', onMouseMove); map.off('mouseout', onMouseOut); map.off('move', onMove); } catch (e) {}
+        if (cont) {
+          cont.removeEventListener('pointerdown', onPointerDown, true); cont.style.cursor = '';
+          Array.prototype.forEach.call(cont.querySelectorAll('.lm-under'), function (el) { el.classList.remove('lm-under'); });
+        }
+      }
+      if (card) card.remove();
+      map = cont = card = blocked = null;
+      states.clear(); hoverI = tapI = shownI = -1; mouseAt = null;
+    }
+    // For the layer: site index -> { angle (radians), rise (metres), scale } of every moving model, or null.
+    function poses() {
+      if (!states.size) return null;
+      var out = new Map();
+      states.forEach(function (st, i) { out.set(i, { angle: st.angle, rise: st.riseM * st.level, scale: scaleOf(st) }); });
+      return out;
+    }
+    return { attach: attach, detach: detach, tap: tap, poses: poses, pick: pick,
+      state: function () { return { hover: hoverI, tap: tapI, card: shownI, moving: Array.from(states.keys()), gate: gateOpen() }; },
+      _landing: landing, _setDown: setDown, _states: states };
+  })();
   // Close-range Sofia houses. Build the mesh in local metres around the mapped
   // footprint so a rotated street frontage keeps its original alignment.
   var houseDesigns = [
@@ -13074,7 +13626,8 @@
   // `canopy` is a fixed-model source (metro roofs, landmarks): { suffix, minZoom, visible(bounds), vertices(map, origin, visible) }.
   // A source with awake() decides for itself whether it is drawn; the others follow the building layer's visibility.
   function bulgarianHouseLayer(materialLayer, sourceId, canopy) {
-    var map, program, buffer, matrixLoc, anchorLoc, position, color, normal, emitLoc, lightLocs, shadowProgram, origin;
+    var map, program, buffer, matrixLoc, anchorLoc, spinLoc, raiseLoc, position, color, normal, emitLoc, lightLocs, shadowProgram, origin;
+    var ranges = null;   // fixed models: where each site sits in the buffer (landmarks.js), for turning one alone
     var dirty=true, count=0, lastBuild=0, terrain, view, built=-1, asleep=false;
     var previousKeys = null, meshCache = new Map(), batch = buildingBuffer(10);
     function moved(){ if (canopy) dirty=true; else view.cameraMoved(); }
@@ -13121,8 +13674,48 @@
       count=batch.count();
       return null;
     }
+    // Shared by render() and drawMoving(): the program, camera, light and vertex layout.
+    function begin(gl,matrix){
+      gl.useProgram(program);gl.disable(gl.CULL_FACE);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
+      var anchor=[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];});
+      gl.uniform4fv(anchorLoc,anchor);
+      gl.uniformMatrix4fv(matrixLoc,false,Float32Array.from(matrix,function(v){return v*origin.unit;}));
+      var light=daylight.lighting();
+      gl.uniform3fv(lightLocs[0],light.dir);gl.uniform3fv(lightLocs[1],light.color);gl.uniform3fv(lightLocs[2],light.ambient);gl.uniform1f(lightLocs[3],light.lit);
+      [position,color,normal,emitLoc].forEach(function(a){gl.enableVertexAttribArray(a);});
+      gl.vertexAttribPointer(position,3,gl.FLOAT,false,40,0);gl.vertexAttribPointer(color,3,gl.FLOAT,false,40,12);
+      gl.vertexAttribPointer(normal,3,gl.FLOAT,false,40,24);gl.vertexAttribPointer(emitLoc,1,gl.FLOAT,false,40,36);
+      return anchor;
+    }
+    // Fixed models that are moving (landmark-lift.js): their buffer range and pose, in buffer order.
+    function movingList(){
+      var moving=[], poses=canopy && canopy.poses ? canopy.poses() : null;
+      if (poses && ranges) poses.forEach(function(pose,i){var r=ranges.get(i); if(r) moving.push({r:r,pose:pose});});
+      return moving.sort(function(a,b){return a.r.first-b.r.first;});
+    }
+    function drawPoses(gl,moving){
+      moving.forEach(function(m){
+        gl.uniform4f(spinLoc,m.r.x,m.r.y,Math.cos(m.pose.angle),Math.sin(m.pose.angle));gl.uniform3f(raiseLoc,m.r.z,m.pose.rise*m.r.k,m.pose.scale||1);
+        gl.drawArrays(gl.TRIANGLES,m.r.first,m.r.count);
+      });
+    }
+    var overlaid=false;   // a layer on top of the style draws the moving models (drawMoving)
     return {
       id:materialLayer+(canopy ? canopy.suffix : '-houses'),type:'custom',renderingMode:'3d',
+      // Called by a custom layer at the very top of the style: the moving models over everything else drawn on the
+      // map (labels, vehicle dots, stop icons, other models). The depth buffer is cleared first, so they hide
+      // nothing of themselves but nothing drawn before covers them.
+      drawMoving:function(gl,matrix){
+        overlaid=true;
+        if (asleep || !count || !origin || !program) return;
+        var moving=movingList();
+        if (!moving.length) return;
+        gl.bindBuffer(gl.ARRAY_BUFFER,buffer);
+        gl.depthMask(true);gl.clearDepth(1);gl.clear(gl.DEPTH_BUFFER_BIT);
+        begin(gl,matrix);
+        drawPoses(gl,moving);
+        [position,color,normal,emitLoc].forEach(function(a){gl.disableVertexAttribArray(a);});
+      },
       refresh:function(){dirty=true;},   // the fixed-model source changed what it shows
       onAdd:function(owner,gl){
         map=owner;
@@ -13134,18 +13727,22 @@
           if(!gl.getShaderParameter(shader,gl.COMPILE_STATUS)) throw Error(gl.getShaderInfoLog(shader));
           gl.attachShader(program,shader);gl.deleteShader(shader);
         }
-        attach(gl.VERTEX_SHADER,'attribute vec3 pos,rgb,nrm; attribute float emit; uniform vec4 anchor; uniform mat4 offsetMatrix; uniform vec3 sunDir,sunColor,ambient; varying vec3 tint; varying float lampOn; void main(){gl_Position=anchor+offsetMatrix*vec4(pos,0.0);tint=rgb*(ambient+sunColor*max(dot(nrm,sunDir),0.0));lampOn=emit;}');
+        // spin = (centre x, centre y, cos, sin) turns a model about its upright axis; raise = (its ground, rise, scale)
+        // lifts and grows it from its foot (landmark-lift.js). Every other draw passes (0, 0, 1, 0) and (0, 0, 1).
+        attach(gl.VERTEX_SHADER,'attribute vec3 pos,rgb,nrm; attribute float emit; uniform vec4 anchor,spin; uniform vec3 raise; uniform mat4 offsetMatrix; uniform vec3 sunDir,sunColor,ambient; varying vec3 tint; varying float lampOn; mat2 turn(){return mat2(spin.z,spin.w,-spin.w,spin.z);} void main(){vec3 p=vec3(spin.xy+turn()*(pos.xy-spin.xy)*raise.z,raise.x+(pos.z-raise.x)*raise.z+raise.y);vec3 n=vec3(turn()*nrm.xy,nrm.z);gl_Position=anchor+offsetMatrix*vec4(p,0.0);tint=rgb*(ambient+sunColor*max(dot(n,sunDir),0.0));lampOn=emit;}');
         attach(gl.FRAGMENT_SHADER,'precision mediump float; varying vec3 tint; varying float lampOn; uniform float lit; void main(){float on=step(0.001,lampOn)*step(lampOn,lit);gl_FragColor=vec4(mix(tint,vec3(1.0,0.76,0.42)*(0.7+0.5*fract(lampOn*57.3)),0.9*on),1.0);}');
         gl.linkProgram(program);
         if(!gl.getProgramParameter(program,gl.LINK_STATUS)) throw Error(gl.getProgramInfoLog(program));
         position=gl.getAttribLocation(program,'pos');color=gl.getAttribLocation(program,'rgb');normal=gl.getAttribLocation(program,'nrm');emitLoc=gl.getAttribLocation(program,'emit');
         lightLocs=['sunDir','sunColor','ambient','lit'].map(function(k){return gl.getUniformLocation(program,k);});
         matrixLoc=gl.getUniformLocation(program,'offsetMatrix');anchorLoc=gl.getUniformLocation(program,'anchor');
+        spinLoc=gl.getUniformLocation(program,'spin');raiseLoc=gl.getUniformLocation(program,'raise');
         buffer=gl.createBuffer();
         try { shadowProgram=shadows.create(gl); } catch (e) { console.warn('3D shadows failed:', e); }
         map.on('move',moved);map.on('resize',resized);map.on('sourcedata',sourceChanged);map.on('terrain',resetGeometry);
       },
       render:function(gl,matrix){
+        if (canopy && canopy.frame) canopy.frame(matrix, map);
         if(map.getZoom()<(canopy ? canopy.minZoom : HOUSE_MIN_ZOOM) || (canopy && canopy.awake ? !canopy.awake() : map.getLayoutProperty(materialLayer,'visibility')==='none')){
           asleep=true;return;
         }
@@ -13161,23 +13758,22 @@
           var data = rebuild(gl);
           if (data !== null) {
             count = data.length / 10;
+            ranges = data.ranges || null;
             gl.bufferData(gl.ARRAY_BUFFER,data,gl.DYNAMIC_DRAW);
           }
           lastBuild=now;dirty=false;terrain=currentTerrain;built=version;
         } else if(due) map.triggerRepaint();
         if(!count)return;
-        gl.useProgram(program);gl.disable(gl.CULL_FACE);gl.enable(gl.DEPTH_TEST);gl.depthMask(true);
-        var anchor=[0,1,2,3].map(function(i){return matrix[i]*origin.x+matrix[i+4]*origin.y+matrix[i+12];});
-        gl.uniform4fv(anchorLoc,anchor);
-        gl.uniformMatrix4fv(matrixLoc,false,Float32Array.from(matrix,function(v){return v*origin.unit;}));
-        var light=daylight.lighting();
-        gl.uniform3fv(lightLocs[0],light.dir);gl.uniform3fv(lightLocs[1],light.color);gl.uniform3fv(lightLocs[2],light.ambient);gl.uniform1f(lightLocs[3],light.lit);
-        [position,color,normal,emitLoc].forEach(function(a){gl.enableVertexAttribArray(a);});
-        gl.vertexAttribPointer(position,3,gl.FLOAT,false,40,0);gl.vertexAttribPointer(color,3,gl.FLOAT,false,40,12);
-        gl.vertexAttribPointer(normal,3,gl.FLOAT,false,40,24);gl.vertexAttribPointer(emitLoc,1,gl.FLOAT,false,40,36);
-        gl.drawArrays(gl.TRIANGLES,0,count);
+        var anchor=begin(gl,matrix), moving=movingList();
+        // Moving models (a lifted landmark) are left out here: the layer on top of the style draws them (drawMoving).
+        // Without that layer they are drawn here, each with its own turn and rise.
+        function still(draw){var at=0;moving.forEach(function(m){if(m.r.first>at)draw(at,m.r.first-at);at=m.r.first+m.r.count;});if(count>at)draw(at,count-at);}
+        gl.uniform4f(spinLoc,0,0,1,0);gl.uniform3f(raiseLoc,0,0,1);
+        still(function(first,n){gl.drawArrays(gl.TRIANGLES,first,n);});
+        if (!overlaid) drawPoses(gl,moving);
         [position,color,normal,emitLoc].forEach(function(a){gl.disableVertexAttribArray(a);});
-        shadows.pass(gl,shadowProgram,map,anchor,Float32Array.from(matrix,function(v){return v*origin.unit;}),40,function(){gl.drawArrays(gl.TRIANGLES,0,count);});
+        // a model in the air casts no ground shadow here
+        shadows.pass(gl,shadowProgram,map,anchor,Float32Array.from(matrix,function(v){return v*origin.unit;}),40,function(){still(function(first,n){gl.drawArrays(gl.TRIANGLES,first,n);});});
       },
       onRemove:function(owner,gl){
         owner.off('move',moved);owner.off('resize',resized);owner.off('sourcedata',sourceChanged);owner.off('terrain',resetGeometry);
@@ -13949,6 +14545,11 @@
       map3.addLayer(models, layer.id);
       if (!landmarkLayers.has(map3)) landmarkLayers.set(map3, []);
       landmarkLayers.get(map3).push(models);
+      // A lifted landmark (landmark-lift.js) is drawn by this layer at the top of the style, over everything else.
+      // landmarks.raise() moves it back to the top when a model lifts off, after later layers were added.
+      var lifted = models.id + '-lifted';
+      if (!map3.getLayer(lifted)) map3.addLayer({ id: lifted, type: 'custom', renderingMode: '3d', render: function (gl, matrix) { models.drawMoving(gl, matrix); } });
+      if (landmarks.liftLayers.indexOf(lifted) < 0) landmarks.liftLayers.push(lifted);
 
     }
 
@@ -15689,6 +16290,8 @@
       m3.addLayer({ id: 'v3-me-acc', type: 'fill', source: 'v3-me-acc',
         paint: { 'fill-color': '#1A73E8', 'fill-opacity': 0.12, 'fill-outline-color': 'rgba(26,115,232,.45)' } }, sym);
       accKey = '';
+      // release 110: zoomed out, a landmark under the mouse (or tapped) lifts off and spins; vehicles and stops come first
+      landmarkLift.attach(m3, { blocked: function (p) { return !!(vehAtPoint(p, true, true) || stopAtPoint(p)); } });
       addOverlays(sym);
       applyBuildingTextures();
       syncPins();
@@ -16284,12 +16887,14 @@
     // label when labels show. Worked out from the drawn positions, not queryRenderedFeatures: on a symbol layer
     // whose data changes 15 times a second, MapLibre 4.7 can throw "feature index out of bounds" there.
     // a vehicle under point p; with skipBodies only its marker or number counts, not a 3D model's body
-    function vehAtPoint(p, skipBodies) {
+    // `tight`: only a pointer on the dot itself (the zoomed-out landmark lift uses it, so a nearby dot does not block)
+    function vehAtPoint(p, skipBodies, tight) {
       var lbl = labelsBySearch || viewZoom() >= LABEL_ZOOM, best = null, bd = Infinity;
       var all = drawn.concat(farDrawn);
       for (var i = 0; i < all.length; i++) {
         var f = all[i], q = m3.project(f.c), dx = Math.abs(q.x - p.x), dy = Math.abs(q.y - p.y);
         var rx = f.m ? 26 * ui : lbl ? 18 * ui : 12, ry = f.m ? 16 * ui : lbl ? 12 * ui : 12;
+        if (tight) { rx = Math.min(rx, 5 * ui); ry = Math.min(ry, 5 * ui); }
         if (f.model) {
           var length = (vehicleMeshType(f.type) === 0 ? 10.5 : 6) * vehicleModelMetresPerUnit;
           var h = toRad(f.bearing), lon = length*Math.sin(h)/(111320*Math.cos(toRad(f.c[1]))), lat = length*Math.cos(h)/111320;
@@ -16620,6 +17225,7 @@
         scheduleViewportPrefetch();
         view3d.on = false; closing = false; ready = false; camBusy = false;
         daylightMap.detach();
+        landmarkLift.detach();
         m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
         roads = null; roadRailVersion = -1;
@@ -16923,6 +17529,7 @@
       if (v) { openVeh(v); return; }
       var sm = e && e.point ? stopAtPoint(e.point) : null;   // v103: a stop of the all-stops layer
       if (sm) { stopTap(sm); return; }
+      if (e && e.point && landmarkLift.tap(e.point)) return;   // release 110: zoomed out, a landmark lifts off
       v = e && e.point ? vehAtPoint(e.point) : null;
       if (v) { openVeh(v); return; }
       cancelFocusCard();

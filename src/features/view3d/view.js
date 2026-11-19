@@ -289,6 +289,8 @@
       m3.addLayer({ id: 'v3-me-acc', type: 'fill', source: 'v3-me-acc',
         paint: { 'fill-color': '#1A73E8', 'fill-opacity': 0.12, 'fill-outline-color': 'rgba(26,115,232,.45)' } }, sym);
       accKey = '';
+      // release 110: zoomed out, a landmark under the mouse (or tapped) lifts off and spins; vehicles and stops come first
+      landmarkLift.attach(m3, { blocked: function (p) { return !!(vehAtPoint(p, true, true) || stopAtPoint(p)); } });
       addOverlays(sym);
       applyBuildingTextures();
       syncPins();
@@ -884,12 +886,14 @@
     // label when labels show. Worked out from the drawn positions, not queryRenderedFeatures: on a symbol layer
     // whose data changes 15 times a second, MapLibre 4.7 can throw "feature index out of bounds" there.
     // a vehicle under point p; with skipBodies only its marker or number counts, not a 3D model's body
-    function vehAtPoint(p, skipBodies) {
+    // `tight`: only a pointer on the dot itself (the zoomed-out landmark lift uses it, so a nearby dot does not block)
+    function vehAtPoint(p, skipBodies, tight) {
       var lbl = labelsBySearch || viewZoom() >= LABEL_ZOOM, best = null, bd = Infinity;
       var all = drawn.concat(farDrawn);
       for (var i = 0; i < all.length; i++) {
         var f = all[i], q = m3.project(f.c), dx = Math.abs(q.x - p.x), dy = Math.abs(q.y - p.y);
         var rx = f.m ? 26 * ui : lbl ? 18 * ui : 12, ry = f.m ? 16 * ui : lbl ? 12 * ui : 12;
+        if (tight) { rx = Math.min(rx, 5 * ui); ry = Math.min(ry, 5 * ui); }
         if (f.model) {
           var length = (vehicleMeshType(f.type) === 0 ? 10.5 : 6) * vehicleModelMetresPerUnit;
           var h = toRad(f.bearing), lon = length*Math.sin(h)/(111320*Math.cos(toRad(f.c[1]))), lat = length*Math.cos(h)/111320;
@@ -1220,6 +1224,7 @@
         scheduleViewportPrefetch();
         view3d.on = false; closing = false; ready = false; camBusy = false;
         daylightMap.detach();
+        landmarkLift.detach();
         m3 = null; el = null; viewBounds01 = null;
         meMk = beamMk = null; meKey = accKey = ''; pinMks = {}; pop = null;
         roads = null; roadRailVersion = -1;
@@ -1523,6 +1528,7 @@
       if (v) { openVeh(v); return; }
       var sm = e && e.point ? stopAtPoint(e.point) : null;   // v103: a stop of the all-stops layer
       if (sm) { stopTap(sm); return; }
+      if (e && e.point && landmarkLift.tap(e.point)) return;   // release 110: zoomed out, a landmark lifts off
       v = e && e.point ? vehAtPoint(e.point) : null;
       if (v) { openVeh(v); return; }
       cancelFocusCard();
