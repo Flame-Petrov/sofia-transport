@@ -22,6 +22,11 @@
   }
   .leaflet-container .leaflet-control-3d a { display: flex; align-items: center; justify-content: center; font: 700 15px/48px var(--font); letter-spacing: -.01em; color: #3a3a3c; }
   .leaflet-container .leaflet-control-3d.on a { background: var(--ink); color: #fff; }
+  /* 2026-11-19: 3D paused after a crash: a red dot on the button (a tap explains, see #v3Issue) */
+  .leaflet-container .leaflet-control-3d a { position: relative; }
+  .leaflet-container .leaflet-control-3d.issue a { color: #8e8e93; }
+  .leaflet-container .leaflet-control-3d.issue a::after { content: ''; position: absolute; top: 7px; right: 7px; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--err, #FF3B30); box-shadow: 0 0 0 2px #fff; }
   .leaflet-container .leaflet-control-north a { display: flex; align-items: center; justify-content: center; color: #3a3a3c; }
   .leaflet-control-north svg { width: 24px; height: 24px; }
   .leaflet-container .leaflet-control-north.hu a { color: var(--trolley); }
@@ -82,6 +87,18 @@
 #v3Help p { margin: 8px 0; }
 #v3Help kbd { padding: 1px 5px; border: 1px solid var(--hair); border-bottom-width: 2px; border-radius: 5px; font: inherit; }
 #v3Help button { margin-top: 10px; width: 100%; min-height: 44px; border: 0; border-radius: 12px; background: #285599; color: white; font: inherit; font-weight: 600; cursor: pointer; }
+/* 2026-11-19: why 3D is paused, with a retry (issue-dialog.html), in the coach mark's style */
+#v3Issue { box-sizing: border-box; width: min(340px, calc(100vw - 32px)); margin: auto auto max(96px, calc(env(safe-area-inset-bottom) + 96px));
+  padding: 20px 24px; border: 1px solid var(--glass-edge); border-radius: 20px; background: #fafcfb; color: var(--ink); box-shadow: var(--glass-shadow);
+  text-align: left; font: 15px/1.45 system-ui, sans-serif; }
+#v3Issue::backdrop { background: rgba(28,38,49,.14); }
+#v3Issue h2 { margin: 0 0 8px; font-size: 19px; display: flex; align-items: center; gap: 8px; }
+#v3Issue h2::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--err, #FF3B30); }
+#v3Issue p { margin: 8px 0; }
+#v3Issue .v3i-when { font-size: 13px; color: var(--muted, #6e6e73); }
+#v3Issue button { display: block; width: 100%; min-height: 44px; margin-top: 10px; border: 0; border-radius: 12px; font: inherit; font-weight: 600; cursor: pointer; }
+#v3IssueRetry { background: #285599; color: white; }
+#v3Issue .v3i-later { margin-top: 6px; background: var(--fill, rgba(118,118,128,.14)); color: var(--ink); }
 /* release 109: the 3D settings row opens three groups (Map, Buildings, Vehicles) */
 #v3Menu[hidden], .v3-group[hidden], #v3HelpBtn[hidden] { display: none; }
 #v3Body { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 8px; }

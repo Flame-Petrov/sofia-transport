@@ -74,6 +74,9 @@
   // vehicle is tracked.
   var RESULTS_MAX = 30;
   var resultsHtml = '';
+  // 2026-11-19: the list can be put away. Its ✕, a tap on the chip of the search shown (a second tap brings it back)
+  // or a tap anywhere outside the list, the search row and the chips hides it; typing in the search shows it again.
+  var resultsOpen = true, resultsListable = false;
   function vehNextStop(v) {
     if (v.d.metroRun || typeof computeRouteStops !== 'function') return null;
     var list = computeRouteStops(v);
@@ -103,7 +106,8 @@
   function renderResults(toks, matched) {
     var box = document.getElementById('results');
     if (!box) return;
-    var show = toks.length > 0 && matched.length > 0 && matched.length <= RESULTS_MAX && !selected;
+    resultsListable = toks.length > 0 && matched.length > 0 && matched.length <= RESULTS_MAX && !selected;
+    var show = resultsListable && resultsOpen;
     var html = '';
     if (show) {
       var list = matched.slice().sort(function (a, b) {
@@ -111,7 +115,10 @@
           String(a.d.headsign || '').localeCompare(String(b.d.headsign || ''), 'bg') ||
           String(a.d.label).localeCompare(String(b.d.label), 'bg', { numeric: true });
       });
-      html = '<div class="rs-head">' + esc(tp(list.length, '{n} vehicle found', '{n} vehicles found')) + '</div>' +
+      html = '<div class="rs-head"><span>' + esc(tp(list.length, '{n} vehicle found', '{n} vehicles found')) + '</span>' +
+        '<button type="button" class="rs-close" aria-label="' + esc(t('Hide results')) + '" title="' + esc(t('Hide results')) + '">' +
+        '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M3 3l8 8M11 3l-8 8"/></svg>' +
+        '</button></div>' +
         list.map(function (v) {
           var d = v.d, tone = lineTones(d.color), next = vehNextStop(v), delay = vehDelay(v, next);
           var title = d.headsign ? t('To {dest}', { dest: titleCaseBg(d.headsign) }) : typeInfo(d.type).name + ' ' + (d.line || '');
@@ -137,8 +144,37 @@
       box.hidden = !html;
       fitPanel();
     }
+    syncChipState();
   }
+  function setResultsOpen(on) {
+    if (resultsOpen === on) return;
+    resultsOpen = on;
+    var toks = tokens();
+    renderResults(toks, Object.keys(vehicles).map(function (k) { return vehicles[k]; }).filter(function (v) { return matches(v.d, toks); }));
+  }
+  // the chip of the search on screen says whether its list is open (aria-expanded, .open)
+  function chipShown(b) {
+    return q.value.trim().toLowerCase() === String(b.getAttribute('data-line')).toLowerCase() &&
+      Object.keys(activeTypes).every(function (k) { return !!activeTypes[k] === (k === b.getAttribute('data-type')); });
+  }
+  function syncChipState() {
+    var listed = !!resultsHtml;
+    document.querySelectorAll('#chips .chip').forEach(function (b) {
+      var on = listed && chipShown(b);
+      b.classList.toggle('open', on);
+      b.setAttribute('aria-expanded', on ? 'true' : 'false');
+    });
+  }
+  q.addEventListener('input', function () { resultsOpen = true; });
+  q.addEventListener('click', function () { if (resultsListable) setResultsOpen(true); });   // a tap in the search: back
+  // a tap outside the list, the search row and the chips puts the list away (capture: the map stops some events)
+  document.addEventListener('pointerdown', function (e) {
+    if (!resultsHtml || !e.target.closest) return;
+    if (e.target.closest('#results, #chips, #types, #panel .qrow')) return;
+    setResultsOpen(false);
+  }, true);
   document.getElementById('results').addEventListener('click', function (e) {
+    if (e.target.closest('.rs-close')) { setResultsOpen(false); return; }
     var row = e.target.closest('[data-veh]'), v = row && vehicles[row.getAttribute('data-veh')];
     if (!v) return;
     q.blur();
@@ -277,11 +313,17 @@
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'chip';
+        b.setAttribute('data-line', g.line);
+        b.setAttribute('data-type', String(g.type));
         // release 109: "Bus 94 · 10 running" instead of "×10"; the shape of the type's map marker in the dot
         b.innerHTML = '<i class="sh-' + (DOT_SHAPE[g.type] || 'circle') + '" style="background:' + g.color + '"></i>' + esc(typeInfo(g.type).name) + ' ' + esc(g.line) +
-          ' <small>' + esc(g.n ? tp(g.n, '{n} running', '{n} running') : t('timetable')) + '</small>';
+          ' <small>' + esc(g.n ? tp(g.n, '{n} running', '{n} running') : t('timetable')) + '</small>' +
+          (g.n && g.n <= RESULTS_MAX ? '<svg class="chip-car" viewBox="0 0 12 12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M3 4.5l3 3 3-3"/></svg>' : '');
         b.title = g.n ? t('Show the {n} vehicles of this line', { n: g.n }) : t('No live vehicles: timetable only');
         b.onclick = function () {
+          // the chip of the search already shown: a tap hides its list, the next one shows it again
+          if (chipShown(b) && resultsListable) { setResultsOpen(!resultsOpen); return; }
+          resultsOpen = true;
           q.value = g.line;
           syncClear();
           if (TYPES[g.type]) setOnlyType(g.type);

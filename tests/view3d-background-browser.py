@@ -1,8 +1,9 @@
 """The 3D button must survive the phone putting the page in the background.
 
 Leaving the app (another app opens, the screen locks) can make the browser drop the 3D map's WebGL context or discard
-the whole tab. Neither means the phone ran out of memory in 3D, so neither may hide the 3D button for a day. A context
-loss or a page death while the 3D view is on screen still does.
+the whole tab. Neither means the phone ran out of memory in 3D, so neither may pause 3D for a day. A context
+loss or a page death while the 3D view is on screen still does: since 2026-11-19 the button then stays with a red dot,
+a tap on it opens a dialog with the reason (#v3Issue), and its Try 3D again clears the pause and opens 3D.
 
 Usage: python tests/view3d-background-browser.py OUTPUT_DIR [--standalone]
 Needs the Python 3.12 venv in old/osm-work (Playwright) and Chrome.
@@ -72,6 +73,7 @@ with sync_playwright() as pw:
     def button(page):
         return page.evaluate('''() => { const b = document.querySelector(".leaflet-control-3d");
             return { shown: !!b && !b.closest("[hidden]") && getComputedStyle(b).display !== "none", on: qa3d.on,
+                     issue: !!b && b.classList.contains("issue"),
                      memo: localStorage.getItem("sofia_3d_memo"), open: localStorage.getItem("sofia_3d_open") }; }''')
     def open3d(page):
         page.evaluate('qaFlat.setView([42.698,23.322],17,{animate:false})')
@@ -115,7 +117,17 @@ with sync_playwright() as pw:
 
     # 3. still guarded: context lost on screen
     p = fresh(); lose(p); shot(p, '04-after-onscreen-context-loss')
-    results['onscreen context loss'] = button(p); p.close()
+    results['onscreen context loss'] = button(p)
+    # the red dot explains itself: a tap opens the reason, Try 3D again reopens 3D
+    p.evaluate('document.querySelector(".leaflet-control-3d a").click()'); p.wait_for_timeout(300)
+    results['issue dialog'] = p.evaluate('''() => { const d = document.getElementById("v3Issue");
+        return { open: d.open, what: document.getElementById("v3IssueWhat").textContent, when: document.getElementById("v3IssueWhen").textContent, on: qa3d.on }; }''')
+    p.screenshot(path=str(args.shots / '04b-issue-dialog.png'))
+    p.evaluate('document.getElementById("v3IssueRetry").click()')
+    p.wait_for_function('window.qaMap && qaMap.getLayer("v3-models")', timeout=30000)
+    p.evaluate('document.querySelector("#v3Help button")?.click()'); p.wait_for_timeout(1500)
+    results['after retry'] = button(p); shot(p, '04c-after-retry')
+    p.close()
     print('3 done', flush=True)
 
     # 4. still guarded: page killed on screen in 3D
@@ -130,8 +142,11 @@ bg = results['background context loss']
 ok = {'background context loss: button kept': bg['while hidden']['memo'] is None and bg['after return']['shown'],
       'background context loss: 3D back on return': bg['after return']['on'],
       'background discard: button kept': results['background discard']['shown'] and results['background discard']['memo'] is None,
-      'onscreen context loss: button hidden': not results['onscreen context loss']['shown'] and results['onscreen context loss']['memo'] is not None,
-      'onscreen kill: button hidden': not results['onscreen kill']['shown'] and results['onscreen kill']['memo'] is not None}
+      'background context loss: no dot': not bg['after return']['issue'],
+      'onscreen context loss: button kept with a dot': results['onscreen context loss']['shown'] and results['onscreen context loss']['issue'] and results['onscreen context loss']['memo'] is not None,
+      'onscreen context loss: tap opens the reason': results['issue dialog']['open'] and 'graphics memory' in results['issue dialog']['what'] and not results['issue dialog']['on'],
+      'retry: 3D open, pause cleared': results['after retry']['on'] and results['after retry']['memo'] is None and not results['after retry']['issue'],
+      'onscreen kill: button kept with a dot': results['onscreen kill']['shown'] and results['onscreen kill']['issue'] and results['onscreen kill']['memo'] is not None}
 for k, v in ok.items(): print(('PASS ' if v else 'FAIL ') + k)
 print('page errors:', errors[:5])
 assert all(ok.values())

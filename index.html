@@ -1171,7 +1171,18 @@
     padding: 6px; border-radius: 22px; background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); scrollbar-width: thin; }
   #results[hidden] { display: none; }
-  .rs-head { padding: 6px 10px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6e6e73; }
+  .rs-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px;
+    padding: 0 0 0 10px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6e6e73; }
+  /* 2026-11-19: the ✕ that hides the list; the small grey circle of the search's clear button in a 44 px tap area */
+  .rs-close { flex: none; width: 44px; height: 44px; margin: -6px -2px -6px 0; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; color: var(--ink-2, #3c3c43);
+    background: radial-gradient(circle, var(--fill, rgba(120,120,128,.16)) 14px, transparent 15px); }
+  .rs-close svg { width: 12px; height: 12px; }
+  @media (hover: hover) { .rs-close:hover { color: var(--ink, #1d1d1f); } }
+  .rs-close:active { background: radial-gradient(circle, var(--row-press, rgba(120,120,128,.28)) 14px, transparent 15px); }
+  /* the chip's arrow: down while its list is hidden, up while it is open (a tap toggles it) */
+  .chip-car { width: 12px; height: 12px; flex: none; margin-right: -4px; color: var(--muted); transition: transform 150ms ease; }
+  .chip.open .chip-car { transform: rotate(180deg); }
   .rs-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 6px 10px; border: 0; border-radius: 14px;
     background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .rs-row + .rs-row { border-top: 1px solid var(--hair); }
@@ -1321,6 +1332,11 @@
   }
   .leaflet-container .leaflet-control-3d a { display: flex; align-items: center; justify-content: center; font: 700 15px/48px var(--font); letter-spacing: -.01em; color: #3a3a3c; }
   .leaflet-container .leaflet-control-3d.on a { background: var(--ink); color: #fff; }
+  /* 2026-11-19: 3D paused after a crash: a red dot on the button (a tap explains, see #v3Issue) */
+  .leaflet-container .leaflet-control-3d a { position: relative; }
+  .leaflet-container .leaflet-control-3d.issue a { color: #8e8e93; }
+  .leaflet-container .leaflet-control-3d.issue a::after { content: ''; position: absolute; top: 7px; right: 7px; width: 10px; height: 10px;
+    border-radius: 50%; background: var(--err, #FF3B30); box-shadow: 0 0 0 2px #fff; }
   .leaflet-container .leaflet-control-north a { display: flex; align-items: center; justify-content: center; color: #3a3a3c; }
   .leaflet-control-north svg { width: 24px; height: 24px; }
   .leaflet-container .leaflet-control-north.hu a { color: var(--trolley); }
@@ -1381,6 +1397,18 @@
 #v3Help p { margin: 8px 0; }
 #v3Help kbd { padding: 1px 5px; border: 1px solid var(--hair); border-bottom-width: 2px; border-radius: 5px; font: inherit; }
 #v3Help button { margin-top: 10px; width: 100%; min-height: 44px; border: 0; border-radius: 12px; background: #285599; color: white; font: inherit; font-weight: 600; cursor: pointer; }
+/* 2026-11-19: why 3D is paused, with a retry (issue-dialog.html), in the coach mark's style */
+#v3Issue { box-sizing: border-box; width: min(340px, calc(100vw - 32px)); margin: auto auto max(96px, calc(env(safe-area-inset-bottom) + 96px));
+  padding: 20px 24px; border: 1px solid var(--glass-edge); border-radius: 20px; background: #fafcfb; color: var(--ink); box-shadow: var(--glass-shadow);
+  text-align: left; font: 15px/1.45 system-ui, sans-serif; }
+#v3Issue::backdrop { background: rgba(28,38,49,.14); }
+#v3Issue h2 { margin: 0 0 8px; font-size: 19px; display: flex; align-items: center; gap: 8px; }
+#v3Issue h2::before { content: ''; flex: none; width: 10px; height: 10px; border-radius: 50%; background: var(--err, #FF3B30); }
+#v3Issue p { margin: 8px 0; }
+#v3Issue .v3i-when { font-size: 13px; color: var(--muted, #6e6e73); }
+#v3Issue button { display: block; width: 100%; min-height: 44px; margin-top: 10px; border: 0; border-radius: 12px; font: inherit; font-weight: 600; cursor: pointer; }
+#v3IssueRetry { background: #285599; color: white; }
+#v3Issue .v3i-later { margin-top: 6px; background: var(--fill, rgba(118,118,128,.14)); color: var(--ink); }
 /* release 109: the 3D settings row opens three groups (Map, Buildings, Vehicles) */
 #v3Menu[hidden], .v3-group[hidden], #v3HelpBtn[hidden] { display: none; }
 #v3Body { display: flex; flex-direction: column; gap: 6px; padding: 4px 0 8px; }
@@ -1520,6 +1548,15 @@
   <p id="v3HelpTouch"><span>Twist two fingers to rotate.</span><br><span>Slide two fingers up or down to tilt.</span></p>
   <p id="v3HelpKeys"><span>Rotate:</span> <kbd>Ctrl</kbd> + <kbd>←</kbd> <kbd>→</kbd><br><span>Tilt:</span> <kbd>Ctrl</kbd> + <kbd>↑</kbd> <kbd>↓</kbd><br><span>Or drag with the right mouse button.</span></p>
   <button type="button" autofocus>Got it</button>
+</dialog>
+<!-- 2026-11-19: after the 3D view crashed or could not start, the 3D button stays with a red dot; a tap opens this
+     dialog with the reason and a retry (view.js: showIssue(), memo()) -->
+<dialog id="v3Issue" aria-labelledby="v3IssueTitle" aria-describedby="v3IssueWhat v3IssueWhen">
+  <h2 id="v3IssueTitle">3D is paused on this device</h2>
+  <p id="v3IssueWhat"></p>
+  <p id="v3IssueWhen" class="v3i-when"></p>
+  <button type="button" id="v3IssueRetry" autofocus>Try 3D again</button>
+  <button type="button" id="v3IssueClose" class="v3i-later">Not now</button>
 </dialog>
 <div id="stopProg" hidden role="progressbar" aria-valuemin="0" aria-valuemax="100" title="Show the way to your stop">
   <div class="pg-stop"></div>
@@ -1887,6 +1924,7 @@
     '{n} vehicle found': 'Намерено: {n} превозно средство',
     '{n} vehicles found': 'Намерени: {n} превозни средства',
     '{n} running': '{n} в движение',
+    'Hide results': 'Скрий резултатите',
     'Show the {n} vehicles of this line': 'Покажи {n}-те превозни средства на линията',
     'No live vehicles: timetable only': 'Няма превозни средства на живо: само разписание',
     '{n} vehicle here': '{n} превозно средство тук',
@@ -1924,6 +1962,13 @@
     'Got it': 'Разбрах',
     '3D was turned off on this device after it ran out of graphics memory ({time}, {why}). It comes back by itself after a day.': '3D беше изключено на това устройство, защото графичната памет свърши ({time}, {why}). Ще се върне само след един ден.',
     'The 3D view could not start: {err}': '3D изгледът не можа да стартира: {err}',
+    '3D is paused on this device': '3D е спряно на това устройство',
+    'Not now': 'Не сега',
+    '3D is paused: tap for the reason': '3D е спряно: докоснете за причината',
+    'The device ran out of graphics memory while the 3D view was on screen, so the browser stopped drawing it (WebGL context lost).': 'Графичната памет на устройството свърши, докато 3D изгледът беше на екрана, и браузърът спря да го рисува (загубен WebGL контекст).',
+    'The page restarted while the 3D view was open. The browser most likely closed it because 3D used too much memory.': 'Страницата се рестартира, докато 3D изгледът беше отворен. Браузърът най-вероятно я е затворил, защото 3D използваше твърде много памет.',
+    'The 3D view stopped: {why}': '3D изгледът спря: {why}',
+    'It happened at {time}. 3D comes back by itself at {back} tomorrow, or try again now.': 'Случи се в {time}. 3D ще се върне само утре в {back} или опитайте отново сега.',
     'Loading the 3D view…': 'Зареждане на 3D изгледа…',
     'Heading up (tap for north up)': 'Посоката нагоре (докоснете за север нагоре)',
     'North up (tap for heading up)': 'Север нагоре (докоснете за посоката нагоре)',
@@ -9767,6 +9812,9 @@
   // vehicle is tracked.
   var RESULTS_MAX = 30;
   var resultsHtml = '';
+  // 2026-11-19: the list can be put away. Its ✕, a tap on the chip of the search shown (a second tap brings it back)
+  // or a tap anywhere outside the list, the search row and the chips hides it; typing in the search shows it again.
+  var resultsOpen = true, resultsListable = false;
   function vehNextStop(v) {
     if (v.d.metroRun || typeof computeRouteStops !== 'function') return null;
     var list = computeRouteStops(v);
@@ -9796,7 +9844,8 @@
   function renderResults(toks, matched) {
     var box = document.getElementById('results');
     if (!box) return;
-    var show = toks.length > 0 && matched.length > 0 && matched.length <= RESULTS_MAX && !selected;
+    resultsListable = toks.length > 0 && matched.length > 0 && matched.length <= RESULTS_MAX && !selected;
+    var show = resultsListable && resultsOpen;
     var html = '';
     if (show) {
       var list = matched.slice().sort(function (a, b) {
@@ -9804,7 +9853,10 @@
           String(a.d.headsign || '').localeCompare(String(b.d.headsign || ''), 'bg') ||
           String(a.d.label).localeCompare(String(b.d.label), 'bg', { numeric: true });
       });
-      html = '<div class="rs-head">' + esc(tp(list.length, '{n} vehicle found', '{n} vehicles found')) + '</div>' +
+      html = '<div class="rs-head"><span>' + esc(tp(list.length, '{n} vehicle found', '{n} vehicles found')) + '</span>' +
+        '<button type="button" class="rs-close" aria-label="' + esc(t('Hide results')) + '" title="' + esc(t('Hide results')) + '">' +
+        '<svg viewBox="0 0 14 14" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M3 3l8 8M11 3l-8 8"/></svg>' +
+        '</button></div>' +
         list.map(function (v) {
           var d = v.d, tone = lineTones(d.color), next = vehNextStop(v), delay = vehDelay(v, next);
           var title = d.headsign ? t('To {dest}', { dest: titleCaseBg(d.headsign) }) : typeInfo(d.type).name + ' ' + (d.line || '');
@@ -9830,8 +9882,37 @@
       box.hidden = !html;
       fitPanel();
     }
+    syncChipState();
   }
+  function setResultsOpen(on) {
+    if (resultsOpen === on) return;
+    resultsOpen = on;
+    var toks = tokens();
+    renderResults(toks, Object.keys(vehicles).map(function (k) { return vehicles[k]; }).filter(function (v) { return matches(v.d, toks); }));
+  }
+  // the chip of the search on screen says whether its list is open (aria-expanded, .open)
+  function chipShown(b) {
+    return q.value.trim().toLowerCase() === String(b.getAttribute('data-line')).toLowerCase() &&
+      Object.keys(activeTypes).every(function (k) { return !!activeTypes[k] === (k === b.getAttribute('data-type')); });
+  }
+  function syncChipState() {
+    var listed = !!resultsHtml;
+    document.querySelectorAll('#chips .chip').forEach(function (b) {
+      var on = listed && chipShown(b);
+      b.classList.toggle('open', on);
+      b.setAttribute('aria-expanded', on ? 'true' : 'false');
+    });
+  }
+  q.addEventListener('input', function () { resultsOpen = true; });
+  q.addEventListener('click', function () { if (resultsListable) setResultsOpen(true); });   // a tap in the search: back
+  // a tap outside the list, the search row and the chips puts the list away (capture: the map stops some events)
+  document.addEventListener('pointerdown', function (e) {
+    if (!resultsHtml || !e.target.closest) return;
+    if (e.target.closest('#results, #chips, #types, #panel .qrow')) return;
+    setResultsOpen(false);
+  }, true);
   document.getElementById('results').addEventListener('click', function (e) {
+    if (e.target.closest('.rs-close')) { setResultsOpen(false); return; }
     var row = e.target.closest('[data-veh]'), v = row && vehicles[row.getAttribute('data-veh')];
     if (!v) return;
     q.blur();
@@ -9970,11 +10051,17 @@
         var b = document.createElement('button');
         b.type = 'button';
         b.className = 'chip';
+        b.setAttribute('data-line', g.line);
+        b.setAttribute('data-type', String(g.type));
         // release 109: "Bus 94 · 10 running" instead of "×10"; the shape of the type's map marker in the dot
         b.innerHTML = '<i class="sh-' + (DOT_SHAPE[g.type] || 'circle') + '" style="background:' + g.color + '"></i>' + esc(typeInfo(g.type).name) + ' ' + esc(g.line) +
-          ' <small>' + esc(g.n ? tp(g.n, '{n} running', '{n} running') : t('timetable')) + '</small>';
+          ' <small>' + esc(g.n ? tp(g.n, '{n} running', '{n} running') : t('timetable')) + '</small>' +
+          (g.n && g.n <= RESULTS_MAX ? '<svg class="chip-car" viewBox="0 0 12 12" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" d="M3 4.5l3 3 3-3"/></svg>' : '');
         b.title = g.n ? t('Show the {n} vehicles of this line', { n: g.n }) : t('No live vehicles: timetable only');
         b.onclick = function () {
+          // the chip of the search already shown: a tap hides its list, the next one shows it again
+          if (chipShown(b) && resultsListable) { setResultsOpen(!resultsOpen); return; }
+          resultsOpen = true;
           q.value = g.line;
           syncClear();
           if (TYPES[g.type]) setOnlyType(g.type);
@@ -16105,7 +16192,10 @@
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
     var HANDLERS = ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'];
 
-    // ---- after a crash: the button stays hidden for VIEW3D_RETRY_MS ----
+    // ---- after a crash: 3D is paused for VIEW3D_RETRY_MS ----
+    // 2026-11-19: the button no longer hides. It keeps a red dot, and a tap opens a dialog (#v3Issue) with the reason
+    // and Try 3D again. memo.why: 'graphics memory lost', 'the page reloaded while 3D was open' or 'could not start'
+    // (memo.err holds the browser's message).
     function memo() {
       try { var m = JSON.parse(store(MEMO_KEY) || 'null'); return m && Date.now() - m.t < VIEW3D_RETRY_MS ? m : null; } catch (e) { return null; }
     }
@@ -16121,21 +16211,49 @@
     })();
     window.addEventListener('pagehide', function () { unstore(OPEN_KEY); });
     function markOpen() { if (view3d.on && !document.hidden) store(OPEN_KEY, String(Date.now())); }
-    function available() { return /^vector/.test(mapMode) && !!builtStyle && !memo(); }
+    function canDraw() { return /^vector/.test(mapMode) && !!builtStyle; }
+    function available() { return canDraw() && !memo(); }
+    function issueText(m) {
+      if (m.why === 'graphics memory lost') return t('The device ran out of graphics memory while the 3D view was on screen, so the browser stopped drawing it (WebGL context lost).');
+      if (m.why === 'the page reloaded while 3D was open') return t('The page restarted while the 3D view was open. The browser most likely closed it because 3D used too much memory.');
+      if (m.why === 'could not start') return t('The 3D view could not start: {err}', { err: m.err || '?' });
+      return t('The 3D view stopped: {why}', { why: m.why });
+    }
+    var issueDlg = document.getElementById('v3Issue');
+    function showIssue() {
+      var m = memo();
+      if (!m) return;
+      setText(document.getElementById('v3IssueWhat'), issueText(m));
+      setText(document.getElementById('v3IssueWhen'), t('It happened at {time}. 3D comes back by itself at {back} tomorrow, or try again now.',
+        { time: clockHM(m.t), back: clockHM(m.t + VIEW3D_RETRY_MS) }));
+      if (!issueDlg.open) issueDlg.showModal();
+    }
+    function retry3d() {
+      unstore(MEMO_KEY);
+      if (issueDlg.open) issueDlg.close();
+      refresh();
+      open();
+    }
+    document.getElementById('v3IssueRetry').onclick = retry3d;
+    document.getElementById('v3IssueClose').onclick = function () { issueDlg.close(); };
+    issueDlg.addEventListener('click', function (e) { if (e.target === issueDlg) issueDlg.close(); });   // the backdrop
 
     // ---- the buttons and the menu note ----
     function refresh() {
-      var show = view3d.on || available(), a = box3d.querySelector('a'), relayout = false;
+      var issue = !view3d.on && canDraw() && !!memo();
+      var show = view3d.on || canDraw(), a = box3d.querySelector('a'), relayout = false;
       if (box3d.hidden === show) { box3d.hidden = !show; relayout = true; }
       if (northBox.inert === view3d.on) { northBox.inert = !view3d.on; relayout = true; }
       box3d.classList.toggle('on', view3d.on);
-      var tip = view3d.on ? t('Back to the flat map') : t('Show the city in 3D');
+      box3d.classList.toggle('issue', issue);
+      var tip = view3d.on ? t('Back to the flat map') : issue ? t('3D is paused: tap for the reason') : t('Show the city in 3D');
       setText(a, view3d.on ? '2D' : '3D');
       if (a.title !== tip) { a.title = tip; a.setAttribute('aria-label', tip); }
       a.setAttribute('aria-pressed', view3d.on ? 'true' : 'false');
       var vector = /^vector/.test(mapMode);
       document.getElementById('v3Menu').hidden = !vector;   // release 109: the settings row (closed by default)
       document.getElementById('v3TerRow').hidden = !vector;   // v103
+      show = view3d.on || available();   // the settings below only while 3D can open
       document.getElementById('v3ShowRow').hidden = !show;
       document.getElementById('v3VehGroup').hidden = !show;
       document.getElementById('v3LandmarkRow').hidden = !window.DecompressionStream;
@@ -16146,10 +16264,11 @@
       showBuildLevel();
       var m = memo(), bx = document.getElementById('v3Box');
       bx.hidden = !m || !vector;
-      if (m) setText(document.getElementById('v3Note'), t('3D was turned off on this device after it ran out of graphics memory ({time}, {why}). It comes back by itself after a day.', { time: clockHM(m.t), why: m.why }));
+      if (m) setText(document.getElementById('v3Note'), issueText(m) + ' ' + t('It happened at {time}. 3D comes back by itself at {back} tomorrow, or try again now.',
+        { time: clockHM(m.t), back: clockHM(m.t + VIEW3D_RETRY_MS) }));
       if (relayout) layoutRightEdge();
     }
-    document.getElementById('v3Retry').onclick = function () { unstore(MEMO_KEY); refresh(); };
+    document.getElementById('v3Retry').onclick = retry3d;
 
     // ---- the 3D style: the 2D map's finished style, changed for 3D only ----
     function firstOf(type) {
@@ -16210,6 +16329,8 @@
       } catch (e) {
         if (el) el.remove();
         el = null; m3 = null;
+        store(MEMO_KEY, JSON.stringify({ t: Date.now(), why: 'could not start', err: String(e && e.message || e) }));
+        refresh();
         toast(t('The 3D view could not start: {err}', { err: (e && e.message || e) }), 6000);
         return;
       }
@@ -17695,7 +17816,7 @@
       var m = memo(), rows = [];
       var st = view3d.on ? (m3 ? 'On · pitch ' + Math.round(m3.getPitch()) + '° · bearing ' + Math.round((m3.getBearing() + 360) % 360) + '°' : 'On')
         : /^image/.test(mapMode) ? 'Hidden: image map'
-        : m ? 'Hidden: stopped ' + clockHM(m.t) + ' (' + m.why + '), back at ' + clockHM(m.t + VIEW3D_RETRY_MS) + ' tomorrow'
+        : m ? 'Paused (red dot): stopped ' + clockHM(m.t) + ' (' + m.why + (m.err ? ': ' + m.err : '') + '), back at ' + clockHM(m.t + VIEW3D_RETRY_MS) + ' tomorrow'
         : !/^vector/.test(mapMode) ? 'Waiting for the map' : 'Off';
       rows.push(['Status', st]);
       if (view3d.on && m3) {
@@ -17867,7 +17988,7 @@
 
     view3d.open = open;
     view3d.close = close;
-    view3d.toggle = function () { if (view3d.on) close('2D button'); else open(); };
+    view3d.toggle = function () { if (view3d.on) close('2D button'); else if (canDraw() && memo()) showIssue(); else open(); };
     view3d.refresh = refresh;
     view3d.map = function () { return m3; };
     refresh();

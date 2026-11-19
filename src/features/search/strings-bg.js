@@ -18,6 +18,7 @@
     '{n} vehicle found': 'Намерено: {n} превозно средство',
     '{n} vehicles found': 'Намерени: {n} превозни средства',
     '{n} running': '{n} в движение',
+    'Hide results': 'Скрий резултатите',
     'Show the {n} vehicles of this line': 'Покажи {n}-те превозни средства на линията',
     'No live vehicles: timetable only': 'Няма превозни средства на живо: само разписание',
     '{n} vehicle here': '{n} превозно средство тук',

@@ -98,7 +98,10 @@
     var userMoving = false, pointerDown = false, dragFrom = null, dragAt = 0, selfMove = false, lastRender = 0, rtSig = '', rtAt = 0, rtMks = {}, dimNow = null;
     var HANDLERS = ['dragging', 'touchZoom', 'scrollWheelZoom', 'doubleClickZoom', 'boxZoom', 'keyboard'];
 
-    // ---- after a crash: the button stays hidden for VIEW3D_RETRY_MS ----
+    // ---- after a crash: 3D is paused for VIEW3D_RETRY_MS ----
+    // 2026-11-19: the button no longer hides. It keeps a red dot, and a tap opens a dialog (#v3Issue) with the reason
+    // and Try 3D again. memo.why: 'graphics memory lost', 'the page reloaded while 3D was open' or 'could not start'
+    // (memo.err holds the browser's message).
     function memo() {
       try { var m = JSON.parse(store(MEMO_KEY) || 'null'); return m && Date.now() - m.t < VIEW3D_RETRY_MS ? m : null; } catch (e) { return null; }
     }
@@ -114,21 +117,49 @@
     })();
     window.addEventListener('pagehide', function () { unstore(OPEN_KEY); });
     function markOpen() { if (view3d.on && !document.hidden) store(OPEN_KEY, String(Date.now())); }
-    function available() { return /^vector/.test(mapMode) && !!builtStyle && !memo(); }
+    function canDraw() { return /^vector/.test(mapMode) && !!builtStyle; }
+    function available() { return canDraw() && !memo(); }
+    function issueText(m) {
+      if (m.why === 'graphics memory lost') return t('The device ran out of graphics memory while the 3D view was on screen, so the browser stopped drawing it (WebGL context lost).');
+      if (m.why === 'the page reloaded while 3D was open') return t('The page restarted while the 3D view was open. The browser most likely closed it because 3D used too much memory.');
+      if (m.why === 'could not start') return t('The 3D view could not start: {err}', { err: m.err || '?' });
+      return t('The 3D view stopped: {why}', { why: m.why });
+    }
+    var issueDlg = document.getElementById('v3Issue');
+    function showIssue() {
+      var m = memo();
+      if (!m) return;
+      setText(document.getElementById('v3IssueWhat'), issueText(m));
+      setText(document.getElementById('v3IssueWhen'), t('It happened at {time}. 3D comes back by itself at {back} tomorrow, or try again now.',
+        { time: clockHM(m.t), back: clockHM(m.t + VIEW3D_RETRY_MS) }));
+      if (!issueDlg.open) issueDlg.showModal();
+    }
+    function retry3d() {
+      unstore(MEMO_KEY);
+      if (issueDlg.open) issueDlg.close();
+      refresh();
+      open();
+    }
+    document.getElementById('v3IssueRetry').onclick = retry3d;
+    document.getElementById('v3IssueClose').onclick = function () { issueDlg.close(); };
+    issueDlg.addEventListener('click', function (e) { if (e.target === issueDlg) issueDlg.close(); });   // the backdrop
 
     // ---- the buttons and the menu note ----
     function refresh() {
-      var show = view3d.on || available(), a = box3d.querySelector('a'), relayout = false;
+      var issue = !view3d.on && canDraw() && !!memo();
+      var show = view3d.on || canDraw(), a = box3d.querySelector('a'), relayout = false;
       if (box3d.hidden === show) { box3d.hidden = !show; relayout = true; }
       if (northBox.inert === view3d.on) { northBox.inert = !view3d.on; relayout = true; }
       box3d.classList.toggle('on', view3d.on);
-      var tip = view3d.on ? t('Back to the flat map') : t('Show the city in 3D');
+      box3d.classList.toggle('issue', issue);
+      var tip = view3d.on ? t('Back to the flat map') : issue ? t('3D is paused: tap for the reason') : t('Show the city in 3D');
       setText(a, view3d.on ? '2D' : '3D');
       if (a.title !== tip) { a.title = tip; a.setAttribute('aria-label', tip); }
       a.setAttribute('aria-pressed', view3d.on ? 'true' : 'false');
       var vector = /^vector/.test(mapMode);
       document.getElementById('v3Menu').hidden = !vector;   // release 109: the settings row (closed by default)
       document.getElementById('v3TerRow').hidden = !vector;   // v103
+      show = view3d.on || available();   // the settings below only while 3D can open
       document.getElementById('v3ShowRow').hidden = !show;
       document.getElementById('v3VehGroup').hidden = !show;
       document.getElementById('v3LandmarkRow').hidden = !window.DecompressionStream;
@@ -139,10 +170,11 @@
       showBuildLevel();
       var m = memo(), bx = document.getElementById('v3Box');
       bx.hidden = !m || !vector;
-      if (m) setText(document.getElementById('v3Note'), t('3D was turned off on this device after it ran out of graphics memory ({time}, {why}). It comes back by itself after a day.', { time: clockHM(m.t), why: m.why }));
+      if (m) setText(document.getElementById('v3Note'), issueText(m) + ' ' + t('It happened at {time}. 3D comes back by itself at {back} tomorrow, or try again now.',
+        { time: clockHM(m.t), back: clockHM(m.t + VIEW3D_RETRY_MS) }));
       if (relayout) layoutRightEdge();
     }
-    document.getElementById('v3Retry').onclick = function () { unstore(MEMO_KEY); refresh(); };
+    document.getElementById('v3Retry').onclick = retry3d;
 
     // ---- the 3D style: the 2D map's finished style, changed for 3D only ----
     function firstOf(type) {
@@ -203,6 +235,8 @@
       } catch (e) {
         if (el) el.remove();
         el = null; m3 = null;
+        store(MEMO_KEY, JSON.stringify({ t: Date.now(), why: 'could not start', err: String(e && e.message || e) }));
+        refresh();
         toast(t('The 3D view could not start: {err}', { err: (e && e.message || e) }), 6000);
         return;
       }
@@ -1688,7 +1722,7 @@
       var m = memo(), rows = [];
       var st = view3d.on ? (m3 ? 'On · pitch ' + Math.round(m3.getPitch()) + '° · bearing ' + Math.round((m3.getBearing() + 360) % 360) + '°' : 'On')
         : /^image/.test(mapMode) ? 'Hidden: image map'
-        : m ? 'Hidden: stopped ' + clockHM(m.t) + ' (' + m.why + '), back at ' + clockHM(m.t + VIEW3D_RETRY_MS) + ' tomorrow'
+        : m ? 'Paused (red dot): stopped ' + clockHM(m.t) + ' (' + m.why + (m.err ? ': ' + m.err : '') + '), back at ' + clockHM(m.t + VIEW3D_RETRY_MS) + ' tomorrow'
         : !/^vector/.test(mapMode) ? 'Waiting for the map' : 'Off';
       rows.push(['Status', st]);
       if (view3d.on && m3) {
@@ -1860,7 +1894,7 @@
 
     view3d.open = open;
     view3d.close = close;
-    view3d.toggle = function () { if (view3d.on) close('2D button'); else open(); };
+    view3d.toggle = function () { if (view3d.on) close('2D button'); else if (canDraw() && memo()) showIssue(); else open(); };
     view3d.refresh = refresh;
     view3d.map = function () { return m3; };
     refresh();

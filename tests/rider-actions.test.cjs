@@ -14,6 +14,7 @@ test('search matches exact line, fleet label or plate and respects the type butt
   const a = app(['features/search/render', 'features/search/controls'], {
     TYPES: { 0: {}, 1: {}, 3: {}, 11: {} }, stopIfFiltered: noop, setTimeout: noop,
     document: {
+      addEventListener: noop,
       querySelectorAll: () => buttons,
       getElementById: id => id === 'q' ? input : clear
     }

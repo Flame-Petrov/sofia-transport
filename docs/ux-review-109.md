@@ -15,6 +15,17 @@ The changes from the 2026-11-18 UX/UI review (workspace `debug images/2026-11-18
 - A search that finds 1 to 30 vehicles lists them under the search (`#results`, `renderResults()` in `features/search/render.js`): line badge, destination, fleet number, next stop with its minutes (`~` when from the timetable), and how late or early when the feed gives a delay. A tap tracks that vehicle the same way as tapping it on the map, and the list hides while a vehicle is tracked.
 - The line chips say "Bus 94 · 10 running" (or "timetable" when no vehicle runs) instead of "×10". A tap still fits the map to the line's vehicles.
 
+### Hiding the results list (2026-11-19)
+
+The list can be put away without clearing the search (`resultsOpen`, `setResultsOpen()` in `features/search/render.js`; styles in `features/panel/menu-layout.css`):
+
+- **✕** at the right of its header ("10 vehicles found") hides it (`.rs-close`, a 44 px tap area).
+- **The chip of the search on screen** toggles it: the first tap on "Bus 94 · 10 running" applies that line and type as before and keeps the list; each further tap hides or shows it. Chips that can list (1 to 30 running) carry an arrow, down while the list is hidden and up while it is open (`.chip.open`, `aria-expanded`).
+- **A tap anywhere else** (the map, the menu, the tracking card, the status card) hides it. Taps in the list, the search row, the chips and the type filters do not (a capture-phase `pointerdown` on `document`, so the map cannot swallow it).
+- **Typing** in the search, or **a tap in the search box**, shows it again.
+
+Verify: `old/osm-work/venv/Scripts/python site/tests/search-results-hide-browser.py` (live feed; desktop 1280 × 800 and an Android phone 390 × 844 with touch; 30 checks, shots under `debug images/<date>-search-results-hide/`).
+
 ## Status card
 
 - One short line: "Live · 637 vehicles". The search count is on its chip, not here.

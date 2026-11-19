@@ -1,0 +1,9 @@
+<!-- 2026-11-19: after the 3D view crashed or could not start, the 3D button stays with a red dot; a tap opens this
+     dialog with the reason and a retry (view.js: showIssue(), memo()) -->
+<dialog id="v3Issue" aria-labelledby="v3IssueTitle" aria-describedby="v3IssueWhat v3IssueWhen">
+  <h2 id="v3IssueTitle">3D is paused on this device</h2>
+  <p id="v3IssueWhat"></p>
+  <p id="v3IssueWhen" class="v3i-when"></p>
+  <button type="button" id="v3IssueRetry" autofocus>Try 3D again</button>
+  <button type="button" id="v3IssueClose" class="v3i-later">Not now</button>
+</dialog>

@@ -29,6 +29,14 @@ Follow one vehicle ID, stop ID, or saved place from input to stored state to dis
 
 ## Current roadmap and handoff
 
+**2026-11-19 — [Search results can be hidden](docs/ux-review-109.md#hiding-the-results-list-2026-11-19); [a paused 3D keeps its button](docs/3d-button-availability.md).** The rider asked: “there is no way to hide [the found vehicles list] – add an X … when i click the bubble with the "Bus X 10 running" the list appears and hides again and if i click outside it it should hide”, then “when the 3d isnt rendering and there is issue with graphics memory dont hide the 3d button – instead add a dot … a popup should … say exactly what is the issue and a button for the retry”.
+- Search (`features/search/render.js`, `menu-layout.css`): a ✕ in the list's header; the chip of the shown search toggles the list (arrow down/up, `aria-expanded`); a tap outside the list, search row, chips and type filters hides it; typing or a tap in the search shows it again.
+- 3D (`features/view3d/view.js`, `view.css`, new `issue-dialog.html`): after an on-screen context loss, a death in 3D or a failed start (new memo `could not start`), the button stays grey with a red dot; a tap opens `#v3Issue` with the exact reason, the time, when it comes back, **Try 3D again** (clears the memo, opens 3D) and **Not now**. The menu note uses the same text.
+
+Results: release stays 110 (rebuilt). All 89 Node tests (the search stub in `tests/rider-actions.test.cjs` now has `addEventListener`) and the build check passed. New `tests/search-results-hide-browser.py` (live feed, desktop 1280 × 800 and Android phone 390 × 844) passed 30 of 30; `tests/view3d-background-browser.py`, updated for the dot, dialog and retry, passed 8 of 8, no page errors. Shots in `debug images/2026-11-19-search-results-hide/` and `debug images/2026-11-19-3d-issue-dot/`.
+
+Not changed: on the image map (vector style failed, remembered 24 h by `useVectorMap()`) the 3D button is still hidden, not dotted. Not verified: a physical Android or iPhone; the Bulgarian texts in a browser.
+
 **2026-11-19 — [Vehicles and stops grow under the mouse in 3D](docs/3d-hover.md).** The rider reported: “when hovering over a bus stop or a bus when in 3d mode the icons are not getting bigger”. In 3D, vehicles and stops are drawn by MapLibre layers and the number canvas, so 2D's CSS `:hover` never reached them. Now `view.js` tracks the mouse (only where `(hover: hover)` matches) and grows the item under it over 0.2 s, in the same order as a click (number or dot, stop, model body):
 - line numbers 1.3× from a sharp 1.3× badge, with a shadow, drawn last;
 - dots 1.8×, as 2D's 5 to 9 px, through `circle-radius` of `v3-veh-dot` and `v3-veh-far`;

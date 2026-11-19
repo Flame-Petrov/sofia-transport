@@ -92,7 +92,18 @@
     padding: 6px; border-radius: 22px; background: var(--glass-strong); -webkit-backdrop-filter: var(--glass-blur); backdrop-filter: var(--glass-blur);
     border: 1px solid var(--glass-edge); box-shadow: var(--glass-shadow); scrollbar-width: thin; }
   #results[hidden] { display: none; }
-  .rs-head { padding: 6px 10px 4px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6e6e73; }
+  .rs-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px;
+    padding: 0 0 0 10px; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #6e6e73; }
+  /* 2026-11-19: the ✕ that hides the list; the small grey circle of the search's clear button in a 44 px tap area */
+  .rs-close { flex: none; width: 44px; height: 44px; margin: -6px -2px -6px 0; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+    display: flex; align-items: center; justify-content: center; color: var(--ink-2, #3c3c43);
+    background: radial-gradient(circle, var(--fill, rgba(120,120,128,.16)) 14px, transparent 15px); }
+  .rs-close svg { width: 12px; height: 12px; }
+  @media (hover: hover) { .rs-close:hover { color: var(--ink, #1d1d1f); } }
+  .rs-close:active { background: radial-gradient(circle, var(--row-press, rgba(120,120,128,.28)) 14px, transparent 15px); }
+  /* the chip's arrow: down while its list is hidden, up while it is open (a tap toggles it) */
+  .chip-car { width: 12px; height: 12px; flex: none; margin-right: -4px; color: var(--muted); transition: transform 150ms ease; }
+  .chip.open .chip-car { transform: rotate(180deg); }
   .rs-row { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 56px; padding: 6px 10px; border: 0; border-radius: 14px;
     background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
   .rs-row + .rs-row { border-top: 1px solid var(--hair); }
