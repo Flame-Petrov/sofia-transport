@@ -13075,10 +13075,11 @@
     var RISE_PX = 44;            // how high a model's foot rises on screen, at least
     var PICK_PAD_PX = 8;         // the pointer may be this far outside a model's outline on screen
     var GROW_PX = 110, GROW_MIN = 1.4, GROW_MAX = 7;   // while up a model grows to about this size on screen, within these factors
-    var TURN_S = 3.2;            // seconds a turn while up
-    var RISE_RATE = 6;           // spring rate of the rise, 1/s (critically damped: up in about a second)
+    var TURN_S = 6;              // seconds a turn while up
+    var RISE_RATE = 11;          // spring rate of the rise, 1/s (critically damped: up in under half a second)
     var SPIN_RATE = 2.4;         // how fast the spin gathers speed, 1/s
-    var LAND_MIN = 0.8, LAND_MAX = 2.2;   // seconds a landing takes, by how far the model must still turn
+    var FALL_S = 0.5;            // seconds the way down takes
+    var LAND_MIN = 0.8, LAND_MAX = 4;   // seconds the spin takes to settle, by how far the model must still turn
     var reduce = !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
     var map = null, cont = null, card = null, blocked = null, raf = 0, last = 0;
     var states = new Map();      // site index -> { level, vel, angle, spin, riseM, grow, land }
@@ -13196,23 +13197,28 @@
       var st = states.get(i);
       if (!st || st.land) return;
       var w = st.spin, turn = 2 * Math.PI, at = ((st.angle % turn) + turn) % turn;
-      var ahead = turn - at;
+      var ahead = (turn - at) % turn;
       if (ahead < 1e-4) ahead = 0;
       if (ahead < w * LAND_MIN / 3 - 1e-6) ahead += turn;   // never slow so hard that it runs back
       var d = ahead;
       if (w < 0.5 && at > 1e-4 && at < ahead) d = -at;     // barely turning: go back the short way
-      var T = Math.min(LAND_MAX, Math.max(LAND_MIN, w > 0.1 ? 2 * Math.abs(d) / w : LAND_MIN + Math.abs(d) / Math.PI));
-      st.land = { t: 0, T: T, from: st.angle, d: d, w0: w, l0: st.level, v0: st.vel };
+      var T = Math.abs(d) < 1e-6 && w < 0.1 ? FALL_S
+        : Math.min(LAND_MAX, Math.max(LAND_MIN, w > 0.1 ? 2 * Math.abs(d) / w : LAND_MIN + Math.abs(d) / Math.PI));
+      // The model comes down in FALL_S; its spin settles on its own clock (T), on the ground if it needs longer.
+      st.land = { t: 0, T: T, F: FALL_S, end: Math.max(T, FALL_S), from: st.angle, d: d, w0: w, l0: st.level, v0: st.vel };
       run();
     }
-    // Where a landing is after `dt` more seconds: Hermite curves from the current angle, speed, height and climb to
-    // the next whole turn and the ground, both at rest. With d = w0 T / 2 the spin slows down evenly.
+    // Where a landing is after `dt` more seconds: Hermite curves from the current angle and speed to the next whole
+    // turn at rest (over T; with d = w0 T / 2 the spin slows down evenly), and from the current height and climb to
+    // the ground at rest (over F).
+    function hermite(s, T) {
+      return { h1: s - 2 * s * s + s * s * s, h2: 3 * s * s - 2 * s * s * s, d1: (1 - 4 * s + 3 * s * s) / T, d2: (6 * s - 6 * s * s) / T };
+    }
     function landing(st, dt) {
-      var L = st.land, t = Math.min(L.T, L.t + dt), s = t / L.T, T = L.T;
-      var h1 = s - 2 * s * s + s * s * s, h2 = 3 * s * s - 2 * s * s * s, h0 = 1 - h2;
-      var d1 = (1 - 4 * s + 3 * s * s) / T, d2 = (6 * s - 6 * s * s) / T;
-      return { t: t, done: s >= 1, angle: L.from + L.w0 * T * h1 + L.d * h2, spin: L.w0 * T * d1 + L.d * d2,
-        level: Math.max(0, L.l0 * h0 + L.v0 * T * h1), levelVel: -L.l0 * d2 + L.v0 * T * d1 };
+      var L = st.land, t = Math.min(L.end, L.t + dt), T = L.T, F = L.F;
+      var a = hermite(Math.min(1, t / T), T), b = hermite(Math.min(1, t / F), F);
+      return { t: t, done: t >= L.end, angle: L.from + L.w0 * T * a.h1 + L.d * a.h2, spin: L.w0 * T * a.d1 + L.d * a.d2,
+        level: Math.max(0, L.l0 * (1 - b.h2) + L.v0 * F * b.h1), levelVel: -L.l0 * b.d2 + L.v0 * F * b.d1 };
     }
     function step(dt) {
       var target = reduce ? 0 : 2 * Math.PI / TURN_S;

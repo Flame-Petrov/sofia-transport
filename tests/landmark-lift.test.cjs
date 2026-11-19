@@ -44,7 +44,7 @@ function land(angle, spin, level, vel, dt = 1 / 60) {
   lift._setDown(0);
   const path = [];
   let t = 0;
-  while (t < 5) {
+  while (t < 8) {
     const now = lift._landing(st, dt);
     st.land.t = now.t; st.angle = now.angle; st.spin = now.spin; st.level = now.level; st.vel = now.levelVel;
     path.push(now);
@@ -61,7 +61,8 @@ test('a landing ends at rest, on the ground, facing the way the model is mapped'
       const { st, path, T } = land(angle, spin, 1, 0);
       const end = path[path.length - 1];
       assert.ok(end.done, 'landing finished');
-      assert.ok(T >= 0.8 - 1e-9 && T <= 2.2 + 1e-9, 'takes ' + T + ' s');
+      assert.ok((T >= 0.8 - 1e-9 && T <= 4 + 1e-9) || Math.abs(T - 0.5) < 1e-9, 'the spin settles in ' + T + ' s');
+      for (const p of path) if (p.t >= 0.5 - 1e-9) assert.ok(p.level < 1e-9, 'down on the ground within half a second');
       assert.ok(Math.abs(end.level) < 1e-9 && Math.abs(end.spin) < 1e-6, 'at rest on the ground');
       const off = ((st.angle % TURN) + TURN) % TURN;
       assert.ok(Math.min(off, TURN - off) < 1e-6, 'faces its mapped bearing: ' + off + ' from ' + angle + ' at ' + spin);
@@ -72,10 +73,11 @@ test('a landing ends at rest, on the ground, facing the way the model is mapped'
 
 test('a spinning model slows to a stop without turning back, and its speed does not jump', () => {
   for (const angle of [0, 0.2, 2, 4, 6.2]) {
-    const spin = TURN / 3.2;
+    const spin = TURN / 6;   // the cruise: a turn in 6 s
     const { path } = land(angle, spin, 1, 0);
     assert.ok(Math.abs(path[0].spin - spin) < 0.2, 'first frame keeps the speed: ' + path[0].spin);
-    assert.ok(Math.max(...path.map(p => p.spin)) < spin * 2.2, 'no wild whirl before landing');
+    assert.ok(Math.max(...path.map(p => p.spin)) < spin * 2.2, 'no wild whirl');
+    for (const p of path) if (p.level > 0) assert.ok(p.spin < spin * 1.6, 'no faster than 1.6 times the cruise on the way down');
     for (const p of path) assert.ok(p.spin >= -1e-9, 'turning back at ' + angle);
     for (let i = 1; i < path.length; i++) assert.ok(Math.abs(path[i].spin - path[i - 1].spin) < 0.6, 'smooth speed');
   }

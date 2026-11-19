@@ -97,6 +97,15 @@ def empty_point(page):
             if (qaLift.pick({x, y}) < 0 && document.elementFromPoint(x, y) === c) return {x, y};
         return null; }''')
 
+def record(page, i):   # every frame from now on: [animation time, rise, angle] of site i
+    page.evaluate('''i => { const out = []; let t = 0, last = performance.now(); window.qaRec = out; window.qaRecOn = true;
+        const f = now => { if (!window.qaRecOn || window.qaRec !== out) return; t += Math.min(0.05, Math.max(0, (now - last) / 1000)); last = now;
+            const ps = qaLift.poses(), p = ps && ps.get(i); out.push([t, p ? p.rise : null, p ? p.angle : null]); requestAnimationFrame(f); };
+        requestAnimationFrame(f); }''', i)
+
+def recorded(page):
+    return page.evaluate('() => { window.qaRecOn = false; return window.qaRec || []; }')
+
 def shot(page, name, around=None):
     page.screenshot(path=str(args.shots / name))
     if around:   # an enlarged crop around a point, to see a small model
@@ -114,36 +123,46 @@ with sync_playwright() as pw:
     s0 = state(page)
     check('desktop: the gate is open at zoom 13.4', s0['gate'], s0)
     page.mouse.move(target['x'] - 30, target['y'])
+    record(page, target['i'])
     page.mouse.move(target['x'], target['y'], steps=4)
-    page.wait_for_timeout(350)
+    page.wait_for_timeout(450)
     shot(page, '02-desktop-lifting.png', (target['x'], target['y']) if target else None)
     page.wait_for_timeout(1100)
     s1 = state(page)
     shot(page, '03-desktop-up-spinning.png', (target['x'], target['y']) if target else None)
-    page.wait_for_timeout(400)
-    s2 = state(page)
+    page.wait_for_timeout(700)
+    up = recorded(page)
     pose1 = dict((k, v) for k, v in s1['poses']).get(target['i'])
-    pose2 = dict((k, v) for k, v in s2['poses']).get(target['i'])
     check('desktop: hover lifts the cathedral', s1['hover'] == target['i'] and pose1 and pose1['rise'] > 5, s1)
     check('desktop: the model grows while up', pose1 and 3 < pose1['scale'] <= 7, pose1)
     top = page.evaluate('() => { const l = qaMap.style._order; return l[l.length - 1]; }')   # getStyle() leaves out custom layers
     check('desktop: the lifted model is drawn by the top layer of the map', top.endswith('-landmarks-lifted'), top)
-    check('desktop: it spins', pose1 and pose2 and pose2['angle'] - pose1['angle'] > 0.3, [pose1, pose2])
+    # timings in the animation's own time (frames clamped to 50 ms as in the app), so a slow GPU does not skew them
+    lifted = [f for f in up if f[1] is not None]
+    t0 = lifted[0][0] if lifted else 0
+    full = max((f[1] for f in lifted), default=0)
+    t_up = next((f[0] - t0 for f in lifted if f[1] >= 0.8 * full), None)
+    check('desktop: it is up within about half a second', full > 5 and t_up is not None and t_up <= 0.55, {'s_to_80%': t_up and round(t_up, 2), 'rise': full})
+    cruise = [f for f in lifted if f[0] - t0 > 1.6]
+    rate = (cruise[-1][2] - cruise[0][2]) / (cruise[-1][0] - cruise[0][0]) if len(cruise) > 2 and cruise[-1][0] > cruise[0][0] else None
+    check('desktop: it spins slowly (a turn in about 6 s)', rate and 0.85 < rate < 1.25, {'rad_per_s': rate and round(rate, 3), 'frames': len(cruise)})
     check('desktop: its card is shown with text', s1['cardOn'] and 'Nevsky' in s1['cardText'] and len(s1['cardText']) > 60, s1['cardText'])
     check('desktop: the card is on screen', s1['cardBox'] and s1['cardBox'][0] >= 0 and s1['cardBox'][1] >= 0 and s1['cardBox'][0] + s1['cardBox'][2] <= 1280 and s1['cardBox'][1] + s1['cardBox'][3] <= 800, s1['cardBox'])
     away = empty_point(page)
+    record(page, target['i'])
     page.mouse.move(away['x'], away['y'])
-    rises, angles = [], []
-    for k in range(30):
-        st = state(page)
-        p = dict((a, b) for a, b in st['poses']).get(target['i'])
-        if not p: break
-        rises.append(p['rise']); angles.append(p['angle'])
-        if k == 5: shot(page, '04-desktop-landing.png', (target['x'], target['y']) if target else None)
-        page.wait_for_timeout(100)
+    page.wait_for_timeout(250)
+    shot(page, '04-desktop-landing.png', (target['x'], target['y']) if target else None)
+    page.wait_for_function('() => !qaLift.state().moving.length', timeout=20000)
+    down = [f for f in recorded(page) if f[1] is not None]
     s3 = state(page)
     check('desktop: leaving lands it', not s3['moving'] and s3['hover'] == -1, s3)
+    rises, angles = [f[1] for f in down], [f[2] for f in down]
     check('desktop: the landing comes down and keeps turning forward', len(rises) > 3 and rises[-1] < rises[0] and all(b >= a - 1e-6 for a, b in zip(angles, angles[1:])), {'rises': rises[:3] + rises[-2:], 'n': len(rises)})
+    falling = next((f[0] for f in down if f[1] < rises[0] - 0.5), None) if rises else None
+    t_down = next((f[0] - falling for f in down if f[1] < 0.5), None) if falling is not None else None
+    settle = down[-1][0] - falling if down and falling is not None else None
+    check('desktop: it is down within about half a second', t_down is not None and t_down <= 0.55, {'s_to_ground': t_down and round(t_down, 2), 's_to_rest': settle and round(settle, 2)})
     check('desktop: the card goes', not s3['cardOn'], s3)
     page.wait_for_timeout(400)
     shot(page, '05-desktop-landed.png', (target['x'], target['y']) if target else None)
@@ -170,7 +189,7 @@ with sync_playwright() as pw:
     box = s5['cardBox']
     check('phone: the card stays on screen', box and box[0] >= 0 and box[0] + box[2] <= 390 and box[1] >= 0, box)
     page.touchscreen.tap(*(lambda p: (p['x'], p['y']))(point_on(page, 'Alexander Nevsky Cathedral')))
-    page.wait_for_timeout(2600)
+    page.wait_for_timeout(4600)
     s6 = state(page)
     check('phone: a second tap lands it', s6['tap'] == -1 and not s6['moving'] and not s6['cardOn'], s6)
     shot(page, '08-phone-landed.png')
@@ -179,7 +198,7 @@ with sync_playwright() as pw:
     page.wait_for_timeout(900)
     away = empty_point(page)
     page.touchscreen.tap(away['x'], away['y'])
-    page.wait_for_timeout(2600)
+    page.wait_for_timeout(4600)
     s7 = state(page)
     check('phone: a tap beside it lands it', s7['tap'] == -1 and not s7['moving'], s7)
     ctx.close()
