@@ -93,12 +93,26 @@ To verify, zoom to a residential street at app zoom 16 and try each combination 
 
 `src/features/view3d/facade-styles.js` paints the façade sheets and chooses each footprint’s look. `solid-facades.js` draws the walls. A flat cap at the mapped roof height carries the roof colour: varied with textures on, a muted stone-gray with only house designs on. The extrusion follows the mapped footprint. To inspect pattern contrast independently of the building silhouette, toggle textures at a fixed camera position, then rotate past a diagonal roofline.
 
-- `tools/prepare_buildings.py` assembles OSM areas, associates mapped parts with an explicit building relation or the smallest containing outline, and measures the long side of the minimum rotated rectangle in UTM zone 34N. It assigns one material class, façade style and seed using the tallest roof in each group, then clips the individual geometries to zoom-14 Web Mercator tiles. The individual roof and base heights are retained. A feature stores `seed` only when it differs from the one the app derives from its own ID.
+- `tools/prepare_buildings.py` assembles OSM areas, associates mapped parts with an explicit building relation or the smallest containing outline, and measures the long side of the minimum rotated rectangle in UTM zone 34N. It assigns one material class, façade style and seed using the tallest roof in each group, then clips the individual geometries to zoom-14 Web Mercator tiles. The individual roof and base heights are retained. A relation outline is hidden, except where its parts leave ground uncovered (see [Parts never float](#parts-never-float)). A feature stores `seed` only when it differs from the one the app derives from its own ID.
 - `src/features/view3d/building-materials.js` owns the tile protocol, fallback, roof colour expression and layers. It copies the native extrusion styling and filters, then raises textured building opacity to 0.92 for stronger color. The native geometry stays available at zero opacity while textures are on, so switching off can restore the original paint without rebuilding the street layer.
 - `src/features/view3d/menu.html`, `view.css` and `view.js` own the two switches, their hints and their saved preferences. The style-load callback and switch handler use the same material routine. Each 3D map registers the images and layers on its first use of textures. The standalone build includes the material code and tile bundle through `src/page.html`.
 - For a visual check, open the menu, enable **3D building textures**, enter 3D and zoom to Alexander Nevsky Square. Compare both settings at the same pitch and bearing, then check the tile-edge sample above. Switch while following a vehicle and reload with each setting.
 
 The shipped tiles contain 133,769 distinct footprints and parts. All 3,757 IDs repeated across buffered tiles retained the same class. Chrome rendered all four materials on desktop and in a 390 × 844 phone viewport. The tests exercised keyboard and rapid opening toggles, saved on/off states, terrain, a followed vehicle’s open popup, cached rendering and forced tile-decoding failure. That earlier failed-decode test predates the window-pattern fallback. The workspace’s `debug images/3D building textures/` contains the matching camera views. The live-feed connection dialog can cover the menu during a sustained outage. Frame time and memory on a physical phone still need measurement.
+
+### Parts never float
+
+In OSM a `type=building` relation names one `outline` and its `part`s, and the outline is normally not drawn because the parts describe the building. Some relations map only a few parts. The Archaeological Museum's relation (6723358) has just its nine domes (`building:part=roof`, 10–11 m), so with the outline hidden the domes hung in the air over the museum garden, with no body under them.
+
+`fill_outlines()` in `tools/prepare_buildings.py` now draws the piece of a hidden outline that its parts do not fill. A part fills its footprint when it starts below the outline's roof (`min_height` lower than the outline's height). A part resting on top, such as a dome, does not, so the outline stands under it. The piece keeps the outline's ID, height and look. Slivers narrower than 1 m or smaller than 4 m² are dropped, so an outline its parts cover keeps hidden. In the 2026-11-07 extract this affects three buildings:
+
+| Outline (feature ID) | Before | Now |
+|---|---|---|
+| Archaeological Museum, way 157740199 (1577401992) | Nine domes floating at 10 m | 10 m body with the domes on top |
+| Postbank head office, Okolovrasten pat 260, way 272136022 (2721360222) | Only a 411 m² part at 7–28 m, floating | The rest of the 4,062 m² outline at 28 m; the part keeps its mapped passage under it |
+| Block 514, Druzhba 2, way 35962746 (359627462) | Only the mapped 32% section | The remaining 651 m² at 33 m (9 levels) |
+
+To verify, run `tests/floating-parts-browser.py OUTPUT_DIR` with the `old/osm-work` venv: it reads the tile features of the three outlines in 3D (fixture basemap, bundled tiles) and saves a shot of each. `--old` expects them missing, to show the check fails on older tiles. Outlines drawn alongside parts that have no relation are a separate case (see the house-walls note in the handoff).
 
 ## Acceptance checks
 
